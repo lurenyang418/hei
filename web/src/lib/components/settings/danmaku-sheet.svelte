@@ -5,34 +5,24 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
+	import type { MainConfigStore } from '$lib/stores/settings/config.svelte';
+
+	export let store: MainConfigStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
 
-	export let danmakuDuration = 15.0;
-	export let danmakuFont = '黑体';
-	export let danmakuFontSize = 25;
-	export let danmakuWidthRatio = 1.2;
-	export let danmakuHorizontalGap = 20.0;
-	export let danmakuLaneSize = 32;
-	export let danmakuFloatPercentage = 0.5;
-	export let danmakuBottomPercentage = 0.3;
-	export let danmakuOpacity = 76;
-	export let danmakuBold = true;
-	export let danmakuOutline = 0.8;
-	export let danmakuTimeOffset = 0.0;
+	const updateHelp: Record<string, string> = {
+		section:
+			'已下载分页会按视频发布时间分阶段刷新弹幕。新鲜期刷新更频繁，成熟期和老化期逐步放缓，超过老化期后会进入冷冻阶段并停止后台轮询。',
+		freshDays: '视频发布后，落在这个天数范围内的分页会被视为新鲜期。',
+		freshIntervalHours: '新鲜期内后台检查弹幕更新的间隔，单位是小时。',
+		matureDays: '超过新鲜期、但还没达到这个天数的分页会进入成熟期。',
+		matureIntervalDays: '成熟期内后台检查弹幕更新的间隔，单位是天。',
+		coldDays: '超过成熟期、但还没达到这个天数的分页会进入老化期；再往后会停止后台轮询。',
+		coldIntervalDays: '老化期内后台检查弹幕更新的间隔，单位是天。'
+	};
 
-	export let danmakuUpdateEnabled = false;
-	export let danmakuUpdateFreshDays = 3;
-	export let danmakuUpdateFreshIntervalHours = 6;
-	export let danmakuUpdateMatureDays = 30;
-	export let danmakuUpdateMatureIntervalDays = 3;
-	export let danmakuUpdateColdDays = 180;
-	export let danmakuUpdateColdIntervalDays = 30;
-
-	export let updateHelp: Record<string, string> = {};
-	export let saving = false;
-	export let onSave: () => void = () => {};
 </script>
 
 <!-- 弹幕设置抽屉 -->
@@ -47,7 +37,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -58,7 +48,7 @@
 					<Input
 						id="danmaku-duration"
 						type="number"
-						bind:value={danmakuDuration}
+						bind:value={store.danmakuDuration}
 						min="1"
 						max="60"
 						step="0.1"
@@ -68,7 +58,7 @@
 
 				<div class="space-y-2">
 					<Label for="danmaku-font">字体</Label>
-					<Input id="danmaku-font" bind:value={danmakuFont} placeholder="黑体" />
+					<Input id="danmaku-font" bind:value={store.danmakuFont} placeholder="黑体" />
 				</div>
 
 				<div class="space-y-2">
@@ -76,7 +66,7 @@
 					<Input
 						id="danmaku-font-size"
 						type="number"
-						bind:value={danmakuFontSize}
+						bind:value={store.danmakuFontSize}
 						min="10"
 						max="200"
 						placeholder="25"
@@ -88,7 +78,7 @@
 					<Input
 						id="danmaku-width-ratio"
 						type="number"
-						bind:value={danmakuWidthRatio}
+						bind:value={store.danmakuWidthRatio}
 						min="0.1"
 						max="3.0"
 						step="0.1"
@@ -101,7 +91,7 @@
 					<Input
 						id="danmaku-horizontal-gap"
 						type="number"
-						bind:value={danmakuHorizontalGap}
+						bind:value={store.danmakuHorizontalGap}
 						min="0"
 						max="500"
 						step="1"
@@ -114,7 +104,7 @@
 					<Input
 						id="danmaku-lane-size"
 						type="number"
-						bind:value={danmakuLaneSize}
+						bind:value={store.danmakuLaneSize}
 						min="10"
 						max="200"
 						placeholder="32"
@@ -126,7 +116,7 @@
 					<Input
 						id="danmaku-float-percentage"
 						type="number"
-						bind:value={danmakuFloatPercentage}
+						bind:value={store.danmakuFloatPercentage}
 						min="0"
 						max="1"
 						step="0.1"
@@ -139,7 +129,7 @@
 					<Input
 						id="danmaku-bottom-percentage"
 						type="number"
-						bind:value={danmakuBottomPercentage}
+						bind:value={store.danmakuBottomPercentage}
 						min="0"
 						max="1"
 						step="0.1"
@@ -152,7 +142,7 @@
 					<Input
 						id="danmaku-opacity"
 						type="number"
-						bind:value={danmakuOpacity}
+						bind:value={store.danmakuOpacity}
 						min="0"
 						max="255"
 						placeholder="76"
@@ -164,7 +154,7 @@
 					<Input
 						id="danmaku-outline"
 						type="number"
-						bind:value={danmakuOutline}
+						bind:value={store.danmakuOutline}
 						min="0"
 						max="5"
 						step="0.1"
@@ -177,7 +167,7 @@
 					<Input
 						id="danmaku-time-offset"
 						type="number"
-						bind:value={danmakuTimeOffset}
+						bind:value={store.danmakuTimeOffset}
 						step="0.1"
 						placeholder="0.0"
 					/>
@@ -187,7 +177,7 @@
 					<input
 						type="checkbox"
 						id="danmaku-bold"
-						bind:checked={danmakuBold}
+						bind:checked={store.danmakuBold}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="danmaku-bold" class="text-sm">加粗字体</Label>
@@ -205,7 +195,7 @@
 					<label class="flex items-center gap-2 text-sm">
 						<input
 							type="checkbox"
-							bind:checked={danmakuUpdateEnabled}
+							bind:checked={store.danmakuUpdateEnabled}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<span>启用</span>
@@ -222,10 +212,10 @@
 						<Input
 							id="danmaku-update-fresh-days"
 							type="number"
-							bind:value={danmakuUpdateFreshDays}
+							bind:value={store.danmakuUpdateFreshDays}
 							min="0"
 							placeholder="3"
-							disabled={!danmakuUpdateEnabled}
+							disabled={!store.danmakuUpdateEnabled}
 						/>
 					</div>
 
@@ -240,10 +230,10 @@
 						<Input
 							id="danmaku-update-fresh-hours"
 							type="number"
-							bind:value={danmakuUpdateFreshIntervalHours}
+							bind:value={store.danmakuUpdateFreshIntervalHours}
 							min="1"
 							placeholder="6"
-							disabled={!danmakuUpdateEnabled}
+							disabled={!store.danmakuUpdateEnabled}
 						/>
 					</div>
 
@@ -258,10 +248,10 @@
 						<Input
 							id="danmaku-update-mature-days"
 							type="number"
-							bind:value={danmakuUpdateMatureDays}
+							bind:value={store.danmakuUpdateMatureDays}
 							min="0"
 							placeholder="30"
-							disabled={!danmakuUpdateEnabled}
+							disabled={!store.danmakuUpdateEnabled}
 						/>
 					</div>
 
@@ -276,10 +266,10 @@
 						<Input
 							id="danmaku-update-mature-interval"
 							type="number"
-							bind:value={danmakuUpdateMatureIntervalDays}
+							bind:value={store.danmakuUpdateMatureIntervalDays}
 							min="1"
 							placeholder="3"
-							disabled={!danmakuUpdateEnabled}
+							disabled={!store.danmakuUpdateEnabled}
 						/>
 					</div>
 
@@ -292,10 +282,10 @@
 						<Input
 							id="danmaku-update-cold-days"
 							type="number"
-							bind:value={danmakuUpdateColdDays}
+							bind:value={store.danmakuUpdateColdDays}
 							min="0"
 							placeholder="180"
-							disabled={!danmakuUpdateEnabled}
+							disabled={!store.danmakuUpdateEnabled}
 						/>
 					</div>
 
@@ -310,18 +300,18 @@
 						<Input
 							id="danmaku-update-cold-interval"
 							type="number"
-							bind:value={danmakuUpdateColdIntervalDays}
+							bind:value={store.danmakuUpdateColdIntervalDays}
 							min="1"
 							placeholder="30"
-							disabled={!danmakuUpdateEnabled}
+							disabled={!store.danmakuUpdateEnabled}
 						/>
 					</div>
 				</div>
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving} class="w-full">
-				{saving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>

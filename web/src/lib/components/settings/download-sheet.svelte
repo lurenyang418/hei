@@ -5,25 +5,12 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
+	import type { MainConfigStore } from '$lib/stores/settings/config.svelte';
+
+	export let store: MainConfigStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let parallelDownloadEnabled = false;
-	export let parallelDownloadThreads = 4;
-	export let parallelDownloadUseAria2 = false;
-	export let concurrentVideo = 3;
-	export let concurrentPage = 2;
-	export let rateLimit = 4;
-	export let rateDuration = 250;
-
-	export let effectiveMaxFileConnections = 4;
-	export let effectiveConcurrentVideo = 3;
-	export let effectiveConcurrentPage = 2;
-	export let estimatedMaxConnections = 24;
-
-	export let saving = false;
-	export let onSave: () => void = () => {};
 </script>
 
 <!-- 下载设置抽屉 -->
@@ -38,7 +25,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -51,7 +38,7 @@
 						<input
 							type="checkbox"
 							id="parallel-download"
-							bind:checked={parallelDownloadEnabled}
+							bind:checked={store.parallelDownloadEnabled}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label
@@ -62,13 +49,13 @@
 						</Label>
 					</div>
 
-					{#if parallelDownloadEnabled}
+					{#if store.parallelDownloadEnabled}
 						<div class="space-y-2">
 							<Label for="threads">下载线程数</Label>
 							<Input
 								id="threads"
 								type="number"
-								bind:value={parallelDownloadThreads}
+								bind:value={store.parallelDownloadThreads}
 								min="1"
 								max="32"
 								placeholder="4"
@@ -79,7 +66,7 @@
 							<input
 								type="checkbox"
 								id="use-aria2"
-								bind:checked={parallelDownloadUseAria2}
+								bind:checked={store.parallelDownloadUseAria2}
 								class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 							/>
 							<Label for="use-aria2" class="text-sm leading-none font-medium">优先使用aria2</Label>
@@ -87,7 +74,7 @@
 					{/if}
 				</div>
 
-				{#if parallelDownloadEnabled}
+				{#if store.parallelDownloadEnabled}
 					<p class="text-muted-foreground text-xs">
 						关闭后将使用原生分片多线程下载（不依赖aria2 RPC）。
 					</p>
@@ -103,7 +90,7 @@
 						<Input
 							id="concurrent-video"
 							type="number"
-							bind:value={concurrentVideo}
+							bind:value={store.concurrentVideo}
 							min="1"
 							max="10"
 							placeholder="3"
@@ -115,7 +102,7 @@
 						<Input
 							id="concurrent-page"
 							type="number"
-							bind:value={concurrentPage}
+							bind:value={store.concurrentPage}
 							min="1"
 							max="10"
 							placeholder="2"
@@ -127,7 +114,7 @@
 						<Input
 							id="rate-limit"
 							type="number"
-							bind:value={rateLimit}
+							bind:value={store.rateLimit}
 							min="1"
 							max="100"
 							placeholder="4"
@@ -140,7 +127,7 @@
 						<Input
 							id="rate-duration"
 							type="number"
-							bind:value={rateDuration}
+							bind:value={store.rateDuration}
 							min="100"
 							max="5000"
 							placeholder="250"
@@ -153,8 +140,8 @@
 					class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200"
 				>
 					<p class="font-medium">
-						预估最大连接数：{estimatedMaxConnections}（单文件最多 {effectiveMaxFileConnections} 条 ×
-						同时处理视频数 {effectiveConcurrentVideo} × 每视频并发分页数 {effectiveConcurrentPage}）
+						预估最大连接数：{store.estimatedMaxConnections}（单文件最多 {store.effectiveMaxFileConnections} 条 ×
+						同时处理视频数 {store.effectiveConcurrentVideo} × 每视频并发分页数 {store.effectiveConcurrentPage}）
 					</p>
 					<p class="mt-1 opacity-80">
 						这是理论峰值，实际连接数受网络带宽和源站限制，通常达不到这个数字。
@@ -177,8 +164,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving} class="w-full">
-				{saving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>

@@ -7,26 +7,40 @@
 
 	type Option = { value: string; label: string };
 
+	import type { MainConfigStore } from '$lib/stores/settings/config.svelte';
+
+	export let store: MainConfigStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
 
-	export let videoMaxQuality = 'Quality8k';
-	export let videoMinQuality = 'Quality360p';
-	export let audioMaxQuality = 'QualityHiRES';
-	export let audioMinQuality = 'Quality64k';
-	export let codecs: string[] = ['AVC', 'HEV', 'AV1'];
-	export let noDolbyVideo = false;
-	export let noDolbyAudio = false;
-	export let noHdr = false;
-	export let noHires = false;
 
-	export let videoQualityOptions: Option[] = [];
-	export let audioQualityOptions: Option[] = [];
-	export let codecOptions: Option[] = [];
+	const videoQualityOptions: Option[] = [
+		{ value: 'Quality8k', label: '8K超高清' },
+		{ value: 'QualityDolby', label: '杜比视界' },
+		{ value: 'QualityHdr', label: 'HDR真彩' },
+		{ value: 'Quality4k', label: '4K超高清' },
+		{ value: 'Quality1080p60', label: '1080P 60fps' },
+		{ value: 'Quality1080pPLUS', label: '1080P+高码率' },
+		{ value: 'Quality1080p', label: '1080P高清' },
+		{ value: 'Quality720p', label: '720P高清' },
+		{ value: 'Quality480p', label: '480P清晰' },
+		{ value: 'Quality360p', label: '360P流畅' }
+	];
 
-	export let saving = false;
-	export let onSave: () => void = () => {};
+	const audioQualityOptions: Option[] = [
+		{ value: 'QualityHiRES', label: 'Hi-Res无损' },
+		{ value: 'Quality192k', label: '192K高品质' },
+		{ value: 'QualityDolby', label: '杜比全景声' },
+		{ value: 'Quality132k', label: '132K标准' },
+		{ value: 'Quality64k', label: '64K省流' }
+	];
+
+	const codecOptions: Option[] = [
+		{ value: 'AVC', label: 'AVC/H.264' },
+		{ value: 'HEV', label: 'HEVC/H.265' },
+		{ value: 'AV1', label: 'AV1' }
+	];
 
 	let draggedIndex: number | null = null;
 
@@ -45,17 +59,17 @@
 	function handleDrop(event: DragEvent, dropIndex: number) {
 		event.preventDefault();
 		if (draggedIndex !== null && draggedIndex !== dropIndex) {
-			const next = [...codecs];
+			const next = [...store.codecs];
 			const draggedItem = next[draggedIndex];
 			next.splice(draggedIndex, 1);
 			next.splice(dropIndex, 0, draggedItem);
-			codecs = next;
+			store.codecs = next;
 		}
 		draggedIndex = null;
 	}
 
 	function removeCodec(index: number) {
-		codecs = codecs.filter((_, i) => i !== index);
+		store.codecs = store.codecs.filter((_, i) => i !== index);
 	}
 </script>
 
@@ -71,7 +85,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -81,9 +95,9 @@
 					<Label for="video-max-quality">视频最高质量</Label>
 					<CustomSelect
 						id="video-max-quality"
-						value={videoMaxQuality}
+						value={store.videoMaxQuality}
 						options={videoQualityOptions}
-						onChange={(nextValue) => (videoMaxQuality = String(nextValue ?? 'Quality8k'))}
+						onChange={(nextValue) => (store.videoMaxQuality = String(nextValue ?? 'Quality8k'))}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 				</div>
@@ -92,9 +106,9 @@
 					<Label for="video-min-quality">视频最低质量</Label>
 					<CustomSelect
 						id="video-min-quality"
-						value={videoMinQuality}
+						value={store.videoMinQuality}
 						options={videoQualityOptions}
-						onChange={(nextValue) => (videoMinQuality = String(nextValue ?? 'Quality360p'))}
+						onChange={(nextValue) => (store.videoMinQuality = String(nextValue ?? 'Quality360p'))}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 				</div>
@@ -103,9 +117,9 @@
 					<Label for="audio-max-quality">音频最高质量</Label>
 					<CustomSelect
 						id="audio-max-quality"
-						value={audioMaxQuality}
+						value={store.audioMaxQuality}
 						options={audioQualityOptions}
-						onChange={(nextValue) => (audioMaxQuality = String(nextValue ?? 'QualityHiRES'))}
+						onChange={(nextValue) => (store.audioMaxQuality = String(nextValue ?? 'QualityHiRES'))}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 				</div>
@@ -114,9 +128,9 @@
 					<Label for="audio-min-quality">音频最低质量</Label>
 					<CustomSelect
 						id="audio-min-quality"
-						value={audioMinQuality}
+						value={store.audioMinQuality}
 						options={audioQualityOptions}
-						onChange={(nextValue) => (audioMinQuality = String(nextValue ?? 'Quality64k'))}
+						onChange={(nextValue) => (store.audioMinQuality = String(nextValue ?? 'Quality64k'))}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 				</div>
@@ -148,7 +162,7 @@
 					</div>
 				</div>
 				<div class="space-y-2">
-					{#each codecs as codec, index (codec)}
+					{#each store.codecs as codec, index (codec)}
 						<div
 							class="flex cursor-move items-center gap-3 rounded-lg border bg-gray-50 p-3 dark:bg-gray-900"
 							draggable="true"
@@ -194,20 +208,20 @@
 						</div>
 					{/each}
 
-					{#if codecs.length < codecOptions.length}
+					{#if store.codecs.length < codecOptions.length}
 						<div class="mt-2">
 							<CustomSelect
 								class="w-full rounded-md border p-2 text-sm"
 								value={null}
 								options={codecOptions
-									.filter((option) => !codecs.includes(option.value))
+									.filter((option) => !store.codecs.includes(option.value))
 									.map((option) => ({ value: option.value, label: option.label }))}
 								placeholder="添加编解码器..."
 								clearAfterSelect
 								onChange={(nextValue) => {
 									const codec = String(nextValue ?? '');
-									if (codec && !codecs.includes(codec)) {
-										codecs = [...codecs, codec];
+									if (codec && !store.codecs.includes(codec)) {
+										store.codecs = [...store.codecs, codec];
 									}
 								}}
 							/>
@@ -221,7 +235,7 @@
 					<input
 						type="checkbox"
 						id="no-dolby-video"
-						bind:checked={noDolbyVideo}
+						bind:checked={store.noDolbyVideo}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="no-dolby-video" class="text-sm">禁用杜比视界</Label>
@@ -231,7 +245,7 @@
 					<input
 						type="checkbox"
 						id="no-dolby-audio"
-						bind:checked={noDolbyAudio}
+						bind:checked={store.noDolbyAudio}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="no-dolby-audio" class="text-sm">禁用杜比全景声</Label>
@@ -241,7 +255,7 @@
 					<input
 						type="checkbox"
 						id="no-hdr"
-						bind:checked={noHdr}
+						bind:checked={store.noHdr}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="no-hdr" class="text-sm">禁用HDR</Label>
@@ -251,7 +265,7 @@
 					<input
 						type="checkbox"
 						id="no-hires"
-						bind:checked={noHires}
+						bind:checked={store.noHires}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="no-hires" class="text-sm">禁用Hi-Res音频</Label>
@@ -259,8 +273,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving} class="w-full">
-				{saving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>

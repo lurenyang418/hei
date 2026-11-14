@@ -5,26 +5,12 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
+	import type { MainConfigStore } from '$lib/stores/settings/config.svelte';
+
+	export let store: MainConfigStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let interval = 1200;
-	export let bindAddress = '0.0.0.0:12345';
-	export let bindAddressValid = true;
-	export let bindAddressError = '';
-	export let cdnSorting = false;
-	export let scanDeletedVideos = false;
-	export let upperPath = '';
-	export let ffmpegPath = '';
-	export let favoriteQuickSubscribePath = '';
-	export let collectionQuickSubscribePath = '';
-	export let submissionQuickSubscribePath = '';
-	export let bangumiQuickSubscribePath = '';
-	export let pugvQuickSubscribePath = '';
-
-	export let saving = false;
-	export let onSave: () => void = () => {};
 </script>
 
 <!-- 系统设置抽屉 -->
@@ -39,7 +25,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -49,8 +35,8 @@
 				<h3 class="text-base font-semibold">基本系统设置</h3>
 
 				<div class="space-y-2">
-					<Label for="interval">扫描间隔（秒）</Label>
-					<Input id="interval" type="number" bind:value={interval} min="60" placeholder="1200" />
+					<Label for="store.interval">扫描间隔（秒）</Label>
+					<Input id="store.interval" type="number" bind:value={store.interval} min="60" placeholder="1200" />
 					<p class="text-muted-foreground text-sm">每次扫描下载的时间间隔</p>
 				</div>
 
@@ -59,12 +45,12 @@
 					<Input
 						id="bind-address"
 						type="text"
-						bind:value={bindAddress}
+						bind:value={store.bindAddress}
 						placeholder="0.0.0.0:12345"
-						class={bindAddressValid ? '' : 'border-red-500'}
+						class={store.bindAddressValid ? '' : 'border-red-500'}
 					/>
-					{#if bindAddressError}
-						<p class="text-sm text-red-500">{bindAddressError}</p>
+					{#if store.bindAddressError}
+						<p class="text-sm text-red-500">{store.bindAddressError}</p>
 					{:else}
 						<p class="text-muted-foreground text-sm">
 							服务器监听地址和端口（修改后需要重启程序生效）
@@ -76,7 +62,7 @@
 					<input
 						type="checkbox"
 						id="cdn-sorting"
-						bind:checked={cdnSorting}
+						bind:checked={store.cdnSorting}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="cdn-sorting" class="text-sm">启用CDN排序</Label>
@@ -87,7 +73,7 @@
 					<input
 						type="checkbox"
 						id="scan-deleted-videos"
-						bind:checked={scanDeletedVideos}
+						bind:checked={store.scanDeletedVideos}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="scan-deleted-videos" class="text-sm">显示已删除视频</Label>
@@ -99,7 +85,7 @@
 					<Input
 						id="upper-path"
 						type="text"
-						bind:value={upperPath}
+						bind:value={store.upperPath}
 						placeholder="config/upper_face"
 					/>
 					<p class="text-muted-foreground text-sm">UP主头像和person.nfo文件的保存目录路径</p>
@@ -122,7 +108,7 @@
 							<Input
 								id="favorite-quick-subscribe-path"
 								type="text"
-								bind:value={favoriteQuickSubscribePath}
+								bind:value={store.favoriteQuickSubscribePath}
 								placeholder={'/Downloads/收藏夹/{{name}}'}
 							/>
 						</div>
@@ -132,7 +118,7 @@
 							<Input
 								id="collection-quick-subscribe-path"
 								type="text"
-								bind:value={collectionQuickSubscribePath}
+								bind:value={store.collectionQuickSubscribePath}
 								placeholder={'/Downloads/合集/{{name}}'}
 							/>
 						</div>
@@ -142,7 +128,7 @@
 							<Input
 								id="submission-quick-subscribe-path"
 								type="text"
-								bind:value={submissionQuickSubscribePath}
+								bind:value={store.submissionQuickSubscribePath}
 								placeholder={'/Downloads/UP投稿/{{name}}'}
 							/>
 						</div>
@@ -151,7 +137,7 @@
 							<Input
 								id="bangumi-quick-subscribe-path"
 								type="text"
-								bind:value={bangumiQuickSubscribePath}
+								bind:value={store.bangumiQuickSubscribePath}
 								placeholder={'/Downloads/番剧/{{name}}'}
 							/>
 						</div>
@@ -160,7 +146,7 @@
 							<Input
 								id="pugv-quick-subscribe-path"
 								type="text"
-								bind:value={pugvQuickSubscribePath}
+								bind:value={store.pugvQuickSubscribePath}
 								placeholder={'/Downloads/课程/{{name}}'}
 							/>
 						</div>
@@ -172,7 +158,7 @@
 					<Input
 						id="ffmpeg-path"
 						type="text"
-						bind:value={ffmpegPath}
+						bind:value={store.ffmpegPath}
 						placeholder="C:\ffmpeg\bin\ffmpeg.exe 或 C:\ffmpeg\bin"
 					/>
 					<p class="text-muted-foreground text-sm">
@@ -206,8 +192,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving} class="w-full">
-				{saving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>

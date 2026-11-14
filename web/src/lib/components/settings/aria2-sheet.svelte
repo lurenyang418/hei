@@ -5,16 +5,12 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
+	import type { MainConfigStore } from '$lib/stores/settings/config.svelte';
+
+	export let store: MainConfigStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let enableAria2HealthCheck = false;
-	export let enableAria2AutoRestart = false;
-	export let aria2HealthCheckInterval = 300;
-
-	export let saving = false;
-	export let onSave: () => void = () => {};
 </script>
 
 <!-- Aria2监控设置抽屉 -->
@@ -29,7 +25,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -44,21 +40,21 @@
 						<input
 							type="checkbox"
 							id="enable-aria2-health-check"
-							bind:checked={enableAria2HealthCheck}
+							bind:checked={store.enableAria2HealthCheck}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="enable-aria2-health-check" class="text-sm">启用Aria2健康检查</Label>
 						<p class="text-muted-foreground ml-2 text-xs">定期检查下载器进程状态和RPC连接</p>
 					</div>
 
-					{#if enableAria2HealthCheck}
+					{#if store.enableAria2HealthCheck}
 						<div class="ml-6 space-y-4">
 							<div class="space-y-2">
 								<Label for="aria2-health-check-interval">健康检查间隔（秒）</Label>
 								<Input
 									id="aria2-health-check-interval"
 									type="number"
-									bind:value={aria2HealthCheckInterval}
+									bind:value={store.aria2HealthCheckInterval}
 									min="30"
 									max="600"
 									placeholder="300"
@@ -82,14 +78,14 @@
 						<input
 							type="checkbox"
 							id="enable-aria2-auto-restart"
-							bind:checked={enableAria2AutoRestart}
+							bind:checked={store.enableAria2AutoRestart}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="enable-aria2-auto-restart" class="text-sm">启用自动重启</Label>
 						<p class="text-muted-foreground ml-2 text-xs">检测到下载器异常时自动重启实例</p>
 					</div>
 
-					{#if !enableAria2AutoRestart}
+					{#if !store.enableAria2AutoRestart}
 						<div
 							class="ml-6 rounded border border-orange-200 bg-orange-50 p-3 dark:border-orange-800 dark:bg-orange-950/20"
 						>
@@ -154,8 +150,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving} class="w-full">
-				{saving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>

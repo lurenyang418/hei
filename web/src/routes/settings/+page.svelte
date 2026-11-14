@@ -13,9 +13,8 @@
 	import DanmakuSheet from '$lib/components/settings/danmaku-sheet.svelte';
 	import CredentialSheet from '$lib/components/settings/credential-sheet.svelte';
 	import RiskSheet from '$lib/components/settings/risk-sheet.svelte';
-	import SectionHeader from '$lib/components/section-header.svelte';
 	import { setBreadcrumb } from '$lib/stores/breadcrumb';
-	import type { ConfigResponse, UpdateConfigRequest } from '$lib/types';
+	import type { ConfigResponse } from '$lib/types';
 	import {
 		DownloadIcon,
 		FileTextIcon,
@@ -27,26 +26,22 @@
 		VideoIcon,
 		BellIcon,
 		SparklesIcon,
-		RefreshCwIcon,
 		DatabaseIcon,
-		EyeIcon,
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
 	import { runRequest } from '$lib/utils/request.js';
-	import { normalizeConcurrencyValue, normalizeNumberInput } from '$lib/utils/number';
 	import { NotificationSettingsStore } from '$lib/stores/settings/notification.svelte';
 	import { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
 	import { CredentialSettingsStore } from '$lib/stores/settings/credential.svelte';
 	import { CaptchaSettingsStore } from '$lib/stores/settings/captcha.svelte';
 	import { AiRenameSettingsStore } from '$lib/stores/settings/ai-rename.svelte';
+	import { MainConfigStore } from '$lib/stores/settings/config.svelte';
 	import { DatabaseSettingsStore } from '$lib/stores/settings/database.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
 	let config: ConfigResponse | null = null;
 	let loading = false;
-	let saving = false;
 
 	// 各设置域的状态容器（runes class，见 $lib/stores/settings）
 	const notification = new NotificationSettingsStore();
@@ -63,6 +58,12 @@
 	const aiRename = new AiRenameSettingsStore({
 		reloadConfig: loadConfig,
 		closeSheet: () => (openSheet = null)
+	});
+
+	const mainConfig = new MainConfigStore({
+		closeSheet: () => (openSheet = null),
+		naming,
+		captcha
 	});
 
 	const database = new DatabaseSettingsStore();
@@ -177,165 +178,8 @@
 		return settingTooltips[id as keyof typeof settingTooltips] ?? '';
 	}
 
-	const DEFAULT_CONFIG_VALUES = {
-		interval: 1200,
-		nfoIncludeGenre: true,
-		bindAddress: '0.0.0.0:12345',
-		parallelDownloadThreads: 4,
-		codecs: ['AVC', 'HEV', 'AV1'],
-		danmakuDuration: 15.0,
-		danmakuFontSize: 25,
-		danmakuWidthRatio: 1.2,
-		danmakuHorizontalGap: 20.0,
-		danmakuLaneSize: 32,
-		danmakuFloatPercentage: 0.5,
-		danmakuBottomPercentage: 0.3,
-		danmakuOpacity: 76,
-		danmakuOutline: 0.8,
-		danmakuTimeOffset: 0.0,
-		danmakuUpdateFreshDays: 3,
-		danmakuUpdateFreshIntervalHours: 6,
-		danmakuUpdateMatureDays: 30,
-		danmakuUpdateMatureIntervalDays: 3,
-		danmakuUpdateColdDays: 180,
-		danmakuUpdateColdIntervalDays: 30,
-		concurrentVideo: 3,
-		concurrentPage: 2,
-		rateLimit: 4,
-		rateDuration: 250,
-		largeSubmissionThreshold: 80,
-		baseRequestDelay: 1000,
-		largeSubmissionDelayMultiplier: 2,
-		maxDelayMultiplier: 4,
-		batchSize: 3,
-		batchDelaySeconds: 2,
-		autoBackoffBaseSeconds: 10,
-		autoBackoffMaxMultiplier: 5,
-		sourceDelaySeconds: 2,
-		submissionSourceDelaySeconds: 5,
-		dynamicApiDelayMultiplier: 1.5,
-		largeSourceDownloadThreshold: 1000,
-		largeSourceDownloadPageThreshold: 1000,
-		largeSourceMaxVideosPerRound: 0,
-		largeSourceMaxPagesPerRound: 2000,
-		largeSourceConcurrentVideo: 1,
-		largeSourceConcurrentPage: 1,
-		largeSourcePlayurlLimit: 1,
-		largeSourcePlayurlDurationMs: 1000,
-		aria2HealthCheckInterval: 300,
-		riskControlTimeout: 300,
-		autoSolveMaxRetries: 3,
-		autoSolveTimeout: 120,
-		aiRenameTimeoutSeconds: 20,
-		notificationMinVideos: 1
-	} as const;
 
 
-	// 表单数据（命名域字段见 naming store）
-	let interval = 1200;
-	let nfoTimeType = 'favtime';
-	let nfoIncludeGenre = true;
-	let bindAddress = '0.0.0.0:12345';
-	let parallelDownloadEnabled = false;
-	let parallelDownloadThreads = 4;
-	let parallelDownloadUseAria2 = false;
-
-	// 视频质量设置
-	let videoMaxQuality = 'Quality8k';
-	let videoMinQuality = 'Quality360p';
-	let audioMaxQuality = 'QualityHiRES';
-	let audioMinQuality = 'Quality64k';
-	let codecs = ['AVC', 'HEV', 'AV1'];
-	let noDolbyVideo = false;
-	let noDolbyAudio = false;
-	let noHdr = false;
-	let noHires = false;
-
-	// 弹幕设置
-	let danmakuDuration = 15.0;
-	let danmakuFont = '黑体';
-	let danmakuFontSize = 25;
-	let danmakuWidthRatio = 1.2;
-	let danmakuHorizontalGap = 20.0;
-	let danmakuLaneSize = 32;
-	let danmakuFloatPercentage = 0.5;
-	let danmakuBottomPercentage = 0.3;
-	let danmakuOpacity = 76;
-	let danmakuBold = true;
-	let danmakuOutline = 0.8;
-	let danmakuTimeOffset = 0.0;
-	let danmakuUpdateEnabled = false;
-	let danmakuUpdateFreshDays = 3;
-	let danmakuUpdateFreshIntervalHours = 6;
-	let danmakuUpdateMatureDays = 30;
-	let danmakuUpdateMatureIntervalDays = 3;
-	let danmakuUpdateColdDays = 180;
-	let danmakuUpdateColdIntervalDays = 30;
-
-	// 并发控制设置
-	let concurrentVideo = 3;
-	let concurrentPage = 2;
-	let rateLimit = 4;
-	let rateDuration = 250;
-
-	// 「下载线程数」兜底后的值（空/0 时按默认 4 处理）
-	$: effectiveDownloadThreads = normalizeConcurrencyValue(parallelDownloadThreads, 4);
-	// 单文件最多使用的连接数
-	$: effectiveMaxFileConnections = effectiveDownloadThreads;
-	// 预估最大连接数（理论峰值）= 单文件最多连接数 × 同时处理视频数 × 每视频并发分页数
-	$: effectiveConcurrentVideo = normalizeConcurrencyValue(concurrentVideo, 3);
-	$: effectiveConcurrentPage = normalizeConcurrencyValue(concurrentPage, 2);
-	$: estimatedMaxConnections =
-		effectiveMaxFileConnections * effectiveConcurrentVideo * effectiveConcurrentPage;
-
-	// 其他设置
-	let cdnSorting = false;
-	let scanDeletedVideos = false;
-	let upperPath = ''; // UP主头像保存路径
-	let favoriteQuickSubscribePath = ''; // 添加源页：收藏夹快捷订阅路径模板
-	let collectionQuickSubscribePath = ''; // 添加源页：合集快捷订阅路径模板
-	let submissionQuickSubscribePath = ''; // 添加源页：UP主投稿快捷订阅路径模板
-	let bangumiQuickSubscribePath = ''; // 添加源页：番剧快捷订阅路径模板
-	let pugvQuickSubscribePath = ''; // 添加源页：课程快捷订阅路径模板
-	let ffmpegPath = ''; // ffmpeg可执行路径（文件或目录）
-
-	// B站凭证设置
-
-	// UP主投稿风控配置
-	let largeSubmissionThreshold = 100;
-	let baseRequestDelay = 200;
-	let largeSubmissionDelayMultiplier = 2;
-
-	// 风控验证配置
-	let enableProgressiveDelay = true;
-	let maxDelayMultiplier = 4;
-	let enableIncrementalFetch = true;
-	let incrementalFallbackToFull = true;
-	let enableBatchProcessing = false;
-	let batchSize = 5;
-	let batchDelaySeconds = 2;
-	let enableAutoBackoff = true;
-	let autoBackoffBaseSeconds = 10;
-	let autoBackoffMaxMultiplier = 5;
-	let sourceDelaySeconds = 2;
-	let submissionSourceDelaySeconds = 5;
-	let enableDynamicApiDelay = true;
-	let dynamicApiDelayMultiplier = 1.5;
-	let enableLargeSourceDownloadLimit = true;
-	let largeSourceDownloadThreshold = 1000;
-	let largeSourceDownloadPageThreshold = 1000;
-	let largeSourceMaxVideosPerRound = 0;
-	let largeSourceMaxPagesPerRound = 2000;
-	let largeSourceConcurrentVideo = 1;
-	let largeSourceConcurrentPage = 1;
-	let largeSourcePlayurlLimit = 1;
-	let largeSourcePlayurlDurationMs = 1000;
-	let audioOnlyUseLowQnForPlayurl = true;
-
-	// aria2监控配置
-	let enableAria2HealthCheck = false;
-	let enableAria2AutoRestart = false;
-	let aria2HealthCheckInterval = 300;
 
 
 	// AI重命名配置
@@ -346,50 +190,12 @@
 	// 显示帮助信息的状态（在文件命名抽屉中使用）
 	let showHelp = false;
 
-	const danmakuUpdateHelp = {
-		section:
-			'已下载分页会按视频发布时间分阶段刷新弹幕。新鲜期刷新更频繁，成熟期和老化期逐步放缓，超过老化期后会进入冷冻阶段并停止后台轮询。',
-		freshDays: '视频发布后，落在这个天数范围内的分页会被视为新鲜期。',
-		freshIntervalHours: '新鲜期内后台检查弹幕更新的间隔，单位是小时。',
-		matureDays: '超过新鲜期、但还没达到这个天数的分页会进入成熟期。',
-		matureIntervalDays: '成熟期内后台检查弹幕更新的间隔，单位是天。',
-		coldDays: '超过成熟期、但还没达到这个天数的分页会进入老化期；再往后会停止后台轮询。',
-		coldIntervalDays: '老化期内后台检查弹幕更新的间隔，单位是天。'
-	};
 
 	// 验证相关状态
 	let bindAddressError = '';
 	let bindAddressValid = true;
 
 	// 视频质量选项
-	const videoQualityOptions = [
-		{ value: 'Quality8k', label: '8K超高清' },
-		{ value: 'QualityDolby', label: '杜比视界' },
-		{ value: 'QualityHdr', label: 'HDR真彩' },
-		{ value: 'Quality4k', label: '4K超高清' },
-		{ value: 'Quality1080p60', label: '1080P 60fps' },
-		{ value: 'Quality1080pPLUS', label: '1080P+高码率' },
-		{ value: 'Quality1080p', label: '1080P高清' },
-		{ value: 'Quality720p', label: '720P高清' },
-		{ value: 'Quality480p', label: '480P清晰' },
-		{ value: 'Quality360p', label: '360P流畅' }
-	];
-
-	// 音频质量选项
-	const audioQualityOptions = [
-		{ value: 'QualityHiRES', label: 'Hi-Res无损' },
-		{ value: 'Quality192k', label: '192K高品质' },
-		{ value: 'QualityDolby', label: '杜比全景声' },
-		{ value: 'Quality132k', label: '132K标准' },
-		{ value: 'Quality64k', label: '64K省流' }
-	];
-
-	// 编解码器选项
-	const codecOptions = [
-		{ value: 'AVC', label: 'AVC/H.264' },
-		{ value: 'HEV', label: 'HEVC/H.265' },
-		{ value: 'AV1', label: 'AV1' }
-	];
 
 	// 响应式相关
 	const isMobileQuery = new IsMobile();
@@ -402,38 +208,6 @@
 	$: isTablet = isTabletQuery.current;
 
 	// 拖拽排序相关
-	let draggedIndex: number | null = null;
-
-	function handleDragStart(e: DragEvent, index: number) {
-		if (e.dataTransfer) {
-			draggedIndex = index;
-			e.dataTransfer.effectAllowed = 'move';
-			e.dataTransfer.setData('text/html', '');
-		}
-	}
-
-	function handleDragOver(e: DragEvent) {
-		e.preventDefault();
-		if (e.dataTransfer) {
-			e.dataTransfer.dropEffect = 'move';
-		}
-	}
-
-	function handleDrop(e: DragEvent, dropIndex: number) {
-		e.preventDefault();
-		if (draggedIndex !== null && draggedIndex !== dropIndex) {
-			const newCodecs = [...codecs];
-			const draggedItem = newCodecs[draggedIndex];
-			newCodecs.splice(draggedIndex, 1);
-			newCodecs.splice(dropIndex, 0, draggedItem);
-			codecs = newCodecs;
-		}
-		draggedIndex = null;
-	}
-
-	function removeCodec(index: number) {
-		codecs = codecs.filter((_, i) => i !== index);
-	}
 
 	onMount(async () => {
 		setBreadcrumb([
@@ -458,119 +232,10 @@
 
 		config = response.data;
 
-		// 填充表单（命名域交给 store）
+		mainConfig.applyFromConfig(config);
 		naming.applyFromConfig(config);
-		bindAddress = config.bind_address || '0.0.0.0:12345';
-		parallelDownloadEnabled = config.parallel_download_enabled || false;
-		parallelDownloadThreads = config.parallel_download_threads || 4;
-		parallelDownloadUseAria2 = config.parallel_download_use_aria2 ?? false;
-
-		// 视频质量设置
-		videoMaxQuality = config.video_max_quality || 'Quality8k';
-		videoMinQuality = config.video_min_quality || 'Quality360p';
-		audioMaxQuality = config.audio_max_quality || 'QualityHiRES';
-		audioMinQuality = config.audio_min_quality || 'Quality64k';
-		codecs = config.codecs || ['AVC', 'HEV', 'AV1'];
-		noDolbyVideo = config.no_dolby_video || false;
-		noDolbyAudio = config.no_dolby_audio || false;
-		noHdr = config.no_hdr || false;
-		noHires = config.no_hires || false;
-
-		// 弹幕设置
-		danmakuDuration = config.danmaku_duration || 15.0;
-		danmakuFont = config.danmaku_font || '黑体';
-		danmakuFontSize = config.danmaku_font_size || 25;
-		danmakuWidthRatio = config.danmaku_width_ratio || 1.2;
-		danmakuHorizontalGap = config.danmaku_horizontal_gap || 20.0;
-		danmakuLaneSize = config.danmaku_lane_size || 32;
-		danmakuFloatPercentage = config.danmaku_float_percentage || 0.5;
-		danmakuBottomPercentage = config.danmaku_bottom_percentage || 0.3;
-		danmakuOpacity = config.danmaku_opacity || 76;
-		danmakuBold = config.danmaku_bold !== undefined ? config.danmaku_bold : true;
-		danmakuOutline = config.danmaku_outline || 0.8;
-		danmakuTimeOffset = config.danmaku_time_offset || 0.0;
-		danmakuUpdateEnabled = config.danmaku_update_enabled ?? false;
-		danmakuUpdateFreshDays = config.danmaku_update_fresh_days ?? 3;
-		danmakuUpdateFreshIntervalHours = config.danmaku_update_fresh_interval_hours ?? 6;
-		danmakuUpdateMatureDays = config.danmaku_update_mature_days ?? 30;
-		danmakuUpdateMatureIntervalDays = config.danmaku_update_mature_interval_days ?? 3;
-		danmakuUpdateColdDays = config.danmaku_update_cold_days ?? 180;
-		danmakuUpdateColdIntervalDays = config.danmaku_update_cold_interval_days ?? 30;
-
-		// 并发控制设置
-		concurrentVideo = config.concurrent_video || 3;
-		concurrentPage = config.concurrent_page || 2;
-		rateLimit = config.rate_limit || 4;
-		rateDuration = config.rate_duration || 250;
-
-		// 其他设置
-		cdnSorting = config.cdn_sorting || false;
-		scanDeletedVideos = config.scan_deleted_videos || false;
-		upperPath = config.upper_path || '';
-		favoriteQuickSubscribePath = config.favorite_quick_subscribe_path || '';
-		collectionQuickSubscribePath = config.collection_quick_subscribe_path || '';
-		submissionQuickSubscribePath = config.submission_quick_subscribe_path || '';
-		bangumiQuickSubscribePath = config.bangumi_quick_subscribe_path || '';
-		pugvQuickSubscribePath = config.pugv_quick_subscribe_path || '';
-		ffmpegPath = config.ffmpeg_path || '';
-
-		// B站凭证设置
 		credential.applyFromConfig(config);
-
-		// UP主投稿风控配置
-		largeSubmissionThreshold = config.large_submission_threshold || 100;
-		baseRequestDelay = config.base_request_delay || 200;
-		largeSubmissionDelayMultiplier = config.large_submission_delay_multiplier || 2;
-		enableProgressiveDelay = config.enable_progressive_delay ?? true;
-		maxDelayMultiplier = config.max_delay_multiplier || 4;
-		enableIncrementalFetch = config.enable_incremental_fetch ?? true;
-		incrementalFallbackToFull = config.incremental_fallback_to_full ?? true;
-		enableBatchProcessing = config.enable_batch_processing || false;
-		batchSize = config.batch_size || 5;
-		batchDelaySeconds = config.batch_delay_seconds || 2;
-		enableAutoBackoff = config.enable_auto_backoff ?? true;
-		autoBackoffBaseSeconds = config.auto_backoff_base_seconds || 10;
-		autoBackoffMaxMultiplier = config.auto_backoff_max_multiplier || 5;
-		sourceDelaySeconds = config.source_delay_seconds ?? 2;
-		submissionSourceDelaySeconds = config.submission_source_delay_seconds ?? 5;
-		enableDynamicApiDelay = config.enable_dynamic_api_delay ?? true;
-		dynamicApiDelayMultiplier = config.dynamic_api_delay_multiplier ?? 1.5;
-		enableLargeSourceDownloadLimit = config.enable_large_source_download_limit ?? true;
-		largeSourceDownloadThreshold =
-			config.large_source_download_threshold ?? DEFAULT_CONFIG_VALUES.largeSourceDownloadThreshold;
-		largeSourceDownloadPageThreshold =
-			config.large_source_download_page_threshold ??
-			DEFAULT_CONFIG_VALUES.largeSourceDownloadPageThreshold;
-		largeSourceMaxVideosPerRound =
-			config.large_source_max_videos_per_round ??
-			DEFAULT_CONFIG_VALUES.largeSourceMaxVideosPerRound;
-		largeSourceMaxPagesPerRound =
-			config.large_source_max_pages_per_round ?? DEFAULT_CONFIG_VALUES.largeSourceMaxPagesPerRound;
-		largeSourceConcurrentVideo =
-			config.large_source_concurrent_video ?? DEFAULT_CONFIG_VALUES.largeSourceConcurrentVideo;
-		largeSourceConcurrentPage =
-			config.large_source_concurrent_page ?? DEFAULT_CONFIG_VALUES.largeSourceConcurrentPage;
-		largeSourcePlayurlLimit =
-			config.large_source_playurl_limit ?? DEFAULT_CONFIG_VALUES.largeSourcePlayurlLimit;
-		largeSourcePlayurlDurationMs =
-			config.large_source_playurl_duration_ms ?? DEFAULT_CONFIG_VALUES.largeSourcePlayurlDurationMs;
-		audioOnlyUseLowQnForPlayurl = config.audio_only_use_low_qn_for_playurl ?? true;
-
-		// 风控验证配置
 		captcha.applyFromConfig(config);
-
-		// aria2监控配置
-		enableAria2HealthCheck = config.enable_aria2_health_check ?? false;
-		enableAria2AutoRestart = config.enable_aria2_auto_restart ?? false;
-		aria2HealthCheckInterval = config.aria2_health_check_interval ?? 300;
-
-		// 多P视频目录结构配置
-
-		// 合集目录结构配置
-
-		// 番剧目录结构配置
-
-		// AI重命名配置
 		aiRename.applyFromConfig(config);
 	}
 
@@ -585,48 +250,7 @@
 
 
 
-	// 验证服务器绑定地址
-	function validateBindAddress(value: string) {
-		const trimmedValue = value.trim();
-		if (!trimmedValue) {
-			bindAddressError = '';
-			bindAddressValid = true;
-			return true;
-		}
 
-		// 检查是否包含端口号
-		if (trimmedValue.includes(':')) {
-			// 格式：IP:端口
-			const parts = trimmedValue.split(':');
-			if (parts.length !== 2) {
-				bindAddressError = '绑定地址格式错误，应为 "IP:端口" 或 "端口"';
-				bindAddressValid = false;
-				return false;
-			}
-
-			const port = parseInt(parts[1]);
-			if (isNaN(port) || port < 1 || port > 65535) {
-				bindAddressError = '端口号必须是1-65535之间的数字';
-				bindAddressValid = false;
-				return false;
-			}
-		} else {
-			// 只有端口号
-			const port = parseInt(trimmedValue);
-			if (isNaN(port) || port < 1 || port > 65535) {
-				bindAddressError = '端口号必须是1-65535之间的数字';
-				bindAddressValid = false;
-				return false;
-			}
-		}
-
-		bindAddressError = '';
-		bindAddressValid = true;
-		return true;
-	}
-
-	// 实时校验端口输入
-	$: validateBindAddress(bindAddress);
 
 
 
@@ -646,239 +270,6 @@
 	}
 
 
-	async function saveConfig() {
-		// 保存前验证
-		if (!naming.validateAll()) {
-			toast.error('配置验证失败', { description: naming.firstValidationError });
-			return;
-		}
-
-		if (!validateBindAddress(bindAddress)) {
-			toast.error('配置验证失败', { description: bindAddressError });
-			return;
-		}
-
-		const params: UpdateConfigRequest = {
-			...naming.toPayload(),
-			interval: normalizeNumberInput(interval, DEFAULT_CONFIG_VALUES.interval),
-			bind_address: bindAddress,
-			parallel_download_enabled: parallelDownloadEnabled,
-			parallel_download_threads: normalizeNumberInput(
-				parallelDownloadThreads,
-				DEFAULT_CONFIG_VALUES.parallelDownloadThreads
-			),
-			parallel_download_use_aria2: parallelDownloadUseAria2,
-			// 视频质量设置
-			video_max_quality: videoMaxQuality,
-			video_min_quality: videoMinQuality,
-			audio_max_quality: audioMaxQuality,
-			audio_min_quality: audioMinQuality,
-			codecs: codecs.length > 0 ? codecs : [...DEFAULT_CONFIG_VALUES.codecs],
-			no_dolby_video: noDolbyVideo,
-			no_dolby_audio: noDolbyAudio,
-			no_hdr: noHdr,
-			no_hires: noHires,
-			// 弹幕设置
-			danmaku_duration: normalizeNumberInput(
-				danmakuDuration,
-				DEFAULT_CONFIG_VALUES.danmakuDuration
-			),
-			danmaku_font: danmakuFont,
-			danmaku_font_size: normalizeNumberInput(
-				danmakuFontSize,
-				DEFAULT_CONFIG_VALUES.danmakuFontSize
-			),
-			danmaku_width_ratio: normalizeNumberInput(
-				danmakuWidthRatio,
-				DEFAULT_CONFIG_VALUES.danmakuWidthRatio
-			),
-			danmaku_horizontal_gap: normalizeNumberInput(
-				danmakuHorizontalGap,
-				DEFAULT_CONFIG_VALUES.danmakuHorizontalGap
-			),
-			danmaku_lane_size: normalizeNumberInput(
-				danmakuLaneSize,
-				DEFAULT_CONFIG_VALUES.danmakuLaneSize
-			),
-			danmaku_float_percentage: normalizeNumberInput(
-				danmakuFloatPercentage,
-				DEFAULT_CONFIG_VALUES.danmakuFloatPercentage
-			),
-			danmaku_bottom_percentage: normalizeNumberInput(
-				danmakuBottomPercentage,
-				DEFAULT_CONFIG_VALUES.danmakuBottomPercentage
-			),
-			danmaku_opacity: normalizeNumberInput(danmakuOpacity, DEFAULT_CONFIG_VALUES.danmakuOpacity),
-			danmaku_bold: danmakuBold,
-			danmaku_outline: normalizeNumberInput(danmakuOutline, DEFAULT_CONFIG_VALUES.danmakuOutline),
-			danmaku_time_offset: normalizeNumberInput(
-				danmakuTimeOffset,
-				DEFAULT_CONFIG_VALUES.danmakuTimeOffset
-			),
-			danmaku_update_enabled: danmakuUpdateEnabled,
-			danmaku_update_fresh_days: normalizeNumberInput(
-				danmakuUpdateFreshDays,
-				DEFAULT_CONFIG_VALUES.danmakuUpdateFreshDays
-			),
-			danmaku_update_fresh_interval_hours: normalizeNumberInput(
-				danmakuUpdateFreshIntervalHours,
-				DEFAULT_CONFIG_VALUES.danmakuUpdateFreshIntervalHours
-			),
-			danmaku_update_mature_days: normalizeNumberInput(
-				danmakuUpdateMatureDays,
-				DEFAULT_CONFIG_VALUES.danmakuUpdateMatureDays
-			),
-			danmaku_update_mature_interval_days: normalizeNumberInput(
-				danmakuUpdateMatureIntervalDays,
-				DEFAULT_CONFIG_VALUES.danmakuUpdateMatureIntervalDays
-			),
-			danmaku_update_cold_days: normalizeNumberInput(
-				danmakuUpdateColdDays,
-				DEFAULT_CONFIG_VALUES.danmakuUpdateColdDays
-			),
-			danmaku_update_cold_interval_days: normalizeNumberInput(
-				danmakuUpdateColdIntervalDays,
-				DEFAULT_CONFIG_VALUES.danmakuUpdateColdIntervalDays
-			),
-			// 并发控制设置
-			concurrent_video: normalizeNumberInput(
-				concurrentVideo,
-				DEFAULT_CONFIG_VALUES.concurrentVideo
-			),
-			concurrent_page: normalizeNumberInput(concurrentPage, DEFAULT_CONFIG_VALUES.concurrentPage),
-			rate_limit: normalizeNumberInput(rateLimit, DEFAULT_CONFIG_VALUES.rateLimit),
-			rate_duration: normalizeNumberInput(rateDuration, DEFAULT_CONFIG_VALUES.rateDuration),
-			// 其他设置
-			cdn_sorting: cdnSorting,
-			scan_deleted_videos: scanDeletedVideos,
-			upper_path: upperPath,
-			favorite_quick_subscribe_path: favoriteQuickSubscribePath,
-			collection_quick_subscribe_path: collectionQuickSubscribePath,
-			submission_quick_subscribe_path: submissionQuickSubscribePath,
-			bangumi_quick_subscribe_path: bangumiQuickSubscribePath,
-			pugv_quick_subscribe_path: pugvQuickSubscribePath,
-			ffmpeg_path: ffmpegPath,
-			// UP主投稿风控配置
-			large_submission_threshold: normalizeNumberInput(
-				largeSubmissionThreshold,
-				DEFAULT_CONFIG_VALUES.largeSubmissionThreshold
-			),
-			base_request_delay: normalizeNumberInput(
-				baseRequestDelay,
-				DEFAULT_CONFIG_VALUES.baseRequestDelay
-			),
-			large_submission_delay_multiplier: normalizeNumberInput(
-				largeSubmissionDelayMultiplier,
-				DEFAULT_CONFIG_VALUES.largeSubmissionDelayMultiplier
-			),
-			enable_progressive_delay: enableProgressiveDelay,
-			max_delay_multiplier: normalizeNumberInput(
-				maxDelayMultiplier,
-				DEFAULT_CONFIG_VALUES.maxDelayMultiplier
-			),
-			enable_incremental_fetch: enableIncrementalFetch,
-			incremental_fallback_to_full: incrementalFallbackToFull,
-			enable_batch_processing: enableBatchProcessing,
-			batch_size: normalizeNumberInput(batchSize, DEFAULT_CONFIG_VALUES.batchSize),
-			batch_delay_seconds: normalizeNumberInput(
-				batchDelaySeconds,
-				DEFAULT_CONFIG_VALUES.batchDelaySeconds
-			),
-			enable_auto_backoff: enableAutoBackoff,
-			auto_backoff_base_seconds: normalizeNumberInput(
-				autoBackoffBaseSeconds,
-				DEFAULT_CONFIG_VALUES.autoBackoffBaseSeconds
-			),
-			auto_backoff_max_multiplier: normalizeNumberInput(
-				autoBackoffMaxMultiplier,
-				DEFAULT_CONFIG_VALUES.autoBackoffMaxMultiplier
-			),
-			source_delay_seconds: normalizeNumberInput(
-				sourceDelaySeconds,
-				DEFAULT_CONFIG_VALUES.sourceDelaySeconds
-			),
-			submission_source_delay_seconds: normalizeNumberInput(
-				submissionSourceDelaySeconds,
-				DEFAULT_CONFIG_VALUES.submissionSourceDelaySeconds
-			),
-			enable_dynamic_api_delay: enableDynamicApiDelay,
-			dynamic_api_delay_multiplier: normalizeNumberInput(
-				dynamicApiDelayMultiplier,
-				DEFAULT_CONFIG_VALUES.dynamicApiDelayMultiplier
-			),
-			enable_large_source_download_limit: enableLargeSourceDownloadLimit,
-			large_source_download_threshold: normalizeNumberInput(
-				largeSourceDownloadThreshold,
-				DEFAULT_CONFIG_VALUES.largeSourceDownloadThreshold
-			),
-			large_source_download_page_threshold: normalizeNumberInput(
-				largeSourceDownloadPageThreshold,
-				DEFAULT_CONFIG_VALUES.largeSourceDownloadPageThreshold
-			),
-			large_source_max_videos_per_round: normalizeNumberInput(
-				largeSourceMaxVideosPerRound,
-				DEFAULT_CONFIG_VALUES.largeSourceMaxVideosPerRound
-			),
-			large_source_max_pages_per_round: normalizeNumberInput(
-				largeSourceMaxPagesPerRound,
-				DEFAULT_CONFIG_VALUES.largeSourceMaxPagesPerRound
-			),
-			large_source_concurrent_video: normalizeNumberInput(
-				largeSourceConcurrentVideo,
-				DEFAULT_CONFIG_VALUES.largeSourceConcurrentVideo
-			),
-			large_source_concurrent_page: normalizeNumberInput(
-				largeSourceConcurrentPage,
-				DEFAULT_CONFIG_VALUES.largeSourceConcurrentPage
-			),
-			large_source_playurl_limit: normalizeNumberInput(
-				largeSourcePlayurlLimit,
-				DEFAULT_CONFIG_VALUES.largeSourcePlayurlLimit
-			),
-			large_source_playurl_duration_ms: normalizeNumberInput(
-				largeSourcePlayurlDurationMs,
-				DEFAULT_CONFIG_VALUES.largeSourcePlayurlDurationMs
-			),
-			audio_only_use_low_qn_for_playurl: audioOnlyUseLowQnForPlayurl,
-			// aria2监控配置
-			enable_aria2_health_check: enableAria2HealthCheck,
-			enable_aria2_auto_restart: enableAria2AutoRestart,
-			aria2_health_check_interval: normalizeNumberInput(
-				aria2HealthCheckInterval,
-				DEFAULT_CONFIG_VALUES.aria2HealthCheckInterval
-			),
-			// 风控验证配置
-			...captcha.toMainConfigPayload()
-		};
-
-		const response = await runRequest(() => api.updateConfig(params), {
-			setLoading: (value) => (saving = value),
-			context: '保存配置失败'
-		});
-		if (!response) return;
-
-		if (response.data.success) {
-			// 检查是否修改了bind_address，如果是则提醒需要重启
-			const trimmedBindAddress = bindAddress.trim();
-			const nextBindAddress = trimmedBindAddress
-				? trimmedBindAddress.includes(':')
-					? trimmedBindAddress
-					: `0.0.0.0:${trimmedBindAddress}`
-				: DEFAULT_CONFIG_VALUES.bindAddress;
-
-			if (nextBindAddress !== (config?.bind_address ?? DEFAULT_CONFIG_VALUES.bindAddress)) {
-				toast.success('保存成功', {
-					description: '端口配置已更新，请重启程序使配置生效',
-					duration: 8000 // 延长显示时间
-				});
-			} else {
-				toast.success('保存成功', { description: response.data.message });
-			}
-			openSheet = null; // 关闭抽屉
-		} else {
-			toast.error('保存失败', { description: response.data.message });
-		}
-	}
 
 
 
@@ -959,8 +350,8 @@
 	}}
 	{isMobile}
 	store={naming}
-	{saving}
-	onSave={saveConfig}
+	saving={mainConfig.saving}
+	onSave={() => mainConfig.save()}
 />
 
 <QualitySheet
@@ -969,20 +360,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:videoMaxQuality
-	bind:videoMinQuality
-	bind:audioMaxQuality
-	bind:audioMinQuality
-	bind:codecs
-	bind:noDolbyVideo
-	bind:noDolbyAudio
-	bind:noHdr
-	bind:noHires
-	videoQualityOptions={videoQualityOptions}
-	audioQualityOptions={audioQualityOptions}
-	codecOptions={codecOptions}
-	saving={saving}
-	onSave={saveConfig}
+	store={mainConfig}
 />
 
 <DownloadSheet
@@ -991,19 +369,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:parallelDownloadEnabled
-	bind:parallelDownloadThreads
-	bind:parallelDownloadUseAria2
-	bind:concurrentVideo
-	bind:concurrentPage
-	bind:rateLimit
-	bind:rateDuration
-	effectiveMaxFileConnections={effectiveMaxFileConnections}
-	effectiveConcurrentVideo={effectiveConcurrentVideo}
-	effectiveConcurrentPage={effectiveConcurrentPage}
-	estimatedMaxConnections={estimatedMaxConnections}
-	saving={saving}
-	onSave={saveConfig}
+	store={mainConfig}
 />
 
 <DanmakuSheet
@@ -1012,28 +378,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:danmakuDuration
-	bind:danmakuFont
-	bind:danmakuFontSize
-	bind:danmakuWidthRatio
-	bind:danmakuHorizontalGap
-	bind:danmakuLaneSize
-	bind:danmakuFloatPercentage
-	bind:danmakuBottomPercentage
-	bind:danmakuOpacity
-	bind:danmakuBold
-	bind:danmakuOutline
-	bind:danmakuTimeOffset
-	bind:danmakuUpdateEnabled
-	bind:danmakuUpdateFreshDays
-	bind:danmakuUpdateFreshIntervalHours
-	bind:danmakuUpdateMatureDays
-	bind:danmakuUpdateMatureIntervalDays
-	bind:danmakuUpdateColdDays
-	bind:danmakuUpdateColdIntervalDays
-	updateHelp={danmakuUpdateHelp}
-	saving={saving}
-	onSave={saveConfig}
+	store={mainConfig}
 />
 
 <CredentialSheet
@@ -1052,35 +397,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:largeSubmissionThreshold
-	bind:baseRequestDelay
-	bind:largeSubmissionDelayMultiplier
-	bind:maxDelayMultiplier
-	bind:enableProgressiveDelay
-	bind:dynamicApiDelayMultiplier
-	bind:enableDynamicApiDelay
-	bind:enableIncrementalFetch
-	bind:incrementalFallbackToFull
-	bind:enableBatchProcessing
-	bind:batchSize
-	bind:batchDelaySeconds
-	bind:enableAutoBackoff
-	bind:autoBackoffBaseSeconds
-	bind:autoBackoffMaxMultiplier
-	bind:sourceDelaySeconds
-	bind:submissionSourceDelaySeconds
-	bind:enableLargeSourceDownloadLimit
-	bind:largeSourceDownloadThreshold
-	bind:largeSourceDownloadPageThreshold
-	bind:largeSourceMaxVideosPerRound
-	bind:largeSourceMaxPagesPerRound
-	bind:largeSourceConcurrentVideo
-	bind:largeSourceConcurrentPage
-	bind:largeSourcePlayurlLimit
-	bind:largeSourcePlayurlDurationMs
-	bind:audioOnlyUseLowQnForPlayurl
-	saving={saving}
-	onSave={saveConfig}
+	store={mainConfig}
 />
 
 <Aria2Sheet
@@ -1089,11 +406,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:enableAria2HealthCheck
-	bind:enableAria2AutoRestart
-	bind:aria2HealthCheckInterval
-	saving={saving}
-	onSave={saveConfig}
+	store={mainConfig}
 />
 
 <SystemSheet
@@ -1102,21 +415,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:interval
-	bind:bindAddress
-	bind:cdnSorting
-	bind:scanDeletedVideos
-	bind:upperPath
-	bind:ffmpegPath
-	bind:favoriteQuickSubscribePath
-	bind:collectionQuickSubscribePath
-	bind:submissionQuickSubscribePath
-	bind:bangumiQuickSubscribePath
-	bind:pugvQuickSubscribePath
-	bindAddressValid={bindAddressValid}
-	bindAddressError={bindAddressError}
-	saving={saving}
-	onSave={saveConfig}
+	store={mainConfig}
 />
 
 <NotificationSheet

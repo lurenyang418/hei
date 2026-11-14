@@ -5,40 +5,12 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
+	import type { MainConfigStore } from '$lib/stores/settings/config.svelte';
+
+	export let store: MainConfigStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let largeSubmissionThreshold = 100;
-	export let baseRequestDelay = 200;
-	export let largeSubmissionDelayMultiplier = 2;
-	export let maxDelayMultiplier = 4;
-	export let enableProgressiveDelay = false;
-	export let dynamicApiDelayMultiplier = 1.5;
-	export let enableDynamicApiDelay = false;
-	export let enableIncrementalFetch = false;
-	export let incrementalFallbackToFull = false;
-	export let enableBatchProcessing = false;
-	export let batchSize = 5;
-	export let batchDelaySeconds = 2;
-	export let enableAutoBackoff = false;
-	export let autoBackoffBaseSeconds = 10;
-	export let autoBackoffMaxMultiplier = 5;
-	export let sourceDelaySeconds = 2;
-	export let submissionSourceDelaySeconds = 5;
-	export let enableLargeSourceDownloadLimit = false;
-	export let largeSourceDownloadThreshold = 1000;
-	export let largeSourceDownloadPageThreshold = 1000;
-	export let largeSourceMaxVideosPerRound = 0;
-	export let largeSourceMaxPagesPerRound = 2000;
-	export let largeSourceConcurrentVideo = 1;
-	export let largeSourceConcurrentPage = 1;
-	export let largeSourcePlayurlLimit = 1;
-	export let largeSourcePlayurlDurationMs = 1000;
-	export let audioOnlyUseLowQnForPlayurl = false;
-
-	export let saving = false;
-	export let onSave: () => void = () => {};
 </script>
 
 <!-- 风控配置抽屉 -->
@@ -53,7 +25,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -69,7 +41,7 @@
 						<Input
 							id="large-submission-threshold"
 							type="number"
-							bind:value={largeSubmissionThreshold}
+							bind:value={store.largeSubmissionThreshold}
 							min="10"
 							max="1000"
 							placeholder="100"
@@ -82,7 +54,7 @@
 						<Input
 							id="base-request-delay"
 							type="number"
-							bind:value={baseRequestDelay}
+							bind:value={store.baseRequestDelay}
 							min="50"
 							max="2000"
 							placeholder="200"
@@ -95,7 +67,7 @@
 						<Input
 							id="large-submission-delay-multiplier"
 							type="number"
-							bind:value={largeSubmissionDelayMultiplier}
+							bind:value={store.largeSubmissionDelayMultiplier}
 							min="1"
 							max="10"
 							step="0.5"
@@ -109,7 +81,7 @@
 						<Input
 							id="max-delay-multiplier"
 							type="number"
-							bind:value={maxDelayMultiplier}
+							bind:value={store.maxDelayMultiplier}
 							min="1"
 							max="20"
 							step="0.5"
@@ -123,7 +95,7 @@
 					<input
 						type="checkbox"
 						id="enable-progressive-delay"
-						bind:checked={enableProgressiveDelay}
+						bind:checked={store.enableProgressiveDelay}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="enable-progressive-delay" class="text-sm">启用渐进式延迟</Label>
@@ -138,7 +110,7 @@
 							<Input
 								id="dynamic-api-delay-multiplier"
 								type="number"
-								bind:value={dynamicApiDelayMultiplier}
+								bind:value={store.dynamicApiDelayMultiplier}
 								min="0.1"
 								max="10"
 								step="0.1"
@@ -151,7 +123,7 @@
 							<input
 								type="checkbox"
 								id="enable-dynamic-api-delay"
-								bind:checked={enableDynamicApiDelay}
+								bind:checked={store.enableDynamicApiDelay}
 								class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 							/>
 							<Label for="enable-dynamic-api-delay" class="text-sm">启用动态API延迟</Label>
@@ -176,7 +148,7 @@
 						<input
 							type="checkbox"
 							id="enable-incremental-fetch"
-							bind:checked={enableIncrementalFetch}
+							bind:checked={store.enableIncrementalFetch}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="enable-incremental-fetch" class="text-sm">启用增量获取</Label>
@@ -187,7 +159,7 @@
 						<input
 							type="checkbox"
 							id="incremental-fallback-to-full"
-							bind:checked={incrementalFallbackToFull}
+							bind:checked={store.incrementalFallbackToFull}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="incremental-fallback-to-full" class="text-sm"
@@ -210,21 +182,21 @@
 						<input
 							type="checkbox"
 							id="enable-batch-processing"
-							bind:checked={enableBatchProcessing}
+							bind:checked={store.enableBatchProcessing}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="enable-batch-processing" class="text-sm">启用分批处理</Label>
 						<p class="text-muted-foreground ml-2 text-xs">将大量请求分批处理，降低服务器压力</p>
 					</div>
 
-					{#if enableBatchProcessing}
+					{#if store.enableBatchProcessing}
 						<div class="grid grid-cols-1 gap-4 {isMobile ? 'sm:grid-cols-1' : 'md:grid-cols-2'}">
 							<div class="space-y-2">
 								<Label for="batch-size">分批大小（页数）</Label>
 								<Input
 									id="batch-size"
 									type="number"
-									bind:value={batchSize}
+									bind:value={store.batchSize}
 									min="1"
 									max="20"
 									placeholder="5"
@@ -237,7 +209,7 @@
 								<Input
 									id="batch-delay-seconds"
 									type="number"
-									bind:value={batchDelaySeconds}
+									bind:value={store.batchDelaySeconds}
 									min="1"
 									max="60"
 									placeholder="2"
@@ -261,21 +233,21 @@
 						<input
 							type="checkbox"
 							id="enable-auto-backoff"
-							bind:checked={enableAutoBackoff}
+							bind:checked={store.enableAutoBackoff}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="enable-auto-backoff" class="text-sm">启用自动退避</Label>
 						<p class="text-muted-foreground ml-2 text-xs">遇到错误时自动增加延迟时间</p>
 					</div>
 
-					{#if enableAutoBackoff}
+					{#if store.enableAutoBackoff}
 						<div class="grid grid-cols-1 gap-4 {isMobile ? 'sm:grid-cols-1' : 'md:grid-cols-2'}">
 							<div class="space-y-2">
 								<Label for="auto-backoff-base-seconds">自动退避基础时间（秒）</Label>
 								<Input
 									id="auto-backoff-base-seconds"
 									type="number"
-									bind:value={autoBackoffBaseSeconds}
+									bind:value={store.autoBackoffBaseSeconds}
 									min="1"
 									max="300"
 									placeholder="10"
@@ -288,7 +260,7 @@
 								<Input
 									id="auto-backoff-max-multiplier"
 									type="number"
-									bind:value={autoBackoffMaxMultiplier}
+									bind:value={store.autoBackoffMaxMultiplier}
 									min="1"
 									max="20"
 									placeholder="5"
@@ -314,7 +286,7 @@
 							<Input
 								id="source-delay-seconds"
 								type="number"
-								bind:value={sourceDelaySeconds}
+								bind:value={store.sourceDelaySeconds}
 								min="0"
 								max="60"
 								placeholder="2"
@@ -329,7 +301,7 @@
 							<Input
 								id="submission-source-delay-seconds"
 								type="number"
-								bind:value={submissionSourceDelaySeconds}
+								bind:value={store.submissionSourceDelaySeconds}
 								min="0"
 								max="60"
 								placeholder="5"
@@ -360,7 +332,7 @@
 						<input
 							type="checkbox"
 							id="enable-large-source-download-limit"
-							bind:checked={enableLargeSourceDownloadLimit}
+							bind:checked={store.enableLargeSourceDownloadLimit}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label for="enable-large-source-download-limit" class="text-sm">启用大源下载保护</Label>
@@ -369,14 +341,14 @@
 						</p>
 					</div>
 
-					{#if enableLargeSourceDownloadLimit}
+					{#if store.enableLargeSourceDownloadLimit}
 						<div class="grid grid-cols-1 gap-4 {isMobile ? 'sm:grid-cols-1' : 'md:grid-cols-2'}">
 							<div class="space-y-2">
 								<Label for="large-source-download-threshold">大源判定阈值（视频数）</Label>
 								<Input
 									id="large-source-download-threshold"
 									type="number"
-									bind:value={largeSourceDownloadThreshold}
+									bind:value={store.largeSourceDownloadThreshold}
 									min="1"
 									max="100000"
 									placeholder="1000"
@@ -389,7 +361,7 @@
 								<Input
 									id="large-source-download-page-threshold"
 									type="number"
-									bind:value={largeSourceDownloadPageThreshold}
+									bind:value={store.largeSourceDownloadPageThreshold}
 									min="0"
 									max="100000"
 									placeholder="1000"
@@ -404,7 +376,7 @@
 								<Input
 									id="large-source-max-videos-per-round"
 									type="number"
-									bind:value={largeSourceMaxVideosPerRound}
+									bind:value={store.largeSourceMaxVideosPerRound}
 									min="0"
 									max="10000"
 									placeholder="0"
@@ -417,7 +389,7 @@
 								<Input
 									id="large-source-max-pages-per-round"
 									type="number"
-									bind:value={largeSourceMaxPagesPerRound}
+									bind:value={store.largeSourceMaxPagesPerRound}
 									min="0"
 									max="100000"
 									placeholder="2000"
@@ -430,7 +402,7 @@
 								<Input
 									id="large-source-concurrent-video"
 									type="number"
-									bind:value={largeSourceConcurrentVideo}
+									bind:value={store.largeSourceConcurrentVideo}
 									min="1"
 									max="32"
 									placeholder="1"
@@ -445,7 +417,7 @@
 								<Input
 									id="large-source-concurrent-page"
 									type="number"
-									bind:value={largeSourceConcurrentPage}
+									bind:value={store.largeSourceConcurrentPage}
 									min="1"
 									max="32"
 									placeholder="1"
@@ -458,7 +430,7 @@
 								<Input
 									id="large-source-playurl-limit"
 									type="number"
-									bind:value={largeSourcePlayurlLimit}
+									bind:value={store.largeSourcePlayurlLimit}
 									min="1"
 									max="100"
 									placeholder="1"
@@ -471,7 +443,7 @@
 								<Input
 									id="large-source-playurl-duration-ms"
 									type="number"
-									bind:value={largeSourcePlayurlDurationMs}
+									bind:value={store.largeSourcePlayurlDurationMs}
 									min="1"
 									max="60000"
 									placeholder="1000"
@@ -483,7 +455,7 @@
 								<input
 									type="checkbox"
 									id="audio-only-use-low-qn-for-playurl"
-									bind:checked={audioOnlyUseLowQnForPlayurl}
+									bind:checked={store.audioOnlyUseLowQnForPlayurl}
 									class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 								/>
 								<Label for="audio-only-use-low-qn-for-playurl" class="text-sm"
@@ -520,8 +492,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving} class="w-full">
-				{saving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>
