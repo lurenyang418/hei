@@ -10,6 +10,7 @@
 	import HoverDetailCard from '$lib/components/add-source/hover-detail-card.svelte';
 	import { HoverTooltipStore } from '$lib/stores/add-source/hover.svelte';
 	import { SubmissionSelectionStore } from '$lib/stores/add-source/submission.svelte';
+	import { BatchSelectionStore } from '$lib/stores/add-source/batch.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -71,6 +72,44 @@
 	const submission = new SubmissionSelectionStore({
 		getUpId: () => sourceId,
 		getPlatform: () => sourcePlatform
+	});
+
+	const batch = new BatchSelectionStore({
+		getSourceType: () => sourceType,
+		getSelectedTemplate: () => batchSelectedTemplate,
+		getQuickTemplate: (type) => getQuickSubscriptionTemplate(type),
+		renderPath: (template, name) => renderQuickSubscriptionPath(template, name),
+		getBaseParams: () => ({
+			audio_only: audioOnly,
+			audio_only_m4a_only: audioOnlyM4aOnly,
+			flat_folder: flatFolder,
+			split_chapters_after_download: splitChaptersAfterDownload,
+			download_charge_videos: downloadChargeVideos,
+			download_danmaku: downloadDanmaku,
+			download_subtitle: downloadSubtitle,
+			download_ai_subtitle: downloadAiSubtitle,
+			ai_subtitle_language: aiSubtitleLanguage.trim() || DEFAULT_AI_SUBTITLE_LANGUAGE,
+			use_dynamic_api: useDynamicApi,
+			ai_rename: aiRename,
+			ai_rename_video_prompt: aiRenameVideoPrompt.trim() || undefined,
+			ai_rename_audio_prompt: aiRenameAudioPrompt.trim() || undefined,
+			filter_option: filterOptionInheritGlobal ? undefined : cloneFilterOption(filterOptionDraft),
+			ai_rename_enable_multi_page: showAiRenameAdvanced ? aiRenameEnableMultiPage : undefined,
+			ai_rename_enable_collection: showAiRenameAdvanced ? aiRenameEnableCollection : undefined,
+			ai_rename_enable_bangumi: showAiRenameAdvanced ? aiRenameEnableBangumi : undefined,
+			ai_rename_rename_parent_dir: showAiRenameAdvanced ? aiRenameRenameParentDir : undefined
+		}),
+		onBatchAdded: async () => {
+			await runRequest(() => api.refreshScanning(), {
+				showErrorToast: false,
+				context: '触发立即扫描失败'
+			});
+			setTimeout(() => {
+				goto(resolve('/video-sources'));
+			}, 1000);
+		},
+		cleanTitle: (title) => cleanTitle(title),
+		getFavoriteDisplayName: (item) => getFavoriteDisplayName(item)
 	});
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
@@ -270,29 +309,11 @@
 	let showKeywordSection = false; // 是否展开关键词过滤器部分
 	let keywordActiveTab: 'whitelist' | 'blacklist' = 'whitelist'; // 当前选中的标签页
 
-	// 批量添加相关
-	let batchMode = false; // 是否为批量模式
-	let batchSelectedItems: Map<string, BatchSelectedItem> = new SvelteMap(); // 存储选中项 {key: {type, data, name}}
-	let batchCheckboxStates: Record<string, boolean> = {}; // 存储checkbox状态的响应式对象
-	let batchBasePath = '/Downloads'; // 批量基础路径
-	let batchCollectionAggregateEnabled = false; // 批量添加合集时是否启用合集聚合
-	let batchAdding = false; // 批量添加进行中
-	let batchProgress = { current: 0, total: 0 }; // 批量添加进度
-	let batchDialogOpen = false; // 批量配置对话框状态
 
 	function getFavoriteDisplayName(favorite: Partial<UserFavoriteFolder> & { name?: string }) {
 		return favorite.title || favorite.name || '未命名收藏夹';
 	}
 
-	// 响应式语句：当Map变化时更新checkbox状态对象
-	$: {
-		const newStates: Record<string, boolean> = {};
-		for (const [key] of batchSelectedItems) {
-			newStates[key] = true;
-		}
-		batchCheckboxStates = newStates;
-		console.log('🔄 Reactive update - checkbox states:', Object.keys(newStates));
-	}
 
 	// 悬停详情相关
 
@@ -1854,10 +1875,7 @@
 
 	// 切换源类型时，如处于批量模式且已有选择，则清空选择防止跨源类型
 	$: if (sourceType !== lastSourceType) {
-		if (batchMode && batchSelectedItems.size > 0) {
-			clearBatchSelection();
-			toast('已切换源类型，已清空批量选择，请重新选择');
-		}
+		batch.onSourceTypeChanged();
 		lastSourceType = sourceType;
 	}
 
@@ -2019,103 +2037,19 @@
 
 	// 当显示投稿选择且有sourceId时加载数据
 
-	// 计算已选择的投稿数量
-	// 批量选择相关函数
-	function resolveBatchItemSourceTypeByRawType(itemType: string): string {
-		// 将原始的批量项类别映射为其对应的视频源类型
-		switch (itemType) {
-			case 'search':
-			case 'following':
-				return sourceType; // 跟随当前选择的源类型
-			case 'favorite':
-				return 'favorite';
-			case 'collection':
-				return 'collection';
-			case 'bangumi':
-				return 'bangumi';
-			default:
-				return sourceType;
+
+
+
+	function startBatchAdd() {
+		if (!filterOptionInheritGlobal && filterOptionDraft.codecs.length === 0) {
+			toast.error('码率设置无效', { description: '至少保留一个编解码器' });
+			return;
 		}
-	}
-	function toggleBatchSelection(itemKey: string, item: BatchSelectedItemData, itemType: string) {
-		console.log('🔵 toggleBatchSelection called with:', {
-			itemKey,
-			itemType,
-			batchMode,
-			currentMapSize: batchSelectedItems.size
-		});
-
-		if (batchSelectedItems.has(itemKey)) {
-			console.log('🔴 Removing item:', itemKey);
-			batchSelectedItems.delete(itemKey);
-		} else {
-			console.log('🟢 Adding item:', itemKey);
-
-			// 先做跨源类型限制：不允许在一次批量中混合不同视频源类型
-			const newItemSourceType = resolveBatchItemSourceTypeByRawType(itemType);
-			if (batchSelectedItems.size > 0) {
-				const first = batchSelectedItems.values().next().value;
-				if (!first) return;
-				const currentBatchSourceType = getSourceTypeFromBatchItem(first);
-				if (newItemSourceType !== currentBatchSourceType) {
-					console.log('❌ Cross-type selection rejected');
-					toast.error('批量模式不支持跨源类型选择', {
-						description: '请先清空已选项，再选择其他源类型的内容'
-					});
-					return;
-				}
-			}
-
-			// 生成默认名称
-			let itemName = '';
-
-			switch (itemType) {
-				case 'search':
-					itemName = cleanTitle(item.title ?? '');
-					break;
-				case 'favorite':
-					itemName = getFavoriteDisplayName(item);
-					break;
-				case 'collection':
-					itemName = item.name || item.title || '';
-					break;
-				case 'following':
-					itemName = item.name || '';
-					break;
-				case 'bangumi':
-					itemName = item.season_title || item.title || item.full_title || '';
-					break;
-			}
-
-			batchSelectedItems.set(itemKey, {
-				type: itemType,
-				data: item,
-				name: itemName
-			});
-		}
-
-		console.log('📊 After operation:', {
-			newMapSize: batchSelectedItems.size,
-			hasItem: batchSelectedItems.has(itemKey),
-			allKeys: Array.from(batchSelectedItems.keys())
-		});
-
-		batchSelectedItems = new SvelteMap(batchSelectedItems);
-		console.log('✅ New Map created for reactivity');
-	}
-
-	function isBatchSelected(itemKey: string): boolean {
-		return !!batchCheckboxStates[itemKey];
-	}
-
-	function clearBatchSelection() {
-		console.log('🧹 Clearing batch selection');
-		batchSelectedItems = new SvelteMap<string, BatchSelectedItem>();
-		console.log('✅ New empty Map created');
+		void batch.addAll();
 	}
 
 	$: batchSelectedTemplate = (() => {
-		const selectedSourceType = getBatchSelectedSourceType();
+		const selectedSourceType = batch.selectedSourceType;
 		if (selectedSourceType === 'favorite') return favoriteQuickSubscribePathTemplate.trim();
 		if (selectedSourceType === 'collection') return collectionQuickSubscribePathTemplate.trim();
 		if (selectedSourceType === 'submission') return submissionQuickSubscribePathTemplate.trim();
@@ -2124,43 +2058,16 @@
 		return '';
 	})();
 
-	function getBatchPathForItem(item: BatchSelectedItem): string {
-		const customPathOrTemplate = batchBasePath.trim();
-		const fallbackTemplate = getQuickSubscriptionTemplate(
-			getSourceTypeFromBatchItem(item) as VideoCategory
-		).trim();
-		const effectivePathOrTemplate = customPathOrTemplate || fallbackTemplate;
-		if (!effectivePathOrTemplate) {
-			return '';
-		}
-		if (effectivePathOrTemplate.includes('{{') && item.name.trim()) {
-			const renderedPath = renderQuickSubscriptionPath(effectivePathOrTemplate, item.name).trim();
-			if (renderedPath) {
-				return renderedPath;
-			}
-		}
-		return effectivePathOrTemplate;
-	}
 
-	function canStartBatchAdd(): boolean {
-		return !!batchSelectedTemplate || !!batchBasePath.trim();
-	}
 
-	function openBatchDialog() {
-		const defaultTemplate = batchSelectedTemplate;
-		if (!batchBasePath.trim() || batchBasePath === '/Downloads') {
-			batchBasePath = defaultTemplate || '/Downloads';
-		}
-		batchDialogOpen = true;
-	}
 
 	function selectAllVisible(itemType: string) {
 		switch (itemType) {
 			case 'search':
 				filteredSearchResults.forEach((result, index) => {
 					const key = `search_${result.bvid || result.season_id || result.mid || index}`;
-					if (!batchSelectedItems.has(key)) {
-						toggleBatchSelection(key, result, 'search');
+					if (!batch.selectedItems.has(key)) {
+						batch.toggle(key, result, 'search');
 					}
 				});
 				break;
@@ -2170,8 +2077,8 @@
 					// 跳过已添加的UP主
 					const isDisabled =
 						sourceType === 'submission' && existingSubmissionIds.has(following.mid);
-					if (!batchSelectedItems.has(key) && !isDisabled) {
-						toggleBatchSelection(key, following, 'following');
+					if (!batch.selectedItems.has(key) && !isDisabled) {
+						batch.toggle(key, following, 'following');
 					}
 				});
 				break;
@@ -2180,8 +2087,8 @@
 					const key = `favorite_${favorite.id}`;
 					// 跳过已添加的收藏夹
 					const isDisabled = isFavoriteExists(favorite.id);
-					if (!batchSelectedItems.has(key) && !isDisabled) {
-						toggleBatchSelection(key, favorite, 'favorite');
+					if (!batch.selectedItems.has(key) && !isDisabled) {
+						batch.toggle(key, favorite, 'favorite');
 					}
 				});
 				break;
@@ -2190,8 +2097,8 @@
 					const key = `searched-favorite_${favorite.id}`;
 					// 跳过已添加的收藏夹（使用完整ID）
 					const isDisabled = existingFavoriteIds.has(Number(favorite.id));
-					if (!batchSelectedItems.has(key) && !isDisabled) {
-						toggleBatchSelection(key, favorite, 'favorite');
+					if (!batch.selectedItems.has(key) && !isDisabled) {
+						batch.toggle(key, favorite, 'favorite');
 					}
 				});
 				break;
@@ -2204,8 +2111,8 @@
 						collection.mid.toString(),
 						collection.collection_type
 					);
-					if (!batchSelectedItems.has(key) && !isDisabled) {
-						toggleBatchSelection(key, collection, 'collection');
+					if (!batch.selectedItems.has(key) && !isDisabled) {
+						batch.toggle(key, collection, 'collection');
 					}
 				});
 				break;
@@ -2221,231 +2128,18 @@
 								collection.up_mid.toString(),
 								collection.collection_type
 							);
-					if (!batchSelectedItems.has(key) && !isDisabled) {
-						toggleBatchSelection(key, collection, isFavorite ? 'favorite' : 'collection');
+					if (!batch.selectedItems.has(key) && !isDisabled) {
+						batch.toggle(key, collection, isFavorite ? 'favorite' : 'collection');
 					}
 				});
 				break;
 		}
 	}
 
-	// 批量添加函数
-	async function handleBatchAdd() {
-		if (batchSelectedItems.size === 0) {
-			toast.error('未选择任何视频源');
-			return;
-		}
 
-		// 校验所有被选项是否属于同一视频源类型，防止跨源类型批量添加
-		const resolvedTypes = new Set(
-			Array.from(batchSelectedItems.values()).map((it) => getSourceTypeFromBatchItem(it))
-		);
-		if (resolvedTypes.size > 1) {
-			toast.error('不能跨源类型批量添加', {
-				description: '已检测到多种源类型，请清空后按类型分别添加'
-			});
-			return;
-		}
-		if (!filterOptionInheritGlobal && filterOptionDraft.codecs.length === 0) {
-			toast.error('码率设置无效', { description: '至少保留一个编解码器' });
-			return;
-		}
-		batchProgress = { current: 0, total: batchSelectedItems.size };
 
-		const selectedItems = Array.from(batchSelectedItems.entries());
 
-		const batchResult = await runRequest(
-			async () => {
-				let successCount = 0;
-				let failedCount = 0;
-				const failedItems: string[] = [];
 
-				for (let i = 0; i < selectedItems.length; i++) {
-					const [itemKey, item] = selectedItems[i];
-					batchProgress.current = i + 1;
-
-					// 构建添加视频源的参数
-					const params: AddVideoSourceRequest = {
-						source_type: getSourceTypeFromBatchItem(item),
-						source_id: getSourceIdFromBatchItem(item),
-						name: item.name,
-						path: getBatchPathForItem(item),
-						audio_only: audioOnly,
-						audio_only_m4a_only: audioOnlyM4aOnly,
-						flat_folder: flatFolder,
-						split_chapters_after_download: splitChaptersAfterDownload,
-						download_charge_videos: downloadChargeVideos,
-						download_danmaku: downloadDanmaku,
-						download_subtitle: downloadSubtitle,
-						download_ai_subtitle: downloadAiSubtitle,
-						ai_subtitle_language: aiSubtitleLanguage.trim() || DEFAULT_AI_SUBTITLE_LANGUAGE,
-						use_dynamic_api: useDynamicApi,
-						ai_rename: aiRename,
-						ai_rename_video_prompt: aiRenameVideoPrompt.trim() || undefined,
-						ai_rename_audio_prompt: aiRenameAudioPrompt.trim() || undefined,
-						filter_option: filterOptionInheritGlobal
-							? undefined
-							: cloneFilterOption(filterOptionDraft),
-						ai_rename_enable_multi_page: showAiRenameAdvanced ? aiRenameEnableMultiPage : undefined,
-						ai_rename_enable_collection: showAiRenameAdvanced
-							? aiRenameEnableCollection
-							: undefined,
-						ai_rename_enable_bangumi: showAiRenameAdvanced ? aiRenameEnableBangumi : undefined,
-						ai_rename_rename_parent_dir: showAiRenameAdvanced ? aiRenameRenameParentDir : undefined
-					};
-
-					// 添加特定类型的额外参数
-					if (item.type === 'following') {
-						if (sourceType === 'collection') {
-							params.up_id = (item.data.mid ?? '').toString();
-							params.collection_type = 'season';
-							params.collection_aggregate_enabled = batchCollectionAggregateEnabled;
-						} else if (sourceType === 'submission') {
-							// 批量添加UP主投稿时总是使用全部投稿模式
-						}
-					} else if (item.type === 'collection') {
-						// 区分普通合集和关注的合集
-						if (itemKey.startsWith('subscribed-collection_')) {
-							// 关注的合集使用 up_mid
-							params.up_id = (item.data.up_mid ?? '').toString();
-							params.collection_type = item.data.collection_type || 'season';
-							params.collection_aggregate_enabled = batchCollectionAggregateEnabled;
-						} else {
-							// 普通合集使用 mid
-							params.up_id = (item.data.mid ?? '').toString();
-							params.collection_type = item.data.collection_type || 'season';
-							params.collection_aggregate_enabled = batchCollectionAggregateEnabled;
-						}
-					}
-
-					if (item.data.cover) {
-						params.cover = item.data.cover;
-					}
-
-					const result = await runRequest(() => api.addVideoSource(params), {
-						showErrorToast: false
-					});
-
-					if (result?.data.success) {
-						successCount++;
-					} else {
-						failedCount++;
-						failedItems.push(item.name);
-					}
-
-					// 添加小延迟避免请求过于频繁
-					await new Promise((resolve) => setTimeout(resolve, 200));
-				}
-
-				return { successCount, failedCount, failedItems };
-			},
-			{
-				setLoading: (value) => (batchAdding = value),
-				context: '批量添加失败'
-			}
-		);
-
-		batchProgress = { current: 0, total: 0 };
-		if (!batchResult) return;
-
-		const { successCount, failedCount } = batchResult;
-
-		// 显示结果
-		if (successCount > 0 && failedCount === 0) {
-			toast.success('批量添加完成', {
-				description: `成功添加 ${successCount} 个视频源`
-			});
-		} else if (successCount > 0) {
-			toast.success('批量添加部分成功', {
-				description: `成功添加 ${successCount} 个，失败 ${failedCount} 个`
-			});
-		} else {
-			toast.error('批量添加失败', {
-				description: '所有视频源都添加失败'
-			});
-		}
-
-		// 清空选择并关闭批量模式
-		clearBatchSelection();
-		batchMode = false;
-		batchDialogOpen = false;
-		batchCollectionAggregateEnabled = false;
-
-		// 如果有成功添加的，跳转到视频源管理页面
-		if (successCount > 0) {
-			await runRequest(() => api.refreshScanning(), {
-				showErrorToast: false,
-				context: '触发立即扫描失败'
-			});
-			setTimeout(() => {
-				goto(resolve('/video-sources'));
-			}, 1000);
-		}
-	}
-
-	// 根据批量选择项获取视频源类型
-	function getSourceTypeFromBatchItem(item: BatchSelectedItem): string {
-		switch (item.type) {
-			case 'search':
-				return sourceType; // 使用当前选择的源类型
-			case 'following':
-				return sourceType; // 使用当前选择的源类型（submission 或 collection）
-			case 'favorite':
-				return 'favorite';
-			case 'collection':
-				return 'collection';
-			case 'bangumi':
-				return 'bangumi';
-			default:
-				return sourceType;
-		}
-	}
-
-	function getBatchItemTypeLabel(item: BatchSelectedItem): string {
-		switch (item.type) {
-			case 'search':
-			case 'following':
-				return getSourceTypeLabel(getSourceTypeFromBatchItem(item));
-			case 'favorite':
-				return '收藏夹';
-			case 'collection':
-				return '合集';
-			case 'bangumi':
-				return '番剧';
-			default:
-				return getSourceTypeLabel(item.type);
-		}
-	}
-
-	// 根据批量选择项获取视频源ID
-	function getSourceIdFromBatchItem(item: BatchSelectedItem): string {
-		switch (item.type) {
-			case 'search':
-				if (sourceType === 'submission') {
-					return item.data.mid?.toString() || '';
-				}
-				return item.data.bvid || item.data.season_id?.toString() || item.data.mid?.toString() || '';
-			case 'following':
-				return item.data.mid?.toString() || '';
-			case 'favorite':
-				// 优先使用完整收藏夹ID，短ID仅作兜底
-				return (item.data.id ?? item.data.fid ?? '').toString();
-			case 'collection':
-				return item.data.sid?.toString() || '';
-			case 'bangumi':
-				return item.data.season_id?.toString() || '';
-			default:
-				return '';
-		}
-	}
-
-	function getBatchSelectedSourceType(): string | null {
-		if (batchSelectedItems.size === 0) {
-			return null;
-		}
-		const firstItem = Array.from(batchSelectedItems.values())[0];
-		return getSourceTypeFromBatchItem(firstItem);
-	}
 </script>
 
 <svelte:head>
@@ -2466,18 +2160,12 @@
 				/>
 				{#if sourcePlatform === 'bilibili' && sourceType !== 'bangumi' && sourceType !== 'watch_later'}
 					<Button
-						variant={batchMode ? 'default' : 'outline'}
+						variant={batch.mode ? 'default' : 'outline'}
 						size="sm"
-						onclick={() => {
-							batchMode = !batchMode;
-							if (!batchMode) {
-								batchSelectedItems.clear();
-								batchSelectedItems = batchSelectedItems;
-							}
-						}}
+						onclick={() => batch.toggleMode()}
 						class="flex items-center gap-2"
 					>
-						{#if batchMode}
+						{#if batch.mode}
 							<X class="h-4 w-4" />
 							退出批量模式
 						{:else}
@@ -2933,11 +2621,11 @@
 								placeholder="请输入视频源名称"
 								oninput={handleNameInput}
 								required
-								disabled={isMergingBangumi || batchMode}
+								disabled={isMergingBangumi || batch.mode}
 							/>
 							{#if isMergingBangumi}
 								<p class="text-xs text-purple-600">合并时自动沿用目标番剧源的名称</p>
-							{:else if batchMode}
+							{:else if batch.mode}
 								<p class="text-xs text-blue-600">批量模式下名称自动使用所选视频源信息</p>
 							{/if}
 						</div>
@@ -2967,7 +2655,7 @@
 										</div>
 									</div>
 								</div>
-								{#if currentQuickSubscriptionTemplate && !batchMode}
+								{#if currentQuickSubscriptionTemplate && !batch.mode}
 									<Button
 										type="button"
 										size="sm"
@@ -3002,7 +2690,7 @@
 											示例完整路径：{downloadFilePathPreview}
 										</p>
 									{/if}
-									{#if currentQuickSubscriptionTemplate && !batchMode}
+									{#if currentQuickSubscriptionTemplate && !batch.mode}
 										<p class="text-muted-foreground text-xs">
 											已配置快捷路径模板，支持 <code>{'{{name}}'}</code> 变量。选择源后会自动带入，也可继续手动修改。
 										</p>
@@ -3966,7 +3654,7 @@
 						<div class="flex {isMobile ? 'flex-col' : ''} gap-2">
 							<Button
 								type="submit"
-								disabled={loading || batchMode}
+								disabled={loading || batch.mode}
 								class={isMobile ? 'w-full' : ''}
 							>
 								{loading ? '添加中...' : '添加'}
@@ -3991,16 +3679,16 @@
 					<SearchResultsPanel
 						{isCompactLayout}
 						{isMobile}
-						{batchMode}
+						batchMode={batch.mode}
 						{sourceType}
 						{searchResults}
 						{searchTotalResults}
 						{filteredSearchResults}
-						{batchCheckboxStates}
+						batchCheckboxStates={batch.checkboxStates}
 						{enableSearchAnimations}
 						isBangumiSeasonExists={isBangumiSeasonExists}
 						isSubmissionExists={isSubmissionExists}
-						isBatchSelected={isBatchSelected}
+						isBatchSelected={(key) => batch.isSelected(key)}
 						onClose={() => {
 							showSearchResults = false;
 							searchResults = [];
@@ -4008,7 +3696,7 @@
 						}}
 						onSelectAll={() => selectAllVisible('search')}
 						onSelectResult={selectSearchResult}
-						onToggleBatch={(key, result) => toggleBatchSelection(key, result, 'search')}
+						onToggleBatch={(key, result) => batch.toggle(key, result, 'search')}
 						onMouseEnter={(result, e) => hover.show('search', result, e)}
 						onMouseLeave={() => hover.hide()}
 						onMouseMove={(e) => hover.move(e)}
@@ -4029,7 +3717,7 @@
 							headerClass="bg-blue-50 dark:bg-blue-950"
 							titleClass="text-base font-medium text-blue-800 dark:text-blue-200"
 							subtitleClass="text-sm text-blue-600 dark:text-blue-400"
-							showActions={batchMode}
+							showActions={batch.mode}
 						>
 							{#snippet actions()}
 								<SelectAllButton onclick={() => selectAllVisible('following')} />
@@ -4047,24 +3735,24 @@
 										sourceType === 'submission' && existingSubmissionIds.has(following.mid)}
 									<SelectableCardButton
 										onclick={() => {
-											if (batchMode) {
-												toggleBatchSelection(itemKey, following, 'following');
+											if (batch.mode) {
+												batch.toggle(itemKey, following, 'following');
 											} else {
 												selectFollowing(following);
 											}
 										}}
 										disabled={isDisabled}
-										selected={batchMode && isBatchSelected(itemKey)}
+										selected={batch.mode && batch.isSelected(itemKey)}
 										class="p-3"
 									>
 										<div class="flex items-start gap-2">
 											<!-- 批量模式下的复选框 -->
-											{#if batchMode}
+											{#if batch.mode}
 												<BatchCheckbox
-													checked={batchCheckboxStates[itemKey] || false}
+													checked={batch.checkboxStates[itemKey] || false}
 													onclick={(e) => {
 														e.stopPropagation();
-														toggleBatchSelection(itemKey, following, 'following');
+														batch.toggle(itemKey, following, 'following');
 													}}
 												/>
 											{/if}
@@ -4123,7 +3811,7 @@
 							headerClass="bg-green-50 dark:bg-green-950"
 							titleClass="text-base font-medium text-green-800 dark:text-green-200"
 							subtitleClass="text-sm text-green-600 dark:text-green-400"
-							showActions={batchMode}
+							showActions={batch.mode}
 						>
 							{#snippet actions()}
 								<SelectAllButton onclick={() => selectAllVisible('collection')} />
@@ -4144,24 +3832,24 @@
 									)}
 									<SelectableCardButton
 										onclick={() => {
-											if (batchMode) {
-												toggleBatchSelection(itemKey, collection, 'collection');
+											if (batch.mode) {
+												batch.toggle(itemKey, collection, 'collection');
 											} else {
 												selectCollection(collection);
 											}
 										}}
 										disabled={isDisabled}
-										selected={batchMode && isBatchSelected(itemKey)}
+										selected={batch.mode && batch.isSelected(itemKey)}
 										class="p-4"
 									>
 										<div class="flex items-start gap-3">
 											<!-- 批量模式下的复选框 -->
-											{#if batchMode}
+											{#if batch.mode}
 												<BatchCheckbox
-													checked={batchCheckboxStates[itemKey] || false}
+													checked={batch.checkboxStates[itemKey] || false}
 													onclick={(e) => {
 														e.stopPropagation();
-														toggleBatchSelection(itemKey, collection, 'collection');
+														batch.toggle(itemKey, collection, 'collection');
 													}}
 												/>
 											{/if}
@@ -4223,7 +3911,7 @@
 							headerClass="bg-yellow-50 dark:bg-yellow-950"
 							titleClass="text-base font-medium text-yellow-800 dark:text-yellow-200"
 							subtitleClass="text-sm text-yellow-600 dark:text-yellow-400"
-							showActions={batchMode}
+							showActions={batch.mode}
 						>
 							{#snippet actions()}
 								<SelectAllButton onclick={() => selectAllVisible('favorite')} />
@@ -4240,24 +3928,24 @@
 									{@const isDisabled = existingFavoriteIds.has(Number(favorite.id))}
 									<SelectableCardButton
 										onclick={() => {
-											if (batchMode) {
-												toggleBatchSelection(itemKey, favorite, 'favorite');
+											if (batch.mode) {
+												batch.toggle(itemKey, favorite, 'favorite');
 											} else {
 												selectFavorite(favorite);
 											}
 										}}
 										disabled={isDisabled}
-										selected={batchMode && isBatchSelected(itemKey)}
+										selected={batch.mode && batch.isSelected(itemKey)}
 										class="p-4"
 									>
 										<div class="flex items-start gap-3">
 											<!-- 批量模式下的复选框 -->
-											{#if batchMode}
+											{#if batch.mode}
 												<BatchCheckbox
-													checked={batchCheckboxStates[itemKey] || false}
+													checked={batch.checkboxStates[itemKey] || false}
 													onclick={(e) => {
 														e.stopPropagation();
-														toggleBatchSelection(itemKey, favorite, 'favorite');
+														batch.toggle(itemKey, favorite, 'favorite');
 													}}
 												/>
 											{/if}
@@ -4314,7 +4002,7 @@
 							subtitleClass="text-sm text-green-600 dark:text-green-400"
 						>
 							{#snippet actions()}
-								{#if batchMode && searchedUserFavorites.length > 0}
+								{#if batch.mode && searchedUserFavorites.length > 0}
 									<SelectAllButton onclick={() => selectAllVisible('searched-favorite')} />
 								{/if}
 								<button
@@ -4345,24 +4033,24 @@
 										{@const isDisabled = existingFavoriteIds.has(Number(favorite.id))}
 										<SelectableCardButton
 											onclick={() => {
-												if (batchMode) {
-													toggleBatchSelection(itemKey, favorite, 'favorite');
+												if (batch.mode) {
+													batch.toggle(itemKey, favorite, 'favorite');
 												} else {
 													selectSearchedFavorite(favorite);
 												}
 											}}
 											disabled={isDisabled}
-											selected={batchMode && isBatchSelected(itemKey)}
+											selected={batch.mode && batch.isSelected(itemKey)}
 											class="p-4"
 										>
 											<div class="flex items-start gap-3">
 												<!-- 批量模式下的复选框 -->
-												{#if batchMode}
+												{#if batch.mode}
 													<BatchCheckbox
-														checked={batchCheckboxStates[itemKey] || false}
+														checked={batch.checkboxStates[itemKey] || false}
 														onclick={(e) => {
 															e.stopPropagation();
-															toggleBatchSelection(itemKey, favorite, 'favorite');
+															batch.toggle(itemKey, favorite, 'favorite');
 														}}
 													/>
 												{/if}
@@ -4721,7 +4409,7 @@
 							headerClass="bg-purple-50 dark:bg-purple-950"
 							titleClass="text-base font-medium text-purple-800 dark:text-purple-200"
 							subtitleClass="text-sm text-purple-600 dark:text-purple-400"
-							showActions={batchMode}
+							showActions={batch.mode}
 						>
 							{#snippet actions()}
 								<SelectAllButton onclick={() => selectAllVisible('subscribed-collection')} />
@@ -4745,8 +4433,8 @@
 												)}
 									<SelectableCardButton
 										onclick={() => {
-											if (batchMode) {
-												toggleBatchSelection(
+											if (batch.mode) {
+												batch.toggle(
 													itemKey,
 													collection,
 													collection.collection_type === 'favorite' ? 'favorite' : 'collection'
@@ -4756,17 +4444,17 @@
 											}
 										}}
 										disabled={isExisting}
-										selected={batchMode && isBatchSelected(itemKey)}
+										selected={batch.mode && batch.isSelected(itemKey)}
 										class="p-4"
 									>
 										<div class="flex items-start gap-3">
 											<!-- 批量模式下的复选框 -->
-											{#if batchMode}
+											{#if batch.mode}
 												<BatchCheckbox
-													checked={batchCheckboxStates[itemKey] || false}
+													checked={batch.checkboxStates[itemKey] || false}
 													onclick={(e) => {
 														e.stopPropagation();
-														toggleBatchSelection(
+														batch.toggle(
 															itemKey,
 															collection,
 															collection.collection_type === 'favorite' ? 'favorite' : 'collection'
@@ -4830,14 +4518,14 @@
 </div>
 
 <!-- 批量操作工具栏 -->
-{#if batchMode && batchSelectedItems.size > 0}
+{#if batch.mode && batch.selectedItems.size > 0}
 	<BatchActionBar
 		{isMobile}
-		selectedCount={batchSelectedItems.size}
-		adding={batchAdding}
-		progress={batchProgress}
-		onClear={clearBatchSelection}
-		onOpenDialog={openBatchDialog}
+		selectedCount={batch.selectedItems.size}
+		adding={batch.adding}
+		progress={batch.progress}
+		onClear={() => batch.clear()}
+		onOpenDialog={() => batch.openDialog()}
 	/>
 {/if}
 
@@ -4852,23 +4540,20 @@
 
 <!-- 批量添加配置对话框 -->
 <BatchConfigDialog
-	open={batchDialogOpen}
-	selectedItems={batchSelectedItems}
-	bind:batchBasePath
+	open={batch.dialogOpen}
+	selectedItems={batch.selectedItems}
+	bind:batchBasePath={batch.basePath}
 	selectedTemplate={batchSelectedTemplate}
 	bind:filterOptionInheritGlobal
 	bind:filterOptionDraft
-	bind:collectionAggregateEnabled={batchCollectionAggregateEnabled}
-	adding={batchAdding}
-	selectedSourceType={getBatchSelectedSourceType()}
-	canStart={canStartBatchAdd()}
-	getPathForItem={getBatchPathForItem}
-	getItemTypeLabel={getBatchItemTypeLabel}
-	onStart={handleBatchAdd}
-	onCancel={() => {
-		batchDialogOpen = false;
-		batchCollectionAggregateEnabled = false;
-	}}
+	bind:collectionAggregateEnabled={batch.collectionAggregateEnabled}
+	adding={batch.adding}
+	selectedSourceType={batch.selectedSourceType}
+	canStart={batch.canStart}
+	getPathForItem={batch.getPathForItem}
+	getItemTypeLabel={batch.getItemTypeLabel}
+	onStart={startBatchAdd}
+	onCancel={() => batch.closeDialog()}
 />
 
 <style>
