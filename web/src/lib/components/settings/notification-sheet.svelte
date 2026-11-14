@@ -8,36 +8,16 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
-	type NotificationChannel = 'none' | 'telegram' | 'webhook';
-	type WebhookFormat = 'auto' | 'generic' | 'opensend' | 'custom' | 'synology_chat';
+	import type {
+		NotificationChannel,
+		NotificationSettingsStore,
+		WebhookFormat
+	} from '$lib/stores/settings/notification.svelte';
 
+	export let store: NotificationSettingsStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let notificationEnabled = false;
-	export let activeNotificationChannel: NotificationChannel = 'none';
-	export let notificationStatus: { configured: boolean; enabled: boolean } | null = null;
-	export let notificationMinVideos = 1;
-	export let notificationSaving = false;
-
-	export let telegramBotToken = '';
-	export let telegramChatId = '';
-	export let telegramApiBase = 'https://api.telegram.org';
-
-	export let webhookUrl = '';
-	export let webhookBearerToken = '';
-	export let webhookCustomHeaders = '';
-	export let webhookFormat: WebhookFormat = 'auto';
-	export let webhookCustomBody = '';
-	export let webhookSynologyChatTemplate = '';
-
-	export let defaultWebhookCustomBody = '';
-	export let defaultWebhookFormBody = '';
-	export let defaultSynologyChatTemplate = '';
-
-	export let onSave: () => void = () => {};
-	export let onTestNotification: () => void = () => {};
 </script>
 
 <!-- 推送通知设置抽屉 -->
@@ -52,23 +32,23 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
 		<div class="min-h-0 flex-1 space-y-6 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
 			<!-- 推送状态卡片 -->
-			{#if notificationStatus}
+			{#if store.status}
 				<div
-					class="rounded-lg border {activeNotificationChannel !== 'none'
+					class="rounded-lg border {store.activeChannel !== 'none'
 						? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20'
 						: 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'} p-4"
 				>
 					<div class="flex items-center space-x-2">
-						{#if activeNotificationChannel !== 'none'}
+						{#if store.activeChannel !== 'none'}
 							<Badge variant="default" class="bg-green-500">已配置</Badge>
 							<span class="text-sm text-green-700 dark:text-green-400">
-								{activeNotificationChannel === 'telegram' ? 'Telegram' : 'Webhook'}已配置
+								{store.activeChannel === 'telegram' ? 'Telegram' : 'Webhook'}已配置
 							</span>
 						{:else}
 							<Badge variant="secondary">未配置</Badge>
@@ -84,7 +64,7 @@
 					<input
 						type="checkbox"
 						id="notification-enabled"
-						bind:checked={notificationEnabled}
+						bind:checked={store.enabled}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label
@@ -105,14 +85,14 @@
 					<Label for="notification-channel">选择推送渠道</Label>
 					<CustomSelect
 						id="notification-channel"
-						value={activeNotificationChannel}
+						value={store.activeChannel}
 						options={[
 							{ value: 'none', label: '无' },
 							{ value: 'telegram', label: 'Telegram' },
 							{ value: 'webhook', label: 'Webhook' }
 						]}
 						onChange={(nextValue) =>
-							(activeNotificationChannel = String(nextValue ?? 'none') as NotificationChannel)}
+							(store.activeChannel = String(nextValue ?? 'none') as NotificationChannel)}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 					<p class="text-muted-foreground text-sm">选择一个推送渠道，所有推送将发送到该渠道</p>
@@ -120,7 +100,7 @@
 			</div>
 
 			<!-- Telegram配置 -->
-			{#if activeNotificationChannel === 'telegram'}
+			{#if store.activeChannel === 'telegram'}
 				<div
 					class="space-y-4 rounded-lg border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-800 dark:bg-sky-950/10"
 				>
@@ -131,8 +111,8 @@
 						<Input
 							id="telegram-bot-token"
 							type="password"
-							bind:value={telegramBotToken}
-							placeholder={notificationStatus?.configured
+							bind:value={store.telegramBotToken}
+							placeholder={store.status?.configured
 								? '已配置（留空保持不变）'
 								: '请输入 Bot Token'}
 						/>
@@ -150,7 +130,7 @@
 						<Input
 							id="telegram-chat-id"
 							type="text"
-							bind:value={telegramChatId}
+							bind:value={store.telegramChatId}
 							placeholder="例如 123456789 或 -1001234567890"
 						/>
 						<p class="text-muted-foreground text-sm">
@@ -163,7 +143,7 @@
 						<Input
 							id="telegram-api-base"
 							type="text"
-							bind:value={telegramApiBase}
+							bind:value={store.telegramApiBase}
 							placeholder="https://api.telegram.org"
 						/>
 						<p class="text-muted-foreground text-sm">
@@ -174,7 +154,7 @@
 			{/if}
 
 			<!-- Webhook配置 -->
-			{#if activeNotificationChannel === 'webhook'}
+			{#if store.activeChannel === 'webhook'}
 				<div
 					class="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/10"
 				>
@@ -184,7 +164,7 @@
 						<Label for="generic-webhook-format">Webhook格式</Label>
 						<CustomSelect
 							id="generic-webhook-format"
-							value={webhookFormat}
+							value={store.webhookFormat}
 							options={[
 								{ value: 'auto', label: '自动识别（推荐）' },
 								{ value: 'generic', label: '通用 JSON' },
@@ -192,7 +172,7 @@
 								{ value: 'custom', label: '自定义请求' },
 								{ value: 'synology_chat', label: 'Synology Chat（群晖）' }
 							]}
-							onChange={(nextValue) => (webhookFormat = String(nextValue ?? 'auto') as WebhookFormat)}
+							onChange={(nextValue) => (store.webhookFormat = String(nextValue ?? 'auto') as WebhookFormat)}
 							class="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 						/>
 						<p class="text-muted-foreground text-sm">
@@ -207,11 +187,11 @@
 						<Input
 							id="generic-webhook-url"
 							type="password"
-							bind:value={webhookUrl}
+							bind:value={store.webhookUrl}
 							placeholder="https://example.com/notify/webhook"
 						/>
 						<p class="text-muted-foreground text-sm">
-							{webhookFormat === 'synology_chat'
+							{store.webhookFormat === 'synology_chat'
 								? '将以 application/x-www-form-urlencoded 发送 payload=JSON，适用于 Synology Chat Incoming Webhook'
 								: '将发送 JSON POST 请求到该地址，支持按响应内容判定成功'}
 						</p>
@@ -222,7 +202,7 @@
 						<Input
 							id="generic-webhook-token"
 							type="password"
-							bind:value={webhookBearerToken}
+							bind:value={store.webhookBearerToken}
 							placeholder="可选，自动带 Authorization: Bearer xxx"
 						/>
 						<p class="text-muted-foreground text-sm">
@@ -234,7 +214,7 @@
 						<Label for="generic-webhook-custom-headers">自定义 Headers（可选）</Label>
 						<Textarea
 							id="generic-webhook-custom-headers"
-							bind:value={webhookCustomHeaders}
+							bind:value={store.webhookCustomHeaders}
 							rows={6}
 							placeholder={`{\n  "Authorization": "Bearer your-token",\n  "X-Channel": "clawbot"\n}`}
 							class="font-mono text-xs"
@@ -251,7 +231,7 @@
 						</div>
 					</div>
 
-					{#if webhookFormat === 'custom'}
+					{#if store.webhookFormat === 'custom'}
 						<div class="space-y-2">
 							<div class="flex items-center justify-between gap-3">
 								<Label for="generic-webhook-custom-body">自定义 POST Body（任意文本）</Label>
@@ -261,7 +241,7 @@
 										variant="outline"
 										size="sm"
 										onclick={() => {
-											webhookCustomBody = defaultWebhookCustomBody;
+											store.webhookCustomBody = store.defaultWebhookCustomBody;
 										}}
 									>
 										JSON 模板
@@ -271,8 +251,8 @@
 										variant="outline"
 										size="sm"
 										onclick={() => {
-											webhookCustomBody = defaultWebhookFormBody;
-											webhookCustomHeaders = '{"Content-Type":"application/x-www-form-urlencoded"}';
+											store.webhookCustomBody = store.defaultWebhookFormBody;
+											store.webhookCustomHeaders = '{"Content-Type":"application/x-www-form-urlencoded"}';
 										}}
 									>
 										表单模板
@@ -281,9 +261,9 @@
 							</div>
 							<Textarea
 								id="generic-webhook-custom-body"
-								bind:value={webhookCustomBody}
+								bind:value={store.webhookCustomBody}
 								rows={10}
-								placeholder={defaultWebhookCustomBody}
+								placeholder={store.defaultWebhookCustomBody}
 								class="font-mono text-xs"
 							/>
 							<div class="text-muted-foreground space-y-1 text-sm">
@@ -309,7 +289,7 @@
 						</div>
 					{/if}
 
-					{#if webhookFormat === 'synology_chat'}
+					{#if store.webhookFormat === 'synology_chat'}
 						<div class="space-y-2">
 							<div class="flex items-center justify-between gap-3">
 								<Label for="synology-chat-template">群晖 Chat 消息模板</Label>
@@ -318,7 +298,7 @@
 									variant="outline"
 									size="sm"
 									onclick={() => {
-										webhookSynologyChatTemplate = defaultSynologyChatTemplate;
+										store.webhookSynologyChatTemplate = store.defaultSynologyChatTemplate;
 									}}
 								>
 									填入模板
@@ -326,9 +306,9 @@
 							</div>
 							<Textarea
 								id="synology-chat-template"
-								bind:value={webhookSynologyChatTemplate}
+								bind:value={store.webhookSynologyChatTemplate}
 								rows={8}
-								placeholder={defaultSynologyChatTemplate}
+								placeholder={store.defaultSynologyChatTemplate}
 								class="font-mono text-xs"
 							/>
 							<div class="text-muted-foreground space-y-1 text-sm">
@@ -353,7 +333,7 @@
 			{/if}
 
 			<!-- 通用配置 -->
-			{#if activeNotificationChannel !== 'none'}
+			{#if store.activeChannel !== 'none'}
 				<div class="space-y-4">
 					<h3 class="text-base font-semibold">推送设置</h3>
 
@@ -362,7 +342,7 @@
 						<Input
 							id="min-videos"
 							type="number"
-							bind:value={notificationMinVideos}
+							bind:value={store.minVideos}
 							min="1"
 							max="100"
 							placeholder="1"
@@ -375,7 +355,7 @@
 			{/if}
 
 			<!-- 测试推送 -->
-			{#if activeNotificationChannel !== 'none'}
+			{#if store.activeChannel !== 'none'}
 				<div
 					class="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/20"
 				>
@@ -383,7 +363,7 @@
 					<p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
 						发送一条测试消息到您的推送接收端，验证配置是否正确。测试会优先使用当前输入内容（未保存也可测试）。
 					</p>
-					<Button type="button" variant="outline" size="sm" onclick={onTestNotification}>
+					<Button type="button" variant="outline" size="sm" onclick={() => store.test()}>
 						发送测试推送
 					</Button>
 				</div>
@@ -455,8 +435,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={notificationSaving} class="w-full">
-				{notificationSaving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>

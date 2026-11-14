@@ -40,12 +40,17 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { runRequest } from '$lib/utils/request.js';
+	import { normalizeConcurrencyValue, normalizeNumberInput } from '$lib/utils/number';
+	import { NotificationSettingsStore } from '$lib/stores/settings/notification.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
 	let config: ConfigResponse | null = null;
 	let loading = false;
 	let saving = false;
+
+	// 各设置域的状态容器（runes class，见 $lib/stores/settings）
+	const notification = new NotificationSettingsStore();
 
 	// 控制各个抽屉的开关状态
 	let openSheet: string | null = null;
@@ -210,29 +215,6 @@
 		notificationMinVideos: 1
 	} as const;
 
-	function normalizeNumberInput(value: unknown, fallback: number): number {
-		if (typeof value === 'number' && Number.isFinite(value)) {
-			return value;
-		}
-
-		if (typeof value === 'string') {
-			const trimmed = value.trim();
-			if (trimmed) {
-				const parsed = Number(trimmed);
-				if (Number.isFinite(parsed)) {
-					return parsed;
-				}
-			}
-		}
-
-		return fallback;
-	}
-
-	// 并发提示用：输入框可能是空串/0/负数，统一兜成默认值，避免界面上算出 NaN 或 0
-	function normalizeConcurrencyValue(value: unknown, fallback: number): number {
-		const parsed = normalizeNumberInput(value, fallback);
-		return parsed > 0 ? parsed : fallback;
-	}
 
 	// 表单数据
 	let videoName = '{{upper_name}}';
@@ -382,28 +364,6 @@
 	// 番剧目录结构配置
 	let bangumiUseSeasonStructure = false;
 
-	// 推送通知配置
-	let notificationEnabled = false;
-	let activeNotificationChannel: 'none' | 'telegram' | 'webhook' = 'none';
-	let telegramBotToken = '';
-	let telegramChatId = '';
-	let telegramApiBase = 'https://api.telegram.org';
-	let webhookUrl = '';
-	let webhookBearerToken = '';
-	let webhookCustomHeaders = '';
-	let webhookFormat: 'auto' | 'generic' | 'opensend' | 'custom' | 'synology_chat' = 'auto';
-	let webhookCustomBody = '';
-	let webhookSynologyChatTemplate = '';
-	let notificationMinVideos = 1;
-	let notificationSaving = false;
-	let notificationStatus: {
-		configured: boolean;
-		enabled: boolean;
-		last_notification_time: string | null;
-		total_notifications_sent: number;
-		last_error: string | null;
-	} | null = null;
-
 	// AI重命名配置
 	let aiRenameEnabled = false;
 	let aiRenameProvider = 'deepseek';
@@ -458,17 +418,6 @@
 	let importRestoreTarget: { file: File; name: string; size_bytes: number } | null = null;
 	let importRestoreRunning = false;
 
-	const defaultWebhookCustomBody = `{
-  "source": "{{source}}",
-  "title": "{{title}}",
-  "content": "{{content}}",
-  "channel": "{{channel}}",
-  "event": "{{event}}",
-  "sent_at": "{{sent_at}}"
-}`;
-	const defaultWebhookFormBody = `message={{content_urlencoded}}`;
-	const defaultSynologyChatTemplate = `:loudspeaker: ------{{title}}------ :loudspeaker:
-{{content}}`;
 
 	// 显示帮助信息的状态（在文件命名抽屉中使用）
 	let showHelp = false;
@@ -666,10 +615,9 @@
 		await loadConfig();
 		// 检查当前用户信息
 		await checkCurrentUser();
-		// 加载推送通知状态
-		await loadNotificationStatus();
 		// 加载推送通知配置
-		await loadNotificationConfig();
+		await notification.loadStatus();
+		await notification.loadConfig();
 	});
 
 	async function loadConfig() {
@@ -1566,61 +1514,7 @@
 		currentUser = null;
 	}
 
-	// 加载推送通知状态
-	async function loadNotificationStatus() {
-		const response = await runRequest(() => api.getNotificationStatus(), {
-			context: '加载推送通知状态失败',
-			showErrorToast: false
-		});
-		if (!response?.data) return;
 
-		notificationStatus = response.data;
-		notificationEnabled = response.data.enabled;
-	}
-
-	// 保存推送通知配置
-	async function saveNotificationConfig() {
-		type NotificationUpdateConfig = Parameters<typeof api.updateNotificationConfig>[0];
-		const config: NotificationUpdateConfig = {
-			active_channel: activeNotificationChannel,
-			enable_scan_notifications: notificationEnabled,
-			notification_min_videos: normalizeNumberInput(
-				notificationMinVideos,
-				DEFAULT_CONFIG_VALUES.notificationMinVideos
-			)
-		};
-
-		// 根据选择的渠道提交相应配置
-		if (activeNotificationChannel === 'telegram') {
-			config.telegram_bot_token = telegramBotToken.trim();
-			config.telegram_chat_id = telegramChatId.trim();
-			config.telegram_api_base = telegramApiBase.trim();
-		} else if (activeNotificationChannel === 'webhook') {
-			config.webhook_url = webhookUrl.trim();
-			config.webhook_bearer_token = webhookBearerToken.trim();
-			config.webhook_custom_headers = webhookCustomHeaders.trim();
-			config.webhook_format = webhookFormat;
-			config.webhook_custom_body = webhookCustomBody.trim();
-			config.webhook_synology_chat_template = webhookSynologyChatTemplate;
-		}
-
-		const response = await runRequest(() => api.updateNotificationConfig(config), {
-			setLoading: (value) => (notificationSaving = value),
-			context: '保存推送通知配置失败'
-		});
-		if (!response) return;
-
-		const ok = response.status_code === 200;
-		const msg = typeof response.data === 'string' ? response.data : '推送配置更新成功';
-		if (ok) {
-			toast.success('推送通知配置保存成功', { description: msg });
-			// 重新加载状态
-			await loadNotificationStatus();
-			openSheet = null; // 关闭抽屉
-		} else {
-			toast.error('保存失败', { description: msg || '推送配置更新失败' });
-		}
-	}
 
 	async function saveRiskControlConfig() {
 		const config: UpdateConfigRequest = {
@@ -1747,77 +1641,7 @@
 		}
 	}
 
-	// 加载推送通知配置
-	async function loadNotificationConfig() {
-		const response = await runRequest(() => api.getNotificationConfig(), {
-			context: '加载推送通知配置失败',
-			showErrorToast: false
-		});
-		if (!response?.data) return;
 
-		// 加载激活渠道
-		activeNotificationChannel = (response.data.active_channel || 'none') as
-			| 'none'
-			| 'telegram'
-			| 'webhook';
-
-		notificationEnabled = response.data.enable_scan_notifications;
-		notificationMinVideos = response.data.notification_min_videos;
-
-		// 加载 Telegram 配置（如果有）
-		telegramBotToken = response.data.telegram_bot_token || '';
-		telegramChatId = response.data.telegram_chat_id || '';
-		telegramApiBase = response.data.telegram_api_base || 'https://api.telegram.org';
-
-		// 加载通用Webhook配置（如果有）
-		webhookUrl = response.data.webhook_url || '';
-		webhookBearerToken = response.data.webhook_bearer_token || '';
-		webhookCustomHeaders = response.data.webhook_custom_headers || '';
-		webhookFormat =
-			(response.data.webhook_format as
-				| 'auto'
-				| 'generic'
-				| 'opensend'
-				| 'custom'
-				| 'synology_chat'
-				| undefined) || 'auto';
-		webhookCustomBody = response.data.webhook_custom_body || '';
-		webhookSynologyChatTemplate =
-			response.data.webhook_synology_chat_template ||
-			(webhookFormat === 'synology_chat' ? defaultSynologyChatTemplate : '');
-	}
-
-	// 测试推送通知
-	async function testNotification() {
-		type TestNotificationParams = Parameters<typeof api.testNotification>[0];
-		const request: TestNotificationParams = {
-			active_channel: activeNotificationChannel
-		};
-
-		if (activeNotificationChannel === 'telegram') {
-			request.telegram_bot_token = telegramBotToken.trim();
-			request.telegram_chat_id = telegramChatId.trim();
-			request.telegram_api_base = telegramApiBase.trim();
-		} else if (activeNotificationChannel === 'webhook') {
-			request.webhook_url = webhookUrl.trim();
-			request.webhook_bearer_token = webhookBearerToken.trim();
-			request.webhook_custom_headers = webhookCustomHeaders.trim();
-			request.webhook_format = webhookFormat;
-			request.webhook_custom_body = webhookCustomBody.trim();
-			request.webhook_synology_chat_template = webhookSynologyChatTemplate;
-		}
-
-		const response = await runRequest(() => api.testNotification(request), {
-			context: '测试推送失败'
-		});
-		if (!response) return;
-
-		if (response.data.success) {
-			toast.success('测试推送发送成功', { description: '请检查您的推送接收端' });
-		} else {
-			toast.error('测试推送失败', { description: response.data.message });
-		}
-	}
 </script>
 
 <svelte:head>
@@ -2089,30 +1913,12 @@
 />
 
 <NotificationSheet
+	store={notification}
 	open={openSheet === 'notification'}
 	onOpenChange={(open) => {
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:notificationEnabled
-	bind:activeNotificationChannel
-	{notificationStatus}
-	bind:notificationMinVideos
-	{notificationSaving}
-	bind:telegramBotToken
-	bind:telegramChatId
-	bind:telegramApiBase
-	bind:webhookUrl
-	bind:webhookBearerToken
-	bind:webhookCustomHeaders
-	bind:webhookFormat
-	bind:webhookCustomBody
-	bind:webhookSynologyChatTemplate
-	{defaultWebhookCustomBody}
-	{defaultWebhookFormBody}
-	{defaultSynologyChatTemplate}
-	onSave={saveNotificationConfig}
-	onTestNotification={testNotification}
 />
 
 <CaptchaSheet
