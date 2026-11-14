@@ -15,6 +15,7 @@
 	import { PugvCourseStore } from '$lib/stores/add-source/pugv.svelte';
 	import { SearchStore } from '$lib/stores/add-source/search.svelte';
 	import { SourceOptionsStore } from '$lib/stores/add-source/source-options.svelte';
+	import { QuickSubscriptionStore } from '$lib/stores/add-source/quick-subscription.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -81,8 +82,8 @@
 	const batch = new BatchSelectionStore({
 		getSourceType: () => sourceType,
 		getSelectedTemplate: () => batchSelectedTemplate,
-		getQuickTemplate: (type) => getQuickSubscriptionTemplate(type),
-		renderPath: (template, name) => renderQuickSubscriptionPath(template, name),
+		getQuickTemplate: (type) => quick.getTemplate(type),
+		renderPath: (template, name) => quick.renderPath(template, name),
 		getBaseParams: () => ({
 			...options.toPayload()
 		}),
@@ -122,6 +123,7 @@
 	});
 
 	const options = new SourceOptionsStore();
+	const quick = new QuickSubscriptionStore();
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -171,12 +173,6 @@
 	let upId = '';
 	let name = '';
 	let path = '';
-	let favoriteQuickSubscribePathTemplate = '';
-	let collectionQuickSubscribePathTemplate = '';
-	let submissionQuickSubscribePathTemplate = '';
-	let pugvQuickSubscribePathTemplate = '';
-	let bangumiQuickSubscribePathTemplate = '';
-	let lastAutoAppliedPath = '';
 	let cover = '';
 	let collectionType = 'season';
 	let collectionAggregateEnabled = false;
@@ -333,46 +329,22 @@
 		return matched ? matched[1] : text;
 	}
 
-	function getQuickSubscriptionTemplate(type: VideoCategory): string {
-		switch (type) {
-			case 'favorite':
-				return favoriteQuickSubscribePathTemplate;
-			case 'collection':
-				return collectionQuickSubscribePathTemplate;
-			case 'submission':
-				return submissionQuickSubscribePathTemplate;
-			case 'bangumi':
-				return bangumiQuickSubscribePathTemplate;
-			case 'pugv':
-				return pugvQuickSubscribePathTemplate;
-			default:
-				return '';
-		}
-	}
 
 	$: currentQuickSubscriptionType = sourceType;
 	$: currentQuickSubscriptionTemplate =
 		currentQuickSubscriptionType === 'favorite'
-			? favoriteQuickSubscribePathTemplate.trim()
+			? quick.favorite.trim()
 			: currentQuickSubscriptionType === 'collection'
-				? collectionQuickSubscribePathTemplate.trim()
+				? quick.collection.trim()
 				: currentQuickSubscriptionType === 'submission'
-					? submissionQuickSubscribePathTemplate.trim()
+					? quick.submission.trim()
 					: currentQuickSubscriptionType === 'bangumi'
-						? bangumiQuickSubscribePathTemplate.trim()
+						? quick.bangumi.trim()
 						: currentQuickSubscriptionType === 'pugv'
-							? pugvQuickSubscribePathTemplate.trim()
+							? quick.pugv.trim()
 							: '';
 
-	function sanitizeQuickSubscriptionName(value: string): string {
-		// eslint-disable-next-line no-control-regex -- 文件名净化需要过滤控制字符，非笔误
-		return value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '_');
-	}
 
-	function renderQuickSubscriptionPath(template: string, sourceName: string): string {
-		const safeName = sanitizeQuickSubscriptionName(sourceName);
-		return template.replace(/\{\{\s*name\s*\}\}/g, safeName);
-	}
 
 	function buildDownloadFilePathPreview(): string {
 		const root = path.trim().replace(/[\\/]+$/, '');
@@ -394,15 +366,15 @@
 	): boolean {
 		if (bangumi.isMerging) return false;
 
-		const template = getQuickSubscriptionTemplate(type).trim();
+		const template = quick.getTemplate(type).trim();
 		if (!template || !sourceName.trim()) return false;
-		if (!force && path.trim() && path !== lastAutoAppliedPath) return false;
+		if (!force && path.trim() && path !== quick.lastAutoAppliedPath) return false;
 
-		const nextPath = renderQuickSubscriptionPath(template, sourceName).trim();
+		const nextPath = quick.renderPath(template, sourceName).trim();
 		if (!nextPath) return false;
 
 		path = nextPath;
-		lastAutoAppliedPath = nextPath;
+		quick.lastAutoAppliedPath = nextPath;
 		return true;
 	}
 
@@ -418,11 +390,7 @@
 		if (!response) return;
 
 		const config: ConfigResponse = response.data;
-		favoriteQuickSubscribePathTemplate = config.favorite_quick_subscribe_path || '';
-		collectionQuickSubscribePathTemplate = config.collection_quick_subscribe_path || '';
-		submissionQuickSubscribePathTemplate = config.submission_quick_subscribe_path || '';
-		bangumiQuickSubscribePathTemplate = config.bangumi_quick_subscribe_path || '';
-		pugvQuickSubscribePathTemplate = config.pugv_quick_subscribe_path || '';
+		quick.applyFromConfig(config);
 		globalFilterOptionDefault = filterOptionFromConfig(config);
 		if (options.filterOptionInheritGlobal) {
 			options.resetFilterDraft(globalFilterOptionDefault);
@@ -1037,7 +1005,7 @@
 			upId = '';
 			name = '';
 			path = '/Downloads';
-			lastAutoAppliedPath = '';
+			quick.lastAutoAppliedPath = '';
 			downloadAllSeasons = false;
 			collectionType = 'season';
 			collectionAggregateEnabled = false;
@@ -1532,7 +1500,7 @@
 	// 监听sourceType变化，重置手动输入标志和清空所有缓存
 	$: if (sourceType) {
 		isManualInput = false;
-		lastAutoAppliedPath = '';
+		quick.lastAutoAppliedPath = '';
 		// 清空搜索相关状态
 		search.results = [];
 		search.keyword = '';
@@ -1734,11 +1702,11 @@
 
 	$: batchSelectedTemplate = (() => {
 		const selectedSourceType = batch.selectedSourceType;
-		if (selectedSourceType === 'favorite') return favoriteQuickSubscribePathTemplate.trim();
-		if (selectedSourceType === 'collection') return collectionQuickSubscribePathTemplate.trim();
-		if (selectedSourceType === 'submission') return submissionQuickSubscribePathTemplate.trim();
-		if (selectedSourceType === 'bangumi') return bangumiQuickSubscribePathTemplate.trim();
-		if (selectedSourceType === 'pugv') return pugvQuickSubscribePathTemplate.trim();
+		if (selectedSourceType === 'favorite') return quick.favorite.trim();
+		if (selectedSourceType === 'collection') return quick.collection.trim();
+		if (selectedSourceType === 'submission') return quick.submission.trim();
+		if (selectedSourceType === 'bangumi') return quick.bangumi.trim();
+		if (selectedSourceType === 'pugv') return quick.pugv.trim();
 		return '';
 	})();
 
@@ -2357,8 +2325,8 @@
 								bind:value={path}
 								placeholder="例如：D:/Videos/Bilibili"
 								oninput={() => {
-									if (path !== lastAutoAppliedPath) {
-										lastAutoAppliedPath = '';
+									if (path !== quick.lastAutoAppliedPath) {
+										quick.lastAutoAppliedPath = '';
 									}
 								}}
 								required
