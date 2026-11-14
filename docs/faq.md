@@ -133,4 +133,4 @@ A: 这是 Jellyfin 字幕渲染的常见问题，特别是 ASS 格式的弹幕�
 
 ## 其他问题
 
-更多问题请访问 [GitHub Issues](https://github.com/NeeYoonc/bili-sync-up/issues)
+更多问题请访问 [GitHub Issues](https://github.com/lurenyang418/hei/issues)

@@ -164,7 +164,7 @@
 <div class="bg-background flex min-h-screen items-center justify-center">
 	<div class="w-full max-w-2xl space-y-8">
 		<div class="text-center">
-			<h1 class="text-foreground mb-2 text-3xl font-bold">欢迎使用 bili-sync</h1>
+			<h1 class="text-foreground mb-2 text-3xl font-bold">欢迎使用 hei</h1>
 			<p class="text-muted-foreground">首次使用需要进行初始设置</p>
 			<div class="mt-4 flex justify-center">
 				<div class="flex items-center space-x-2">

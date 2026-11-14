@@ -2,25 +2,25 @@
 # https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
-title: bili-sync
+title: hei
 titleTemplate: 由 Rust & Tokio 驱动的哔哩哔哩同步工具（升级优化版）
 
 hero:
-  name: "bili-sync-up"
+  name: "hei"
   text: "由 Rust & Tokio 驱动的哔哩哔哩同步工具（升级优化版）"
   actions:
     - theme: brand
-      text: 什么是 bili-sync？
+      text: 什么是 hei？
       link: /introduction
     - theme: alt
       text: 快速开始
       link: /quick-start
     - theme: alt
       text: GitHub
-      link: https://github.com/NeeYoonc/bili-sync-up
+      link: https://github.com/lurenyang418/hei
   image:
     src: /logo.webp
-    alt: bili-sync
+    alt: hei
 
 features:
   - icon: 🎯

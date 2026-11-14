@@ -60,19 +60,7 @@ services:
 
 ## 群晖 NAS
 
-群晖有两种装法：**套件（推荐）** 和 **Container Manager（Docker）**。
-
-### 方式一：套件源（推荐）
-
-1. DSM → **套件中心** → **设置** → **套件来源** → **新增**
-2. 名称随意（如 `dnof`），位置填 `https://ssp.dnof.net/`
-3. 保存后回到「套件中心 → **社群**」，找到 **Bili Sync Up** → 安装
-
-安装向导可设置 **Web 访问端口**（默认 12345）、**访问 Token**、是否放行防火墙。装完点套件中心「打开」，或访问 `http://<NAS-IP>:<端口>`（填了 Token 会先要求输入）。
-
-> 套件以专用用户 `bili-sync-up` 运行（DSM 7 套件规范）。下载目录建议用安装时自动创建的共享文件夹 `bili-sync-up`；若要指向其它共享文件夹，需在「控制面板 → 共享文件夹 → 权限」中给 `bili-sync-up` 用户读写权限。
-
-### 方式二：Container Manager（Docker）
+### Container Manager（Docker）
 
 1. 打开 Container Manager (Docker)
 2. 在「注册表」页签选择「添加 → 从 URL 添加」，填入 `ghcr.io/lurenyang418/hei:latest`（GHCR 镜像不在 Docker Hub 搜索里）

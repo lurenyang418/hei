@@ -1,6 +1,4 @@
-# bili-sync
-
-![bili-sync](https://socialify.git.ci/lurenyang418/hei/image?custom_description=%E7%94%B1%20Rust%20%26%20Tokio%20%E9%A9%B1%E5%8A%A8%E7%9A%84%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E5%90%8C%E6%AD%A5%E5%B7%A5%E5%85%B7%EF%BC%88%E5%8D%87%E7%BA%A7%E4%BC%98%E5%8C%96%E7%89%88%EF%BC%89&description=1&font=KoHo&issues=1&language=1&logo=https%3A%2F%2Fs2.loli.net%2F2023%2F12%2F02%2F9EwT2yInOu1d3zm.png&name=1&owner=1&pattern=Signal&pulls=1&stargazers=1&theme=Light)
+# hei
 
 [![GitHub Release](https://img.shields.io/github/v/release/lurenyang418/hei)](https://github.com/lurenyang418/hei/releases/latest)
 [![Build](https://github.com/lurenyang418/hei/actions/workflows/build.yml/badge.svg)](https://github.com/lurenyang418/hei/actions/workflows/build.yml)
@@ -160,9 +158,3 @@ cargo run -p bili_sync
 ## 📝 许可证
 
 本项目采用 MIT 许可证。
-
-## 🙏 致谢
-
-- [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect) - B站接口文档
-- [bilibili-api](https://github.com/Nemo2011/bilibili-api) - Python 接口实现参考
-- [danmu2ass](https://github.com/gwy15/danmu2ass) - 弹幕下载功能

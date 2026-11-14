@@ -111,7 +111,7 @@
 			</div>
 
 			<div class="min-w-0 flex-1">
-				<h3 class="mb-1 font-semibold text-zinc-900 dark:text-zinc-100">安装 bili-sync</h3>
+				<h3 class="mb-1 font-semibold text-zinc-900 dark:text-zinc-100">安装 hei</h3>
 				<p class="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
 					将应用添加到桌面，获得更好的使用体验
 				</p>

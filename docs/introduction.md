@@ -1,8 +1,8 @@
 # 项目介绍
 
-## 什么是 bili-sync？
+## 什么是 hei？
 
-bili-sync 是一个用 Rust 编写的高性能 B站视频同步下载工具，专为 NAS 用户设计。
+hei 是一个用 Rust 编写的高性能 B站视频同步下载工具，专为 NAS 用户设计。
 
 ### 核心理念
 - 🎯 **自动同步**：定期扫描视频源，自动下载新内容
@@ -49,4 +49,4 @@ bili-sync 是一个用 Rust 编写的高性能 B站视频同步下载工具，�
 - **最新版本**：v3.1.6.1
 - **开发语言**：Rust (后端) + SvelteKit (前端)
 - **开源协议**：MIT License
-- **项目地址**：[GitHub](https://github.com/NeeYoonc/bili-sync-up)
+- **项目地址**：[GitHub](https://github.com/lurenyang418/hei)

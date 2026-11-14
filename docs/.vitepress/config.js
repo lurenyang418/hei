@@ -1,7 +1,7 @@
 export default {
-  title: 'Bili-Sync',
+  title: 'hei',
   description: '由 Rust & Tokio 驱动的哔哩哔哩同步工具（升级优化版）',
-  base: '/bili-sync-up/',
+  base: '/hei/',
   lang: 'zh-CN',
   ignoreDeadLinks: true,
 
@@ -15,7 +15,7 @@ export default {
     nav: [
       { text: '首页', link: '/' },
       { text: '使用指南', link: '/installation' },
-      { text: 'GitHub', link: 'https://github.com/NeeYoonc/bili-sync-up' }
+      { text: 'GitHub', link: 'https://github.com/lurenyang418/hei' }
     ],
 
     sidebar: [
@@ -56,7 +56,7 @@ export default {
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/NeeYoonc/bili-sync-up' }
+      { icon: 'github', link: 'https://github.com/lurenyang418/hei' }
     ],
 
     footer: {

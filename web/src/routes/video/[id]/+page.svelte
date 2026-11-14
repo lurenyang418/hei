@@ -1062,7 +1062,7 @@
 							{/if}
 							{#if onlinePlayMode}
 								<div class="mb-3 text-sm text-gray-500">
-									当前为 B 站内嵌播放，清晰度和码率由平台播放器控制，不继承 bili-sync
+									当前为 B 站内嵌播放，清晰度和码率由平台播放器控制，不继承 hei
 									的清晰度设置。
 								</div>
 							{/if}

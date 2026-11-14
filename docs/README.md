@@ -1,4 +1,4 @@
-# bili-sync
+# hei
 
 > 🎬 强大的 Bilibili 视频批量下载和管理工具
 
