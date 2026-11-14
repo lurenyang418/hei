@@ -13,6 +13,7 @@
 	import { BatchSelectionStore } from '$lib/stores/add-source/batch.svelte';
 	import { BangumiSeasonStore } from '$lib/stores/add-source/bangumi.svelte';
 	import { PugvCourseStore } from '$lib/stores/add-source/pugv.svelte';
+	import { SearchStore } from '$lib/stores/add-source/search.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -122,6 +123,20 @@
 
 	const pugv = new PugvCourseStore();
 
+	const search = new SearchStore({
+		getSourceType: () => sourceType,
+		onBeforeSearch: () => {
+			clearFollowingsPanel();
+			if (sourceType === 'collection') {
+				clearCollectionPanels();
+			} else if (sourceType === 'favorite') {
+				clearFavoritePanels();
+			} else if (sourceType === 'submission') {
+				submission.open = false;
+			}
+		}
+	});
+
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
 		{ value: 'zh-CN', label: '中文' },
@@ -216,22 +231,10 @@
 	// 添加手动输入标志
 	let isManualInput = false;
 
-	// 搜索相关
-	let searchKeyword = '';
-	let searchLoading = false;
-	let searchResults: SearchResultItem[] = [];
-	let showSearchResults = false;
-
-	let searchTotalResults = 0;
 
 	function clearSearchPanel(options: { clearKeyword?: boolean } = {}) {
-		showSearchResults = false;
-		searchResults = [];
-		searchTotalResults = 0;
+		search.clear(options);
 		hover.hide();
-		if (options.clearKeyword) {
-			searchKeyword = '';
-		}
 	}
 
 	function clearFollowingsPanel() {
@@ -556,126 +559,7 @@
 
 	// 搜索B站内容
 	async function handleSearch(overrideSearchType?: string) {
-		if (!searchKeyword.trim()) {
-			toast.error('请输入搜索关键词');
-			return;
-		}
-
-		clearFollowingsPanel();
-		if (sourceType === 'collection') {
-			clearCollectionPanels();
-		} else if (sourceType === 'favorite') {
-			clearFavoritePanels();
-		} else if (sourceType === 'submission') {
-			submission.open = false;
-		}
-
-		// 根据参数或当前选择的视频源类型确定搜索类型
-		let searchType: 'video' | 'bili_user' | 'media_bangumi';
-		if (overrideSearchType) {
-			searchType = overrideSearchType as 'video' | 'bili_user' | 'media_bangumi';
-		} else {
-			switch (sourceType) {
-				case 'collection':
-				case 'submission':
-				case 'favorite': // 收藏夹类型也搜索UP主
-				case 'pugv': // 课程先按讲师（UP 主）搜索，再列出其名下课程
-					searchType = 'bili_user';
-					break;
-				case 'bangumi':
-					searchType = 'media_bangumi';
-					break;
-				default:
-					searchType = 'video';
-					break;
-			}
-		}
-
-		searchResults = [];
-		searchTotalResults = 0;
-
-		const searchResponse = await runRequest(
-			async () => {
-				// 针对番剧搜索，需要更多页面因为每页实际只有25+25=50个结果但分配可能不均
-				const pageSize = searchType === 'media_bangumi' ? 100 : 50;
-
-				// 第一次请求获取总数
-				const firstResult = await api.searchBilibili({
-					keyword: searchKeyword,
-					search_type: searchType,
-					page: 1,
-					page_size: pageSize
-				});
-
-				if (!firstResult.data.success) {
-					toast.error('搜索失败');
-					return null;
-				}
-
-				const totalResults = firstResult.data.total;
-				let allResults = [...firstResult.data.results];
-
-				// 如果总数超过pageSize，继续获取剩余页面
-				if (totalResults > pageSize) {
-					const totalPages = firstResult.data.num_pages || Math.ceil(totalResults / pageSize);
-					const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-
-					// 串行获取剩余页面，避免并发请求过多导致失败
-					for (const page of remainingPages) {
-						try {
-							const pageResult = await api.searchBilibili({
-								keyword: searchKeyword,
-								search_type: searchType,
-								page,
-								page_size: pageSize
-							});
-
-							if (pageResult.data.success && pageResult.data.results) {
-								allResults.push(...pageResult.data.results);
-							}
-
-							// 添加小延迟避免请求过于频繁
-							await new Promise((resolve) => setTimeout(resolve, 100));
-						} catch {
-							// 静默处理失败，继续获取下一页
-						}
-					}
-				}
-
-				// 去重处理（基于season_id, bvid, mid等唯一标识）
-				const uniqueResults = allResults.filter((result, index, arr) => {
-					const id = result.season_id || result.bvid || result.mid || `${result.title}_${index}`;
-					return (
-						arr.findIndex((r) => {
-							const rid = r.season_id || r.bvid || r.mid || `${r.title}_${arr.indexOf(r)}`;
-							return rid === id;
-						}) === index
-					);
-				});
-
-				return { uniqueResults, totalResults };
-			},
-			{
-				setLoading: (value) => (searchLoading = value),
-				context: '搜索失败'
-			}
-		);
-		if (!searchResponse) return;
-
-		const { uniqueResults, totalResults } = searchResponse;
-		searchTotalResults = totalResults;
-		searchResults = uniqueResults;
-		showSearchResults = true;
-
-		// 优化提示信息
-		const successRate = ((uniqueResults.length / totalResults) * 100).toFixed(1);
-		if (uniqueResults.length < totalResults) {
-			toast.success(
-				`搜索完成，获取到 ${uniqueResults.length}/${totalResults} 个结果 (${successRate}%)`
-			);
-		} else {
-			toast.success(`搜索完成，共获取到 ${uniqueResults.length} 个结果`);
-		}
+		await search.search(overrideSearchType);
 	}
 
 	// 选择搜索结果
@@ -1666,7 +1550,7 @@
 	$: filteredUserFollowings = userFollowings;
 
 	// 过滤后的搜索结果（根据类型过滤已存在的源）
-	$: filteredSearchResults = searchResults.filter((result) => {
+	$: filteredSearchResults = search.results.filter((result) => {
 		if (sourceType === 'submission' && result.mid) {
 			return !existingSubmissionIds.has(Number(result.mid));
 		}
@@ -1705,10 +1589,10 @@
 		isManualInput = false;
 		lastAutoAppliedPath = '';
 		// 清空搜索相关状态
-		searchResults = [];
-		searchKeyword = '';
-		searchTotalResults = 0;
-		showSearchResults = false;
+		search.results = [];
+		search.keyword = '';
+		search.total = 0;
+		search.open = false;
 		hover.hide();
 		// 清空各类型的缓存数据
 		userFollowings = [];
@@ -2080,7 +1964,7 @@
 											<div class="flex {isMobile ? 'flex-col gap-2' : 'gap-2'} mt-2">
 												<Input
 													id="search"
-													bind:value={searchKeyword}
+													bind:value={search.keyword}
 													placeholder={sourceType === 'submission' || sourceType === 'collection'
 														? '搜索UP主...'
 														: sourceType === 'bangumi'
@@ -2099,11 +1983,11 @@
 												<div class="flex gap-2">
 													<Button
 														onclick={() => handleSearch()}
-														disabled={searchLoading || !searchKeyword.trim()}
+														disabled={search.loading || !search.keyword.trim()}
 														size="sm"
 														class={isMobile ? 'flex-1' : ''}
 													>
-														{#if searchLoading}
+														{#if search.loading}
 															搜索中...
 														{:else}
 															<Search class="h-4 w-4" />
@@ -2205,22 +2089,22 @@
 											<div class="flex {isMobile ? 'flex-col gap-2' : 'gap-2'}">
 												<Input
 													placeholder="搜索UP主名称..."
-													bind:value={searchKeyword}
+													bind:value={search.keyword}
 													onkeydown={(e) => e.key === 'Enter' && handleSearch()}
 												/>
 												<Button
 													onclick={() => handleSearch()}
-													disabled={searchLoading || !searchKeyword.trim()}
+													disabled={search.loading || !search.keyword.trim()}
 													size="sm"
 													class={isMobile ? 'w-full' : ''}
 												>
-													{#if searchLoading}搜索中...{:else}搜索{/if}
+													{#if search.loading}搜索中...{:else}搜索{/if}
 												</Button>
 											</div>
 
 											<p class="text-muted-foreground mt-2 text-xs">
-												{#if showSearchResults && searchResults.length > 0}
-													找到 {searchResults.length} 个UP主，请在{isCompactLayout
+												{#if search.open && search.results.length > 0}
+													找到 {search.results.length} 个UP主，请在{isCompactLayout
 														? '下方'
 														: '右侧'}列表中选择
 												{:else}
@@ -3530,14 +3414,14 @@
 				</div>
 
 				<!-- 右侧：搜索结果区域 -->
-				{#if showSearchResults && searchResults.length > 0}
+				{#if search.open && search.results.length > 0}
 					<SearchResultsPanel
 						{isCompactLayout}
 						{isMobile}
 						batchMode={batch.mode}
 						{sourceType}
-						{searchResults}
-						{searchTotalResults}
+						searchResults={search.results}
+						searchTotalResults={search.total}
 						{filteredSearchResults}
 						batchCheckboxStates={batch.checkboxStates}
 						{enableSearchAnimations}
@@ -3545,9 +3429,9 @@
 						isSubmissionExists={isSubmissionExists}
 						isBatchSelected={(key) => batch.isSelected(key)}
 						onClose={() => {
-							showSearchResults = false;
-							searchResults = [];
-							searchTotalResults = 0;
+							search.open = false;
+							search.results = [];
+							search.total = 0;
 						}}
 						onSelectAll={() => selectAllVisible('search')}
 						onSelectResult={selectSearchResult}
