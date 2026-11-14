@@ -28,7 +28,6 @@
 	import { formatTimestampOrFallback } from '$lib/utils/timezone';
 	import { buildAuthenticatedStreamUrl } from '$lib/utils/live-stream';
 	import { createManagedEventSource } from '$lib/utils/live-event-source';
-	import SectionHeader from '$lib/components/section-header.svelte';
 	import { toast } from 'svelte-sonner';
 
 	let queueStatus: QueueStatusResponse | null = null;
@@ -190,21 +189,13 @@
 </script>
 
 <div class="container mx-auto px-4">
-	<SectionHeader
-		as="h1"
-		title="任务队列"
-		description="查看和管理系统任务队列状态"
-		titleClass="text-3xl font-bold"
-		descriptionClass="text-muted-foreground mt-2"
-		class="mb-6"
-	>
-		{#snippet actions()}
-			<Button variant="outline" size="sm" onclick={handleRefresh} disabled={loading}>
-				<RefreshCw class="mr-2 h-4 w-4 {loading ? 'animate-spin' : ''}" />
-				刷新
-			</Button>
-		{/snippet}
-	</SectionHeader>
+	<div class="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+		<p class="text-muted-foreground mt-2">查看和管理系统任务队列状态</p>
+		<Button variant="outline" size="sm" onclick={handleRefresh} disabled={loading}>
+			<RefreshCw class="mr-2 h-4 w-4 {loading ? 'animate-spin' : ''}" />
+			刷新
+		</Button>
+	</div>
 
 	{#if error}
 		<Card class="border-destructive">
@@ -224,9 +215,9 @@
 		</div>
 	{:else if queueStatus}
 		<!-- 系统状态总览 -->
-		<div class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+		<div class="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">扫描状态</CardTitle>
 					{#if queueStatus.is_scanning}
 						<Clock class="h-4 w-4 text-orange-500" />
@@ -234,8 +225,8 @@
 						<CheckCircle class="h-4 w-4 text-green-500" />
 					{/if}
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">
 						{queueStatus.is_scanning ? '扫描中' : '空闲'}
 					</div>
 					<p class="text-muted-foreground text-xs">
@@ -245,14 +236,14 @@
 			</Card>
 
 
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">视频源删除队列</CardTitle>
 					<Trash2 class="text-muted-foreground h-4 w-4" />
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">{queueStatus.delete_queue.length}</div>
-					<div class="flex items-center gap-2">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">{queueStatus.delete_queue.length}</div>
+					<div class="mt-1 flex items-center gap-2">
 						<Badge
 							variant={getQueueStatusVariant(
 								queueStatus.delete_queue.is_processing,
@@ -268,14 +259,14 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">视频删除队列</CardTitle>
 					<Trash2 class="text-muted-foreground h-4 w-4" />
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">{queueStatus.video_delete_queue.length}</div>
-					<div class="flex items-center gap-2">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">{queueStatus.video_delete_queue.length}</div>
+					<div class="mt-1 flex items-center gap-2">
 						<Badge
 							variant={getQueueStatusVariant(
 								queueStatus.video_delete_queue.is_processing,
@@ -291,14 +282,14 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">添加队列</CardTitle>
 					<Plus class="text-muted-foreground h-4 w-4" />
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">{queueStatus.add_queue.length}</div>
-					<div class="flex items-center gap-2">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">{queueStatus.add_queue.length}</div>
+					<div class="mt-1 flex items-center gap-2">
 						<Badge
 							variant={getQueueStatusVariant(
 								queueStatus.add_queue.is_processing,
@@ -314,16 +305,16 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">配置队列</CardTitle>
 					<Settings class="text-muted-foreground h-4 w-4" />
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">
 						{queueStatus.config_queue.update_length + queueStatus.config_queue.reload_length}
 					</div>
-					<div class="flex items-center gap-2">
+					<div class="mt-1 flex items-center gap-2">
 						<Badge
 							variant={getQueueStatusVariant(
 								queueStatus.config_queue.is_processing,
@@ -339,14 +330,14 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">弹幕刷新队列</CardTitle>
 					<RefreshCw class="text-muted-foreground h-4 w-4" />
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">{queueStatus.danmaku_queue.length}</div>
-					<div class="flex items-center gap-2">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">{queueStatus.danmaku_queue.length}</div>
+					<div class="mt-1 flex items-center gap-2">
 						<Badge
 							variant={getQueueStatusVariant(
 								queueStatus.danmaku_queue.is_processing,
@@ -362,14 +353,14 @@
 				</CardContent>
 			</Card>
 
-			<Card>
-				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+			<Card class="gap-2 py-3">
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
 					<CardTitle class="text-sm font-medium">AI 重命名队列</CardTitle>
 					<WandSparkles class="text-muted-foreground h-4 w-4" />
 				</CardHeader>
-				<CardContent>
-					<div class="text-2xl font-bold">{queueStatus.ai_rename_queue.length}</div>
-					<div class="flex items-center gap-2">
+				<CardContent class="px-4 pb-3">
+					<div class="text-xl font-bold">{queueStatus.ai_rename_queue.length}</div>
+					<div class="mt-1 flex items-center gap-2">
 						<Badge
 							variant={getQueueStatusVariant(
 								queueStatus.ai_rename_queue.is_processing,
@@ -391,27 +382,18 @@
 		<div class="grid gap-6 lg:grid-cols-3">
 			<div class="space-y-6 lg:col-span-2">
 				<!-- 视频源删除队列 -->
-				<Card>
-					<CardHeader>
-						<CardTitle class="flex items-center gap-2">
-							<Trash2 class="h-5 w-5" />
+				<Card class="gap-2 py-3">
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
+						<CardTitle class="flex items-center gap-2 text-sm font-medium">
+							<Trash2 class="h-4 w-4" />
 							视频源删除队列
-							{#if queueStatus.delete_queue.is_processing}
-								<Badge variant="destructive">处理中</Badge>
-							{/if}
 						</CardTitle>
-						<CardDescription>等待处理的视频源删除任务</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent class="px-4 pb-3">
 						{#if queueStatus.delete_queue.tasks.length === 0}
-							<div class="text-muted-foreground flex items-center justify-center py-8">
-								<div class="text-center">
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 opacity-50" />
-									<p>队列为空</p>
-								</div>
-							</div>
+							<p class="text-muted-foreground py-1 text-sm">队列为空</p>
 						{:else}
-							<div class="space-y-3">
+							<div class="space-y-2">
 								{#each queueStatus.delete_queue.tasks as task (task.task_id)}
 									<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 										<div class="flex items-center gap-3">
@@ -446,27 +428,18 @@
 				</Card>
 
 				<!-- 视频删除队列 -->
-				<Card>
-					<CardHeader>
-						<CardTitle class="flex items-center gap-2">
-							<Trash2 class="h-5 w-5" />
+				<Card class="gap-2 py-3">
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
+						<CardTitle class="flex items-center gap-2 text-sm font-medium">
+							<Trash2 class="h-4 w-4" />
 							视频删除队列
-							{#if queueStatus.video_delete_queue.is_processing}
-								<Badge variant="destructive">处理中</Badge>
-							{/if}
 						</CardTitle>
-						<CardDescription>等待处理的视频删除任务</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent class="px-4 pb-3">
 						{#if queueStatus.video_delete_queue.tasks.length === 0}
-							<div class="text-muted-foreground flex items-center justify-center py-8">
-								<div class="text-center">
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 opacity-50" />
-									<p>队列为空</p>
-								</div>
-							</div>
+							<p class="text-muted-foreground py-1 text-sm">队列为空</p>
 						{:else}
-							<div class="space-y-3">
+							<div class="space-y-2">
 								{#each queueStatus.video_delete_queue.tasks as task (task.task_id)}
 									<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 										<div class="flex items-center gap-3">
@@ -501,27 +474,18 @@
 				</Card>
 
 				<!-- 添加队列 -->
-				<Card>
-					<CardHeader>
-						<CardTitle class="flex items-center gap-2">
-							<Plus class="h-5 w-5" />
+				<Card class="gap-2 py-3">
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
+						<CardTitle class="flex items-center gap-2 text-sm font-medium">
+							<Plus class="h-4 w-4" />
 							添加队列
-							{#if queueStatus.add_queue.is_processing}
-								<Badge variant="destructive">处理中</Badge>
-							{/if}
 						</CardTitle>
-						<CardDescription>等待处理的视频源添加任务</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent class="px-4 pb-3">
 						{#if queueStatus.add_queue.tasks.length === 0}
-							<div class="text-muted-foreground flex items-center justify-center py-8">
-								<div class="text-center">
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 opacity-50" />
-									<p>队列为空</p>
-								</div>
-							</div>
+							<p class="text-muted-foreground py-1 text-sm">队列为空</p>
 						{:else}
-							<div class="space-y-3">
+							<div class="space-y-2">
 								{#each queueStatus.add_queue.tasks as task (task.task_id)}
 									<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 										<div class="flex items-center gap-3">
@@ -555,27 +519,18 @@
 					</CardContent>
 				</Card>
 
-				<Card>
-					<CardHeader>
-						<CardTitle class="flex items-center gap-2">
-							<RefreshCw class="h-5 w-5" />
+				<Card class="gap-2 py-3">
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
+						<CardTitle class="flex items-center gap-2 text-sm font-medium">
+							<RefreshCw class="h-4 w-4" />
 							弹幕刷新队列
-							{#if queueStatus.danmaku_queue.is_processing}
-								<Badge variant="destructive">处理中</Badge>
-							{/if}
 						</CardTitle>
-						<CardDescription>等待处理的手动弹幕刷新任务</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent class="px-4 pb-3">
 						{#if queueStatus.danmaku_queue.tasks.length === 0}
-							<div class="text-muted-foreground flex items-center justify-center py-8">
-								<div class="text-center">
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 opacity-50" />
-									<p>队列为空</p>
-								</div>
-							</div>
+							<p class="text-muted-foreground py-1 text-sm">队列为空</p>
 						{:else}
-							<div class="space-y-3">
+							<div class="space-y-2">
 								{#each queueStatus.danmaku_queue.tasks as task (task.task_id)}
 									<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 										<div class="flex items-center gap-3">
@@ -610,27 +565,18 @@
 				</Card>
 
 				<!-- AI 重命名队列 -->
-				<Card>
-					<CardHeader>
-						<CardTitle class="flex items-center gap-2">
-							<WandSparkles class="h-5 w-5" />
+				<Card class="gap-2 py-3">
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
+						<CardTitle class="flex items-center gap-2 text-sm font-medium">
+							<WandSparkles class="h-4 w-4" />
 							AI 重命名队列
-							{#if queueStatus.ai_rename_queue.is_processing}
-								<Badge variant="destructive">处理中</Badge>
-							{/if}
 						</CardTitle>
-						<CardDescription>等待执行的 AI 批量重命名历史文件任务</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent class="px-4 pb-3">
 						{#if queueStatus.ai_rename_queue.tasks.length === 0}
-							<div class="text-muted-foreground flex items-center justify-center py-8">
-								<div class="text-center">
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 opacity-50" />
-									<p>队列为空</p>
-								</div>
-							</div>
+							<p class="text-muted-foreground py-1 text-sm">队列为空</p>
 						{:else}
-							<div class="space-y-3">
+							<div class="space-y-2">
 								{#each queueStatus.ai_rename_queue.tasks as task (task.task_id)}
 									<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 										<div class="flex items-center gap-3">
@@ -667,27 +613,18 @@
 				</Card>
 
 				<!-- 配置队列 -->
-				<Card>
-					<CardHeader>
-						<CardTitle class="flex items-center gap-2">
-							<Settings class="h-5 w-5" />
+				<Card class="gap-2 py-3">
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
+						<CardTitle class="flex items-center gap-2 text-sm font-medium">
+							<Settings class="h-4 w-4" />
 							配置队列
-							{#if queueStatus.config_queue.is_processing}
-								<Badge variant="destructive">处理中</Badge>
-							{/if}
 						</CardTitle>
-						<CardDescription>等待处理的配置更新和重载任务</CardDescription>
 					</CardHeader>
-					<CardContent>
+					<CardContent class="px-4 pb-3">
 						{#if queueStatus.config_queue.update_tasks.length === 0 && queueStatus.config_queue.reload_tasks.length === 0}
-							<div class="text-muted-foreground flex items-center justify-center py-8">
-								<div class="text-center">
-									<CheckCircle class="mx-auto mb-3 h-12 w-12 opacity-50" />
-									<p>队列为空</p>
-								</div>
-							</div>
+							<p class="text-muted-foreground py-1 text-sm">队列为空</p>
 						{:else}
-							<div class="grid gap-4 md:grid-cols-2">
+							<div class="grid gap-3 md:grid-cols-2">
 								<!-- 更新配置任务 -->
 								<div>
 									<h4 class="mb-3 text-sm font-medium">
@@ -696,7 +633,7 @@
 									{#if queueStatus.config_queue.update_tasks.length === 0}
 										<p class="text-muted-foreground text-sm">暂无任务</p>
 									{:else}
-										<div class="space-y-3">
+										<div class="space-y-2">
 											{#each queueStatus.config_queue.update_tasks as task (task.task_id)}
 												<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 													<div class="flex items-center gap-3">
@@ -739,7 +676,7 @@
 									{#if queueStatus.config_queue.reload_tasks.length === 0}
 										<p class="text-muted-foreground text-sm">暂无任务</p>
 									{:else}
-										<div class="space-y-3">
+										<div class="space-y-2">
 											{#each queueStatus.config_queue.reload_tasks as task (task.task_id)}
 												<div class="bg-muted/50 flex items-center justify-between rounded-lg p-3">
 													<div class="flex items-center gap-3">

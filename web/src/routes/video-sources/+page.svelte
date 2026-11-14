@@ -22,7 +22,6 @@
 	import KeywordFilterDialog from '$lib/components/keyword-filter-dialog.svelte';
 	import AiPromptDialog from '$lib/components/ai-prompt-dialog.svelte';
 	import FilterOptionEditor from '$lib/components/filter-option-editor.svelte';
-	import SectionHeader from '$lib/components/section-header.svelte';
 	import Loading from '$lib/components/ui/Loading.svelte';
 	import SelectAllButton from '$lib/components/select-all-button.svelte';
 	import EmptyState from '$lib/components/empty-state.svelte';
@@ -1448,34 +1447,28 @@
 
 <div class="space-y-6">
 	<!-- 页面头部 -->
-	<SectionHeader
-		as="h1"
-		title="视频源管理"
-		description="管理 B 站视频源和下载设置。"
-		titleTooltip="管理和配置收藏夹、合集、投稿、番剧与稍后再看视频源"
-		titleClass="font-bold {isMobileQuery.current ? 'text-xl' : 'text-2xl'}"
-		descriptionClass="text-muted-foreground {isMobileQuery.current ? 'text-sm' : 'text-base'} mt-1"
-	>
-		{#snippet actions()}
-			<Button
-				onclick={navigateToAddSource}
-				class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
-				title="添加新的 B 站视频源"
-			>
-				<PlusIcon class="h-4 w-4" />
-				添加 B 站视频源
-			</Button>
-		{/snippet}
-	</SectionHeader>
+	<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+		<p class="text-muted-foreground {isMobileQuery.current ? 'text-sm' : 'text-base'}">
+			管理 B 站视频源和下载设置。
+		</p>
+		<Button
+			onclick={navigateToAddSource}
+			class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
+			title="添加新的 B 站视频源"
+		>
+			<PlusIcon class="h-4 w-4" />
+			添加 B 站视频源
+		</Button>
+	</div>
 
 
 		<div class="mt-6">
 			{#if loading}
 				<Loading />
 			{:else}
-					<Card class="mb-6">
-						<CardContent class="pt-6">
-							<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+					<Card class="mb-4 py-3">
+						<CardContent class="px-4">
+							<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
 								<div class="space-y-1">
 									<div
 										class="text-sm font-semibold"

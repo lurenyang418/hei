@@ -7,7 +7,6 @@
 	import VideoCard from '$lib/components/video-card.svelte';
 	import Pagination from '$lib/components/pagination.svelte';
 	import SearchBar from '$lib/components/search-bar.svelte';
-	import SectionHeader from '$lib/components/section-header.svelte';
 	import Loading from '$lib/components/ui/Loading.svelte';
 	import SelectAllButton from '$lib/components/select-all-button.svelte';
 	import EmptyState from '$lib/components/empty-state.svelte';
@@ -993,13 +992,7 @@
 </svelte:head>
 
 <div class="space-y-6">
-	<SectionHeader
-		as="h1"
-		title="视频管理"
-		description="统一查看已同步的 B 站视频。"
-		titleClass="text-2xl font-bold"
-		descriptionClass="text-muted-foreground mt-1 text-sm"
-	/>
+	<p class="text-muted-foreground text-sm">统一查看已同步的 B 站视频。</p>
 
 	<div>
 		<div class="mt-6 space-y-6">

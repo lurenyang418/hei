@@ -19,7 +19,6 @@
 <div class="space-y-6">
 	<div class="flex items-start justify-between gap-4">
 		<div>
-			<h1 class="text-3xl font-bold tracking-tight">更新记录</h1>
 			<p class="text-muted-foreground mt-2">查看最新更新和改进记录</p>
 		</div>
 		<div class="text-right">

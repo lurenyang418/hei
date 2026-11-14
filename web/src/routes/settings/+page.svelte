@@ -408,7 +408,6 @@
 	let aiRenameProvider = 'deepseek';
 	let aiRenameBaseUrl = 'https://api.deepseek.com/v1';
 	let aiRenameApiKey = '';
-	let aiRenameDeepseekWebToken = '';
 	let aiRenameModel = 'deepseek-v4-flash';
 	let aiRenameTimeoutSeconds = 30;
 	let aiRenameVideoPromptHint = '';
@@ -416,6 +415,8 @@
 	let aiRenameRenameParentDir = false;
 	let aiRenameSaving = false;
 	let aiRenameClearingCache = false;
+	let aiRenameModels: string[] = [];
+	let aiRenameModelsLoading = false;
 
 	// 数据库管理
 	let databaseStatus: {
@@ -821,10 +822,9 @@
 
 		// AI重命名配置
 		aiRenameEnabled = config.ai_rename?.enabled ?? false;
-		aiRenameProvider = config.ai_rename?.provider || 'deepseek';
+		aiRenameProvider = config.ai_rename?.provider === 'custom' ? 'custom' : 'deepseek';
 		aiRenameBaseUrl = config.ai_rename?.base_url || 'https://api.deepseek.com/v1';
 		aiRenameApiKey = config.ai_rename?.api_key || '';
-		aiRenameDeepseekWebToken = config.ai_rename?.deepseek_web_token || '';
 		aiRenameModel = config.ai_rename?.model || 'deepseek-v4-flash';
 		aiRenameTimeoutSeconds = config.ai_rename?.timeout_seconds ?? 30;
 		aiRenameVideoPromptHint = config.ai_rename?.video_prompt_hint || '';
@@ -1664,7 +1664,6 @@
 			ai_rename_provider: aiRenameProvider.trim(),
 			ai_rename_base_url: aiRenameBaseUrl.trim(),
 			ai_rename_api_key: aiRenameApiKey.trim(),
-			ai_rename_deepseek_web_token: aiRenameDeepseekWebToken.trim(),
 			ai_rename_model: aiRenameModel.trim(),
 			ai_rename_timeout_seconds: normalizeNumberInput(
 				aiRenameTimeoutSeconds,
@@ -1703,6 +1702,47 @@
 			toast.success('已清除所有AI对话历史缓存');
 		} else {
 			toast.error('清除失败', { description: response.data.message });
+		}
+	}
+
+	// 从服务商 /models 端点获取可用模型（前端直连，需服务商允许跨域）
+	async function fetchAiRenameModels() {
+		const base = aiRenameBaseUrl.trim().replace(/\/+$/, '');
+		const key = aiRenameApiKey.trim();
+		if (!base) {
+			toast.error('请先填写 API Base URL');
+			return;
+		}
+		if (!key) {
+			toast.error('请先填写 API Key');
+			return;
+		}
+
+		aiRenameModelsLoading = true;
+		try {
+			const response = await fetch(`${base}/models`, {
+				headers: { Authorization: `Bearer ${key}` }
+			});
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}`);
+			}
+			const payload = await response.json();
+			const models: string[] = Array.isArray(payload?.data)
+				? payload.data
+						.map((item: { id?: string }) => item?.id)
+						.filter((id: string | undefined): id is string => Boolean(id))
+				: [];
+			if (models.length === 0) {
+				throw new Error('服务商未返回模型列表');
+			}
+			aiRenameModels = [...new Set(models)].sort((a, b) => a.localeCompare(b));
+			toast.success(`已获取 ${aiRenameModels.length} 个模型`);
+		} catch (error) {
+			toast.error('获取模型列表失败', {
+				description: `${error instanceof Error ? error.message : String(error)}；可手动填写模型名称`
+			});
+		} finally {
+			aiRenameModelsLoading = false;
 		}
 	}
 
@@ -1798,16 +1838,16 @@
 			{:else}
 				<!-- 设置分类卡片列表 -->
 				<div
-					class="grid gap-4 {isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-3'}"
+					class="grid gap-3 {isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-3'}"
 				>
 					{#each settingCategories as category (category.id)}
 						<Card
-							class="hover:border-primary/50 cursor-pointer transition-all hover:shadow-md {isMobile
+							class="hover:border-primary/50 gap-0 py-4 cursor-pointer transition-all hover:shadow-md {isMobile
 								? 'min-h-[80px]'
 								: ''}"
 							onclick={() => (openSheet = category.id)}
 						>
-							<CardHeader>
+							<CardHeader class="px-4 py-0">
 								<div class="flex {isMobile ? 'flex-col gap-2' : 'items-start gap-3'}">
 									<div class="bg-primary/10 rounded-lg p-2 {isMobile ? 'self-start' : ''}">
 										<svelte:component
@@ -2521,37 +2561,40 @@
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
-		<div class="flex-1 space-y-6 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-			<div class="mt-6 space-y-6">
+		<div class="flex-1 space-y-4 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
+			<div class="mt-2 space-y-4">
 				<h3 class="text-base font-semibold">下载配置</h3>
 
-				<div class="flex items-center space-x-2">
-					<input
-						type="checkbox"
-						id="parallel-download"
-						bind:checked={parallelDownloadEnabled}
-						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
-					/>
-					<Label
-						for="parallel-download"
-						class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-					>
-						启用多线程下载
-					</Label>
-				</div>
-
-				{#if parallelDownloadEnabled}
-					<div class="ml-6 space-y-4">
-						<Label for="threads">下载线程数</Label>
-						<Input
-							id="threads"
-							type="number"
-							bind:value={parallelDownloadThreads}
-							min="1"
-							max="32"
-							placeholder="4"
+				<div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 md:grid-cols-4">
+					<div class="flex items-center space-x-2 md:pb-2">
+						<input
+							type="checkbox"
+							id="parallel-download"
+							bind:checked={parallelDownloadEnabled}
+							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
-						<div class="flex items-center space-x-2">
+						<Label
+							for="parallel-download"
+							class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+						>
+							启用多线程下载
+						</Label>
+					</div>
+
+					{#if parallelDownloadEnabled}
+						<div class="space-y-2">
+							<Label for="threads">下载线程数</Label>
+							<Input
+								id="threads"
+								type="number"
+								bind:value={parallelDownloadThreads}
+								min="1"
+								max="32"
+								placeholder="4"
+							/>
+						</div>
+
+						<div class="flex items-center space-x-2 md:pb-2">
 							<input
 								type="checkbox"
 								id="use-aria2"
@@ -2560,17 +2603,20 @@
 							/>
 							<Label for="use-aria2" class="text-sm leading-none font-medium">优先使用aria2</Label>
 						</div>
-						<p class="text-muted-foreground text-xs">
-							关闭后将使用原生分片多线程下载（不依赖aria2 RPC）。
-						</p>
-					</div>
+					{/if}
+				</div>
+
+				{#if parallelDownloadEnabled}
+					<p class="text-muted-foreground text-xs">
+						关闭后将使用原生分片多线程下载（不依赖aria2 RPC）。
+					</p>
 				{/if}
 			</div>
 
-			<div class="mt-6 space-y-6">
+			<div class="mt-2 space-y-4">
 				<h3 class="text-base font-semibold">并发控制</h3>
 
-				<div class="grid grid-cols-1 gap-4 {isMobile ? 'sm:grid-cols-1' : 'md:grid-cols-2'}">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
 					<div class="space-y-2">
 						<Label for="concurrent-video">同时处理视频数</Label>
 						<Input
@@ -2636,7 +2682,7 @@
 			</div>
 
 			<div
-				class="mt-6 rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-800 dark:bg-purple-950/20"
+				class="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-800 dark:bg-purple-950/20"
 			>
 				<h5 class="mb-2 font-medium text-purple-800 dark:text-purple-200">并发控制说明</h5>
 				<div class="space-y-1 text-sm text-purple-700 dark:text-purple-300">
@@ -2676,7 +2722,7 @@
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
 		<div class="min-h-0 flex-1 space-y-6 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-			<div class="grid grid-cols-1 gap-4 {isMobile ? 'sm:grid-cols-1' : 'md:grid-cols-2'}">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
 				<div class="space-y-2">
 					<Label for="danmaku-duration">弹幕持续时间（秒）</Label>
 					<Input
@@ -2818,11 +2864,11 @@
 				</div>
 			</div>
 
-			<div class="rounded-lg border p-4">
-				<div class="mb-4 flex items-center justify-between gap-3">
+			<div class="rounded-lg border p-3">
+				<div class="mb-3 flex items-center justify-between gap-3">
 					<div>
 						<h5 class="cursor-help font-medium" title={danmakuUpdateHelp.section}>弹幕增量更新</h5>
-						<p class="text-muted-foreground mt-1 text-sm">
+						<p class="text-muted-foreground mt-1 text-xs">
 							按视频发布时间分阶段刷新已下载分页的弹幕，并在冷冻期后停止后台轮询。
 						</p>
 					</div>
@@ -2836,7 +2882,7 @@
 					</label>
 				</div>
 
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
 					<div class="space-y-2">
 						<Label
 							for="danmaku-update-fresh-days"
@@ -2940,19 +2986,6 @@
 							disabled={!danmakuUpdateEnabled}
 						/>
 					</div>
-				</div>
-			</div>
-
-			<div
-				class="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950/20"
-			>
-				<h5 class="mb-2 font-medium text-green-800 dark:text-green-200">弹幕设置说明</h5>
-				<div class="space-y-1 text-sm text-green-700 dark:text-green-300">
-					<p><strong>持续时间：</strong>弹幕在屏幕上显示的时间（秒）</p>
-					<p><strong>字体样式：</strong>字体、大小、加粗、描边等外观设置</p>
-					<p><strong>布局设置：</strong>轨道高度、间距、占比等位置控制</p>
-					<p><strong>不透明度：</strong>0-255，0完全不透明，255完全透明</p>
-					<p><strong>时间偏移：</strong>正值延后弹幕，负值提前弹幕</p>
 				</div>
 			</div>
 		</div>
@@ -3915,9 +3948,9 @@
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
-		<div class="min-h-0 flex-1 space-y-6 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
+		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
 			<!-- Basic System Settings -->
-			<div class="mt-6 space-y-6">
+			<div class="mt-2 space-y-4">
 				<h3 class="text-base font-semibold">基本系统设置</h3>
 
 				<div class="space-y-2">
@@ -3977,7 +4010,7 @@
 					<p class="text-muted-foreground text-sm">UP主头像和person.nfo文件的保存目录路径</p>
 				</div>
 
-				<div class="space-y-4">
+				<div class="space-y-3">
 					<div class="space-y-1">
 						<h4 class="text-sm font-medium">快捷订阅路径模板</h4>
 						<p class="text-muted-foreground text-sm">
@@ -3988,7 +4021,7 @@
 						</p>
 					</div>
 
-					<div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+					<div class="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
 						<div class="space-y-2">
 							<Label for="favorite-quick-subscribe-path">收藏夹快捷订阅路径模板</Label>
 							<Input
@@ -4701,157 +4734,147 @@
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
-		<div class="min-h-0 flex-1 space-y-6 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
+		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
 			<!-- 功能说明 -->
 			<div
-				class="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-950/20"
+				class="rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-800 dark:bg-purple-950/20"
 			>
-				<h4 class="mb-2 font-medium text-purple-800 dark:text-purple-400">功能说明</h4>
-				<p class="text-sm text-purple-700 dark:text-purple-300">
+				<h4 class="mb-1.5 font-medium text-purple-800 dark:text-purple-400">功能说明</h4>
+				<p class="text-xs text-purple-700 dark:text-purple-300">
 					AI重命名功能会在视频下载完成后，使用大语言模型分析视频标题、UP主等信息，自动生成更规范、更易读的文件名。
 					支持两种方式：<strong>付费API</strong>（DeepSeek/OpenAI等）和<strong>免费Web API</strong
 					>（DeepSeek Web）。
 				</p>
 			</div>
 
-			<div class="space-y-4">
+			<div class="space-y-3">
 				<!-- 启用AI重命名 -->
-				<div class="flex items-center space-x-2">
-					<input
-						type="checkbox"
-						id="ai-rename-enabled"
-						bind:checked={aiRenameEnabled}
-						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
-					/>
-					<Label
-						for="ai-rename-enabled"
-						class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-					>
-						启用AI重命名（全局开关）
-					</Label>
+				<div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+					<div class="flex items-center space-x-2">
+						<input
+							type="checkbox"
+							id="ai-rename-enabled"
+							bind:checked={aiRenameEnabled}
+							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
+						/>
+						<Label
+							for="ai-rename-enabled"
+							class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+						>
+							启用AI重命名（全局开关）
+						</Label>
+					</div>
+					<div class="flex items-center space-x-2">
+						<input
+							type="checkbox"
+							id="ai-rename-rename-parent-dir"
+							bind:checked={aiRenameRenameParentDir}
+							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
+						/>
+						<Label
+							for="ai-rename-rename-parent-dir"
+							class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+						>
+							允许重命名上级目录（默认关闭）
+						</Label>
+					</div>
 				</div>
-				<p class="text-muted-foreground text-sm">
+				<p class="text-muted-foreground text-xs">
 					启用后，还需要在视频源管理页面为单个视频源开启AI重命名功能才会生效
 				</p>
-				<div class="flex items-center space-x-2">
-					<input
-						type="checkbox"
-						id="ai-rename-rename-parent-dir"
-						bind:checked={aiRenameRenameParentDir}
-						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
-					/>
-					<Label
-						for="ai-rename-rename-parent-dir"
-						class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-					>
-						允许重命名上级目录（默认关闭）
-					</Label>
-				</div>
 
-				<!-- API提供商 -->
-				<div class="space-y-2">
-					<Label for="ai-rename-provider">API提供商</Label>
-					<CustomSelect
-						id="ai-rename-provider"
-						value={aiRenameProvider}
-						options={[
-							{ value: 'deepseek', label: 'DeepSeek (付费API)' },
-							{ value: 'deepseek-web', label: 'DeepSeek Web (免费)' },
-							{ value: 'openai', label: 'OpenAI' },
-							{ value: 'custom', label: '自定义 (OpenAI兼容)' }
-						]}
-						onChange={(nextValue) => (aiRenameProvider = String(nextValue ?? 'deepseek'))}
-						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-					/>
-					<p class="text-muted-foreground text-xs">
-						{#if aiRenameProvider === 'deepseek-web'}
-							使用 chat.deepseek.com 免费 Web API，需要从浏览器获取 Token
-						{:else}
-							使用 OpenAI 兼容的付费 API，需要 API Key
-						{/if}
-					</p>
-				</div>
-
-				{#if aiRenameProvider === 'deepseek-web'}
-					<!-- DeepSeek Web Token -->
+				<!-- API提供商 + 请求超时 -->
+				<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
 					<div class="space-y-2">
-						<Label for="ai-rename-web-token">DeepSeek Web Token</Label>
-						<Input
-							id="ai-rename-web-token"
-							type="password"
-							bind:value={aiRenameDeepseekWebToken}
-							placeholder="从浏览器开发者工具获取"
+						<Label for="ai-rename-provider">API提供商</Label>
+						<CustomSelect
+							id="ai-rename-provider"
+							value={aiRenameProvider}
+							options={[
+								{ value: 'deepseek', label: 'DeepSeek 官方' },
+								{ value: 'custom', label: 'OpenAI 兼容' }
+							]}
+							onChange={(nextValue) => (aiRenameProvider = String(nextValue ?? 'deepseek'))}
+							class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 						/>
-						<div class="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
-							<p class="text-xs text-amber-700 dark:text-amber-300">
-								<strong>获取方法：</strong>
-								<br />1. 登录
-								<a href="https://chat.deepseek.com" target="_blank" class="underline"
-									>chat.deepseek.com</a
+						<p class="text-muted-foreground text-xs">
+							使用 OpenAI 兼容接口，需要 API Key
+						</p>
+					</div>
+					<div class="space-y-2">
+						<Label for="ai-rename-timeout">请求超时时间（秒）</Label>
+						<Input
+							id="ai-rename-timeout"
+							type="number"
+							bind:value={aiRenameTimeoutSeconds}
+							min="10"
+							max="120"
+							placeholder="30"
+						/>
+					</div>
+				</div>
+
+				<!-- API Base URL / API Key / 模型名称 -->
+					<div class="grid grid-cols-1 gap-3 md:grid-cols-10">
+						<div class="space-y-2 md:col-span-3">
+							<Label for="ai-rename-base-url">API Base URL</Label>
+							<Input
+								id="ai-rename-base-url"
+								type="text"
+								bind:value={aiRenameBaseUrl}
+								placeholder="https://api.deepseek.com/v1"
+							/>
+							<p class="text-muted-foreground text-xs">
+								DeepSeek: https://api.deepseek.com/v1 | OpenAI: https://api.openai.com/v1
+							</p>
+						</div>
+
+						<div class="space-y-2 md:col-span-4">
+							<Label for="ai-rename-api-key">API Key</Label>
+							<Input
+								id="ai-rename-api-key"
+								type="password"
+								bind:value={aiRenameApiKey}
+								placeholder="sk-xxxxxxxxxxxxxxxx"
+							/>
+							<p class="text-muted-foreground text-xs">
+								请从API提供商获取API密钥，密钥将安全存储在本地配置中
+							</p>
+						</div>
+
+						<div class="space-y-2 md:col-span-3">
+							<Label for="ai-rename-model">模型名称</Label>
+							<div class="flex gap-2">
+								<Input
+									id="ai-rename-model"
+									type="text"
+									bind:value={aiRenameModel}
+									placeholder="deepseek-v4-flash"
+									list="ai-rename-model-options"
+								/>
+								<datalist id="ai-rename-model-options">
+									{#each aiRenameModels as model (model)}
+										<option value={model}></option>
+									{/each}
+								</datalist>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									class="flex-shrink-0 px-2"
+									onclick={fetchAiRenameModels}
+									disabled={aiRenameModelsLoading}
+									title="获取模型列表"
+									aria-label="获取模型列表"
 								>
-								<br />2. 按 F12 打开开发者工具 → Network（网络）
-								<br />3. 发送一条消息，找到 completion 请求
-								<br />4. 复制 Request Headers 中 Authorization: Bearer 后面的值
+									<RefreshCwIcon class="h-4 w-4 {aiRenameModelsLoading ? 'animate-spin' : ''}" />
+								</Button>
+							</div>
+							<p class="text-muted-foreground text-xs">
+								可点「获取模型」从服务商 GET /models 拉取列表（需 API Key）；也可直接填写。
 							</p>
 						</div>
 					</div>
-				{:else}
-					<!-- API Base URL -->
-					<div class="space-y-2">
-						<Label for="ai-rename-base-url">API Base URL</Label>
-						<Input
-							id="ai-rename-base-url"
-							type="text"
-							bind:value={aiRenameBaseUrl}
-							placeholder="https://api.deepseek.com/v1"
-						/>
-						<p class="text-muted-foreground text-xs">
-							DeepSeek: https://api.deepseek.com/v1 | OpenAI: https://api.openai.com/v1
-						</p>
-					</div>
-
-					<!-- API Key -->
-					<div class="space-y-2">
-						<Label for="ai-rename-api-key">API Key</Label>
-						<Input
-							id="ai-rename-api-key"
-							type="password"
-							bind:value={aiRenameApiKey}
-							placeholder="sk-xxxxxxxxxxxxxxxx"
-						/>
-						<p class="text-muted-foreground text-xs">
-							请从API提供商获取API密钥，密钥将安全存储在本地配置中
-						</p>
-					</div>
-
-					<!-- 模型名称 -->
-					<div class="space-y-2">
-						<Label for="ai-rename-model">模型名称</Label>
-						<Input
-							id="ai-rename-model"
-							type="text"
-							bind:value={aiRenameModel}
-							placeholder="deepseek-v4-flash"
-						/>
-						<p class="text-muted-foreground text-xs">
-							DeepSeek推荐: deepseek-v4-flash；高质量可用 deepseek-v4-pro。旧的 deepseek-chat /
-							deepseek-reasoner 将于 2026-07-24 停用。
-						</p>
-					</div>
-				{/if}
-
-				<!-- 超时时间 -->
-				<div class="space-y-2">
-					<Label for="ai-rename-timeout">请求超时时间（秒）</Label>
-					<Input
-						id="ai-rename-timeout"
-						type="number"
-						bind:value={aiRenameTimeoutSeconds}
-						min="10"
-						max="120"
-						placeholder="30"
-					/>
-				</div>
 
 				<!-- 视频提示词 -->
 				<div class="space-y-2">
@@ -4896,28 +4919,30 @@
 				</div>
 			</div>
 
-			<!-- 使用说明 -->
-			<div class="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/20">
-				<p class="text-sm text-blue-700 dark:text-blue-300">
-					<strong>使用说明：</strong>
-				</p>
-				<div class="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-					<p>1. 在此页面配置API密钥并启用全局开关</p>
-					<p>2. 在"视频源管理"页面为需要AI重命名的视频源开启开关</p>
-					<p>3. 新下载的视频将自动使用AI生成的文件名</p>
-					<p>4. 多P视频/合集/番剧的高级选项在各视频源的AI重命名设置中单独配置</p>
+			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+				<!-- 使用说明 -->
+				<div class="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/20">
+					<p class="text-sm text-blue-700 dark:text-blue-300">
+						<strong>使用说明：</strong>
+					</p>
+					<div class="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+						<p>1. 在此页面配置API密钥并启用全局开关</p>
+						<p>2. 在"视频源管理"页面为需要AI重命名的视频源开启开关</p>
+						<p>3. 新下载的视频将自动使用AI生成的文件名</p>
+						<p>4. 多P视频/合集/番剧的高级选项在各视频源的AI重命名设置中单独配置</p>
+					</div>
 				</div>
-			</div>
 
-			<!-- 费用提示 -->
-			<div class="rounded-lg bg-amber-100 p-3 dark:bg-amber-900/20">
-				<p class="text-sm text-amber-700 dark:text-amber-300">
-					<strong>费用提示：</strong>
-				</p>
-				<div class="space-y-1 text-sm text-amber-700 dark:text-amber-300">
-					<p>• DeepSeek API价格实惠，约￥0.001/千token</p>
-					<p>• OpenAI GPT-4o-mini约$0.15/百万token</p>
-					<p>• 每次重命名约消耗100-200个token</p>
+				<!-- 费用提示 -->
+				<div class="rounded-lg bg-amber-100 p-3 dark:bg-amber-900/20">
+					<p class="text-sm text-amber-700 dark:text-amber-300">
+						<strong>费用提示：</strong>
+					</p>
+					<div class="space-y-1 text-sm text-amber-700 dark:text-amber-300">
+						<p>• DeepSeek API价格实惠，约￥0.001/千token</p>
+						<p>• OpenAI GPT-4o-mini约$0.15/百万token</p>
+						<p>• 每次重命名约消耗100-200个token</p>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -4947,7 +4972,6 @@
 		if (!open) openSheet = null;
 	}}
 	title="数据库管理"
-	description="查看数据库状态，清理缓存与孤立记录"
 	titleTooltip={getSettingTooltip('database')}
 	{isMobile}
 >
@@ -4990,11 +5014,11 @@
 				<!-- 数据量统计 -->
 				<div class="space-y-3">
 					<h3 class="text-base font-semibold">数据量统计</h3>
-					<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+					<div class="grid grid-cols-3 gap-1 sm:grid-cols-4 lg:grid-cols-6">
 						{#each databaseStatus.tables as stat (stat.table)}
-							<div class="rounded-lg border p-3">
-								<p class="text-muted-foreground text-xs">{stat.label}</p>
-								<p class="mt-1 text-lg font-semibold">{stat.rows}</p>
+							<div class="flex items-center justify-between gap-1 rounded border px-2 py-1">
+								<span class="text-muted-foreground truncate text-[11px]">{stat.label}</span>
+								<span class="text-xs font-semibold tabular-nums">{stat.rows}</span>
 							</div>
 						{/each}
 					</div>
@@ -5004,10 +5028,10 @@
 				<!-- 维护操作 -->
 				<div class="space-y-3">
 					<h3 class="text-base font-semibold">维护操作</h3>
-					<div class="space-y-2">
+					<div class="grid grid-cols-2 gap-2 md:grid-cols-4">
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'clear_image_cache',
@@ -5015,15 +5039,12 @@
 									'清空网页图片代理缓存，图片将按需重新拉取。'
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">清理图片代理缓存</p>
-								<p class="text-muted-foreground text-xs">清空 image_proxy_cache 表</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">清理图片代理缓存</span>
+							<span class="text-muted-foreground text-xs">清空 image_proxy_cache 表</span>
 						</button>
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'clear_ai_history',
@@ -5031,15 +5052,12 @@
 									'清空 AI 重命名使用的历史对话记录，不影响已完成的命名。'
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">清理 AI 对话历史</p>
-								<p class="text-muted-foreground text-xs">清空 ai_conversation_history 表</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">清理 AI 对话历史</span>
+							<span class="text-muted-foreground text-xs">清空 ai_conversation_history 表</span>
 						</button>
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'clear_queue_history',
@@ -5047,15 +5065,12 @@
 									'删除已经完成或失败的任务队列记录（删除来源/添加来源等历史任务）。'
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">清理任务队列历史</p>
-								<p class="text-muted-foreground text-xs">删除已完成/失败的任务队列记录</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">清理任务队列历史</span>
+							<span class="text-muted-foreground text-xs">删除已完成/失败的任务队列记录</span>
 						</button>
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'clean_orphans',
@@ -5064,15 +5079,12 @@
 									true
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">清理孤立记录</p>
-								<p class="text-muted-foreground text-xs">无主分P</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">清理孤立记录</span>
+							<span class="text-muted-foreground text-xs">无主分P</span>
 						</button>
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'vacuum',
@@ -5080,17 +5092,14 @@
 									'执行 VACUUM 回收删除数据后留下的磁盘空间，可能需要几秒到几十秒。'
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">压缩数据库</p>
-								<p class="text-muted-foreground text-xs">
-									回收可释放空间（当前约 {formatBytes(databaseStatus.reclaimable_bytes)}）
-								</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">压缩数据库</span>
+							<span class="text-muted-foreground text-xs">
+								回收可释放空间（当前约 {formatBytes(databaseStatus.reclaimable_bytes)}）
+							</span>
 						</button>
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'backup',
@@ -5098,15 +5107,12 @@
 									'生成一份完整数据库快照到配置目录（data-backup-时间戳.sqlite），不影响当前运行。'
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">备份数据库</p>
-								<p class="text-muted-foreground text-xs">VACUUM INTO 快照，不锁库</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">备份数据库</span>
+							<span class="text-muted-foreground text-xs">VACUUM INTO 快照，不锁库</span>
 						</button>
 						<button
 							type="button"
-							class="hover:bg-accent flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors"
+							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
 								requestDatabaseAction(
 									'clean_logs',
@@ -5116,11 +5122,8 @@
 									7
 								)}
 						>
-							<div>
-								<p class="text-sm font-medium">清理旧日志</p>
-								<p class="text-muted-foreground text-xs">保留最近 7 天的 logs/*.csv</p>
-							</div>
-							<span class="text-muted-foreground text-xs">→</span>
+							<span class="text-sm font-medium">清理旧日志</span>
+							<span class="text-muted-foreground text-xs">保留最近 7 天的 logs/*.csv</span>
 						</button>
 					</div>
 				</div>

@@ -12,12 +12,11 @@
 	import api from '$lib/api';
 	import { toast } from 'svelte-sonner';
 	import type { ApiError, BetaImageUpdateStatusResponse } from '$lib/types';
-	import { LogOut, BookOpen, ScrollText } from '@lucide/svelte';
+	import { LogOut, BookOpen, ScrollText, RefreshCw } from '@lucide/svelte';
 	import ResponsiveButton from '$lib/components/responsive-button.svelte';
 	import { initTheme } from '$lib/stores/theme';
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import InstallPrompt from '$lib/components/pwa/install-prompt.svelte';
-	import { Badge } from '$lib/components/ui/badge';
 	import { APP_VERSION } from '$lib/generated/app-version';
 	import { formatTimestampOrFallback } from '$lib/utils/timezone';
 	import { installGlossaryTooltips } from '$lib/utils/glossary-tooltip';
@@ -28,6 +27,7 @@
 	let showVersionTooltip = false;
 	let versionBadgeContainer: HTMLDivElement | null = null;
 	let cleanupGlossaryTooltips: (() => void) | null = null;
+	let sidebarWidth = '16rem';
 
 	// 退出登录
 	function handleLogout() {
@@ -180,6 +180,11 @@
 	onMount(async () => {
 		// 初始化主题
 		initTheme();
+		// 恢复上次拖拽的侧边栏宽度
+		const savedSidebarWidth = localStorage.getItem('sidebar-width');
+		if (savedSidebarWidth && /^\d+(?:\.\d+)?(?:px|rem)$/.test(savedSidebarWidth)) {
+			sidebarWidth = savedSidebarWidth;
+		}
 		cleanupGlossaryTooltips = installGlossaryTooltips(document);
 		// 注册Service Worker更新处理
 		registerSWUpdateHandler();
@@ -205,11 +210,11 @@
 <Toaster />
 <InstallPrompt />
 
-<Sidebar.Provider>
+<Sidebar.Provider style="--sidebar-width: {sidebarWidth}">
 	<div class="prevent-horizontal-scroll flex h-screen w-full overflow-hidden">
 		{#if isAuthenticated}
 			<div data-sidebar="sidebar">
-				<AppSidebar />
+				<AppSidebar onResize={(width) => (sidebarWidth = `${width}px`)} />
 			</div>
 		{/if}
 		<Sidebar.Inset class="flex h-screen flex-1 flex-col overflow-hidden">
@@ -224,61 +229,58 @@
 						</div>
 						<div class="flex items-center gap-1 sm:gap-2">
 							<ThemeToggle />
-							<div class="relative" bind:this={versionBadgeContainer}>
-								<Badge
-									variant="outline"
-									class="max-w-[160px] cursor-pointer truncate font-mono text-[11px] select-none"
-									title={getVersionBadgeTitle()}
-									role="button"
-									tabindex={0}
-									onclick={toggleVersionTooltip}
-									onkeydown={(e) => {
-										if (e.key === 'Enter' || e.key === ' ') {
-											e.preventDefault();
-											toggleVersionTooltip();
-										} else if (e.key === 'Escape') {
-											showVersionTooltip = false;
-										}
-									}}
-								>
-									{APP_VERSION}
-								</Badge>
-								{#if showVersionTooltip}
-									<div
-										class="border-border bg-background fixed inset-x-4 top-[80px] z-50 max-h-[calc(100vh-100px)] overflow-auto rounded-lg border p-3 text-xs shadow-xl sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:left-auto sm:mt-2 sm:max-h-[70vh] sm:w-[min(360px,calc(100vw-2rem))]"
+							{#if betaImageUpdateStatus?.update_available}
+								<div class="relative" bind:this={versionBadgeContainer}>
+									<button
+										type="button"
+										class="border-border bg-background hover:bg-accent relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border"
+										title={getVersionBadgeTitle()}
+										aria-label="发现新版本"
+										onclick={toggleVersionTooltip}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												toggleVersionTooltip();
+											} else if (e.key === 'Escape') {
+												showVersionTooltip = false;
+											}
+										}}
 									>
-										<div class="leading-relaxed whitespace-pre-wrap">
-											{getVersionBadgeTitle()}
+										<RefreshCw class="h-4 w-4" />
+										{#if betaImageUpdateStatus?.release_channel}
+											<span
+												class="border-border bg-background text-muted-foreground pointer-events-none absolute -right-1 -bottom-1 rounded border px-1 text-[10px] leading-[14px]"
+											>
+												{betaImageUpdateStatus.release_channel === 'stable'
+													? '正'
+													: betaImageUpdateStatus.release_channel === 'beta'
+														? '测'
+														: betaImageUpdateStatus.release_channel === 'dev'
+															? '开'
+															: betaImageUpdateStatus.release_channel}
+											</span>
+										{/if}
+										<span
+											class="bg-destructive border-background absolute -top-1 -right-1 h-2 w-2 rounded-full border-2"
+											aria-label="发现更新"
+										></span>
+									</button>
+									{#if showVersionTooltip}
+										<div
+											class="border-border bg-background fixed inset-x-4 top-[80px] z-50 max-h-[calc(100vh-100px)] overflow-auto rounded-lg border p-3 text-xs shadow-xl sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:left-auto sm:mt-2 sm:max-h-[70vh] sm:w-[min(360px,calc(100vw-2rem))]"
+										>
+											<div class="leading-relaxed whitespace-pre-wrap">
+												{getVersionBadgeTitle()}
+											</div>
 										</div>
-									</div>
-								{/if}
-								{#if betaImageUpdateStatus?.release_channel}
-									<span
-										class="border-border bg-background text-muted-foreground pointer-events-none absolute -right-1 -bottom-1 rounded border px-1 text-[10px] leading-[14px]"
-									>
-										{betaImageUpdateStatus.release_channel === 'stable'
-											? '正'
-											: betaImageUpdateStatus.release_channel === 'beta'
-												? '测'
-												: betaImageUpdateStatus.release_channel === 'dev'
-													? '开'
-													: betaImageUpdateStatus.release_channel}
-									</span>
-								{/if}
-								{#if betaImageUpdateStatus?.update_available}
-									<span
-										class="bg-destructive border-background absolute -top-1 -right-1 h-2 w-2 rounded-full border-2"
-										aria-label="发现更新"
-									></span>
-								{/if}
-							</div>
+									{/if}
+								</div>
+							{/if}
 							<ResponsiveButton
 								size="sm"
 								variant="outline"
 								onclick={() => goto(resolve('/changelog'))}
 								icon={ScrollText}
-								text="更新记录"
-								showTextFrom="lg"
 								title="查看更新记录"
 							/>
 							<ResponsiveButton
@@ -286,8 +288,6 @@
 								variant="outline"
 								onclick={() => window.open('https://lurenyang418.github.io/hei/', '_blank')}
 								icon={BookOpen}
-								text="文档"
-								showTextFrom="lg"
 								title="查看文档"
 							/>
 							<ResponsiveButton
@@ -295,8 +295,6 @@
 								variant="outline"
 								onclick={handleLogout}
 								icon={LogOut}
-								text="退出"
-								showTextFrom="lg"
 								title="退出"
 							/>
 						</div>

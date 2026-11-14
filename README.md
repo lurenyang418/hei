@@ -7,18 +7,9 @@
 
 专为 NAS 用户打造的哔哩哔哩同步工具，基于 Rust & Tokio 构建。
 
-📚 [在线文档](https://lurenyang418.github.io/hei/) | 🚀 [快速开始](#快速开始) | 📝 [更新日志](./docs/changelog.md) | 💬 [QQ群交流](https://qm.qq.com/q/144RN3oaLM)
+📚 [在线文档](https://lurenyang418.github.io/hei/) | 🚀 [快速开始](#快速开始) | 📝 [更新日志](./docs/changelog.md)
 
 ## ✨ 核心特性
-
-### 🚀可直接原项目迁移运行
-- **迁移后只需调整个别功能设置**
-
-### 🎯 智能化功能
-- **充电视频智能识别** - 自动检测并处理充电专享视频，无需人工干预
-- **失败任务智能筛选** - 一键筛选失败任务，快速定位问题
-- **任务队列持久化** - 程序重启后自动恢复任务状态
-- **配置热重载** - 修改配置立即生效，无需重启
 
 ### 🎬 视频源支持
 - **收藏夹** - 直接显示用户所有收藏夹，支持快速选择
@@ -28,12 +19,6 @@
 - **番剧下载** - 支持单季和全季下载模式
 - **B站课程** - 支持课程（pugv / cheese）订阅
 
-### 🚀 技术优势
-- **高性能** - Rust + Tokio 异步架构，支持高并发
-- **内存优化** - 智能内存数据库模式，提升扫描性能
-- **Web管理** - 友好的 Web 界面，无需命令行操作
-- **自动重试** - 智能错误处理和重试机制
-
 ## 🚀 快速开始
 
 ### 使用 Docker（推荐）
@@ -42,12 +27,10 @@
 docker run -d \
   --name hei \
   -p 12345:12345 \
-  -v ./config:/app/.config/hei \
-  -v ./Downloads:/Downloads \
+  -v ./data:/app/.config/hei \
+  -v ./videos:/app/videos \
   ghcr.io/lurenyang418/hei:latest
 ```
-
-> 镜像发布在 GitHub Container Registry：`ghcr.io/lurenyang418/hei`。首次使用前请在仓库的 Packages 页面把该包可见性设为 Public；私有包需要先 `docker login ghcr.io`。
 
 ### docker-compose
 ```yaml
@@ -72,8 +55,8 @@ services:
     ports:
       - 12345:12345
     volumes:
-      - ./config:/app/.config/hei
-      - ./Downloads:/Downloads # 下载目录：程序默认下载到容器内 /Downloads，这里映射到宿主机 ./Downloads
+      - ./data:/app/.config/hei
+      - ./videos:/app/videos # 下载目录：程序默认下载到容器内 /app/videos，这里映射到宿主机 ./videos
 
     environment:
       - TZ=Asia/Shanghai
@@ -112,16 +95,6 @@ cargo run -p bili_sync
 
 访问 `http://localhost:12345` 进入管理界面。
 
-## 📸 界面预览
-
-<details>
-<summary>点击展开截图</summary>
-
-### 主页界面
-![概览](./docs/assets/主页.jpg)
-
-</details>
-
 ## 🛠️ 配置说明
 
 首次启动会自动进入设置向导，引导您完成：
@@ -130,28 +103,6 @@ cargo run -p bili_sync
 - 视频源添加
 
 所有配置支持在 Web 界面实时修改。
-
-## 📂 项目结构
-
-```
-├── crates/                 # Rust 后端
-│   ├── bili_sync/          # 主应用
-│   ├── bili_sync_entity/   # 数据库实体
-│   └── bili_sync_migration/# 数据库迁移
-├── web/                    # Svelte 前端
-├── docs/                   # VitePress 文档
-└── scripts/                # 辅助脚本
-```
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本项目
-2. 创建功能分支 (`git checkout -b feature/amazing`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送分支 (`git push origin feature/amazing`)
-5. 创建 Pull Request
 
 ## 📝 许可证
 

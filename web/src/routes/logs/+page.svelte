@@ -795,7 +795,6 @@
 		<div class="flex {isMobile ? 'flex-col gap-4' : 'items-center justify-between'}">
 			<div>
 				<div class="flex flex-wrap items-center gap-2">
-					<h1 class="text-3xl font-bold tracking-tight">系统日志</h1>
 					<Badge
 						variant="outline"
 						class={liveStreamStatus === 'connected'
@@ -831,7 +830,6 @@
 						</Button>
 					{/if}
 				</div>
-				<p class="text-muted-foreground">查看系统运行日志和错误信息</p>
 				{#if authError}
 					<p class="mt-1 text-sm text-red-600">{authError}</p>
 				{/if}
