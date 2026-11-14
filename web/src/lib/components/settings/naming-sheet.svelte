@@ -8,55 +8,91 @@
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 	import SectionHeader from '$lib/components/section-header.svelte';
 	import { EyeIcon } from '@lucide/svelte';
-	import type { FilenamePreviewResponse } from '$lib/types';
+	import type { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
 
 	type HelpItem = { name: string; desc: string };
 
+	export let store: SettingsNamingStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let videoName = '';
-	export let pageName = '';
-	export let multiPageName = '';
-	export let bangumiName = '';
-	export let folderStructure = '';
-	export let bangumiFolderName = '';
-	export let collectionFolderMode = 'unified';
-	export let collectionUnifiedName = '';
-	export let timeFormat = '';
-	export let multiPageUseSeasonStructure = false;
-	export let collectionUseSeasonStructure = false;
-	export let bangumiUseSeasonStructure = false;
-	export let nfoTimeType = 'favtime';
-	export let nfoIncludeGenre = false;
-
-	export let videoNameHasPath = false;
-	export let multiPageNameHasPath = false;
-	export let pageNameValid = true;
-	export let pageNameError = '';
-	export let multiPageNameValid = true;
-	export let multiPageNameError = '';
-	export let collectionUnifiedNameValid = true;
-	export let collectionUnifiedNameError = '';
-	export let filenamePreview: FilenamePreviewResponse | null = null;
-	export let filenamePreviewLoading = false;
-	export let filenamePreviewError = '';
 	export let saving = false;
-
-	export let variableHelp: {
-		video: HelpItem[];
-		page: HelpItem[];
-		common: HelpItem[];
-		time: HelpItem[];
-	};
-
 	export let onSave: () => void = () => {};
-	export let onVideoNameChange: (value: string) => void = () => {};
-	export let onMultiPageNameChange: (value: string) => void = () => {};
-	export let onValidateCollectionUnifiedName: (value: string) => void = () => {};
 
 	let showHelp = false;
+
+	// 变量说明
+	const variableHelp = {
+		video: [
+			{
+				name: '{{title}}',
+				desc: '视频标题'
+			},
+			{ name: '{{show_title}}', desc: '节目标题（与title相同）' },
+			{ name: '{{bvid}}', desc: 'BV号（视频编号）' },
+			{ name: '{{upper_name}}', desc: 'UP主名称' },
+			{ name: '{{upper_mid}}', desc: 'UP主ID' },
+			{ name: '{{pubtime}}', desc: '视频发布时间' },
+			{ name: '{{fav_time}}', desc: '视频收藏时间' },
+			{ name: '{{ctime}}', desc: '视频创建时间' }
+		],
+		page: [
+			{
+				name: '{{title}}',
+				desc: '视频标题（单P/多P模板可用）'
+			},
+			{ name: '{{bvid}}', desc: 'BV号（视频编号，单P/多P模板可用）' },
+			{ name: '{{upper_name}}', desc: 'UP主名称（单P/多P模板可用）' },
+			{ name: '{{upper_mid}}', desc: 'UP主ID（单P/多P模板可用）' },
+			{ name: '{{pubtime}}', desc: '视频发布时间（单P/多P模板可用）' },
+			{ name: '{{fav_time}}', desc: '视频收藏时间（单P/多P模板可用）' },
+			{ name: '{{show_title}}', desc: '节目标题（与title相同）' },
+			{ name: '{{ptitle}}', desc: '分页标题（页面名称）' },
+			{ name: '{{long_title}}', desc: '分页长标题（非番剧可用）' },
+			{ name: '{{pid}}', desc: '分页页号' },
+			{ name: '{{pid_pad}}', desc: '补零的分页页号（如001、002）' },
+			{ name: '{{episode}}', desc: '剧集号（番剧/重命名/合集统一模式可用）' },
+			{ name: '{{episode_pad}}', desc: '补零的剧集号（番剧/重命名/合集统一模式可用）' },
+			{ name: '{{is_multi_page}}', desc: '是否多P视频（合集统一模式可用）' },
+			{ name: '{{season}}', desc: '季度号（番剧/多P视频可用）' },
+			{ name: '{{season_pad}}', desc: '补零的季度号（番剧/多P视频可用）' },
+			{ name: '{{series_title}}', desc: '番剧系列标题（仅番剧可用）' },
+			{ name: '{{version}}', desc: '番剧版本信息（仅番剧可用）' },
+			{ name: '{{year}}', desc: '发布年份（番剧/多P视频可用）' },
+			{ name: '{{studio}}', desc: '制作公司/UP主名称（番剧/多P视频可用）' },
+			{ name: '{{actors}}', desc: '演员信息（番剧/多P视频可用）' },
+			{ name: '{{share_copy}}', desc: '分享文案（番剧/多P视频可用）' },
+			{ name: '{{category}}', desc: '视频分类' },
+			{ name: '{{content_type}}', desc: '内容类型（仅番剧可用）' },
+			{ name: '{{status}}', desc: '播出状态（仅番剧可用）' },
+			{ name: '{{ep_id}}', desc: '剧集ID（仅番剧可用）' },
+			{ name: '{{season_id}}', desc: '季度ID（仅番剧可用）' },
+			{ name: '{{resolution}}', desc: '视频分辨率（番剧/多P视频可用）' },
+			{ name: '{{duration}}', desc: '视频时长（仅重命名可用）' },
+			{ name: '{{width}}', desc: '视频宽度（仅重命名可用）' },
+			{ name: '{{height}}', desc: '视频高度（仅重命名可用）' }
+		],
+		common: [
+			{ name: '{{truncate title 10}}', desc: '截取函数示例：截取标题前10个字符' },
+			{
+				name: '{{truncate_bytes title 200}}',
+				desc: '按 UTF-8 字节截取（中文约3字节/字）：把变量字节数控制在 200 以内，避免整个文件名超过 255 字节'
+			},
+			{
+				name: '自动截断',
+				desc: '生成的文件名超过 255 字节（中文按字节计）时会自动按字节智能截断并预留后缀空间，无需手动处理'
+			},
+			{ name: '路径分隔符', desc: '支持使用 / 或 \\\\ 创建子文件夹' }
+		],
+		time: [
+			{ name: '%Y', desc: '年份（如2023）' },
+			{ name: '%m', desc: '月份（如01-12）' },
+			{ name: '%d', desc: '日期（如01-31）' },
+			{ name: '%H', desc: '小时（如00-23）' },
+			{ name: '%M', desc: '分钟（如00-59）' },
+			{ name: '%S', desc: '秒数（如00-59）' }
+		]
+	};
 
 	const nfoTimeTypeOptions = [
 		{ value: 'favtime', label: '收藏时间' },
@@ -163,7 +199,7 @@
 			</div>
 
 			<!-- 互斥提示面板 -->
-			{#if videoNameHasPath && multiPageNameHasPath}
+			{#if store.videoNameHasPath && store.multiPageNameHasPath}
 				<div
 					class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/20"
 				>
@@ -193,12 +229,12 @@
 					<Label for="video-name">视频文件名模板</Label>
 					<Input
 						id="video-name"
-						bind:value={videoName}
+						bind:value={store.videoName}
 						placeholder={`{{upper_name}}`}
-						class={multiPageNameHasPath ? 'border-orange-400 bg-orange-50' : ''}
-						oninput={(e) => onVideoNameChange((e.target as HTMLInputElement)?.value || '')}
+						class={store.multiPageNameHasPath ? 'border-orange-400 bg-orange-50' : ''}
+						oninput={(e) => store.handleVideoNameChange((e.target as HTMLInputElement)?.value || '')}
 					/>
-					{#if multiPageNameHasPath && videoNameHasPath}
+					{#if store.multiPageNameHasPath && store.videoNameHasPath}
 						<p class="text-xs text-orange-600 dark:text-orange-400">
 							⚠️ 多P模板已设置路径，此模板将自动移除路径设置避免冲突
 						</p>
@@ -210,12 +246,12 @@
 					<Label for="page-name">单P视频文件名模板</Label>
 					<Input
 						id="page-name"
-						bind:value={pageName}
+						bind:value={store.pageName}
 						placeholder={`{{pubtime}}-{{bvid}}`}
-						class={pageNameValid ? '' : 'border-red-500 focus:border-red-500'}
+						class={store.pageNameValid ? '' : 'border-red-500 focus:border-red-500'}
 					/>
-					{#if pageNameError}
-						<p class="text-xs text-red-500 dark:text-red-400">{pageNameError}</p>
+					{#if store.pageNameError}
+						<p class="text-xs text-red-500 dark:text-red-400">{store.pageNameError}</p>
 					{/if}
 					<p class="text-muted-foreground text-xs">
 						控制单P视频的具体文件名，<strong>不允许使用路径分隔符 / 或 \</strong>
@@ -226,19 +262,19 @@
 					<Label for="multi-page-name">多P视频文件名模板</Label>
 					<Input
 						id="multi-page-name"
-						bind:value={multiPageName}
+						bind:value={store.multiPageName}
 						placeholder={`P{{pid_pad}}.{{ptitle}}`}
-						class={!multiPageNameValid
+						class={!store.multiPageNameValid
 							? 'border-red-500 focus:border-red-500'
-							: videoNameHasPath && multiPageNameHasPath
+							: store.videoNameHasPath && store.multiPageNameHasPath
 								? 'border-orange-400 bg-orange-50'
 								: ''}
-						oninput={(e) => onMultiPageNameChange((e.target as HTMLInputElement)?.value || '')}
+						oninput={(e) => store.handleMultiPageNameChange((e.target as HTMLInputElement)?.value || '')}
 					/>
-					{#if multiPageNameError}
-						<p class="text-xs text-red-500 dark:text-red-400">{multiPageNameError}</p>
+					{#if store.multiPageNameError}
+						<p class="text-xs text-red-500 dark:text-red-400">{store.multiPageNameError}</p>
 					{/if}
-					{#if !multiPageNameError && videoNameHasPath && multiPageNameHasPath}
+					{#if !store.multiPageNameError && store.videoNameHasPath && store.multiPageNameHasPath}
 						<p class="text-xs text-orange-600 dark:text-orange-400">
 							⚠️ 检测到路径冲突：视频文件名模板和多P模板都包含路径，系统将自动调整避免冲突
 						</p>
@@ -255,7 +291,7 @@
 						<input
 							type="checkbox"
 							id="multi-page-season"
-							bind:checked={multiPageUseSeasonStructure}
+							bind:checked={store.multiPageUseSeasonStructure}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label
@@ -276,7 +312,7 @@
 						<input
 							type="checkbox"
 							id="collection-season"
-							bind:checked={collectionUseSeasonStructure}
+							bind:checked={store.collectionUseSeasonStructure}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label
@@ -297,7 +333,7 @@
 						<input
 							type="checkbox"
 							id="bangumi-season"
-							bind:checked={bangumiUseSeasonStructure}
+							bind:checked={store.bangumiUseSeasonStructure}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label
@@ -315,7 +351,7 @@
 
 				<div class="space-y-2">
 					<Label for="bangumi-name">番剧文件名模板</Label>
-					<Input id="bangumi-name" bind:value={bangumiName} placeholder={`第{{pid_pad}}集`} />
+					<Input id="bangumi-name" bind:value={store.bangumiName} placeholder={`第{{pid_pad}}集`} />
 					<p class="text-muted-foreground text-xs">控制番剧的季度文件夹和集数文件名</p>
 				</div>
 
@@ -323,7 +359,7 @@
 					<Label for="bangumi-folder-name">番剧文件夹名模板</Label>
 					<Input
 						id="bangumi-folder-name"
-						bind:value={bangumiFolderName}
+						bind:value={store.bangumiFolderName}
 						placeholder={`{{title}}`}
 					/>
 					<p class="text-muted-foreground text-xs">控制番剧主文件夹的命名，包含元数据文件</p>
@@ -336,30 +372,30 @@
 						<EyeIcon class="text-muted-foreground h-4 w-4" />
 						<h4 class="text-sm font-medium">命名预览</h4>
 					</div>
-					{#if filenamePreviewLoading}
+					{#if store.previewLoading}
 						<span class="text-muted-foreground text-xs">更新中...</span>
 					{/if}
 				</div>
 
-				{#if filenamePreviewError}
+				{#if store.previewError}
 					<div
 						class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300"
 					>
-						{filenamePreviewError}
+						{store.previewError}
 					</div>
-				{:else if filenamePreview}
-					{#if filenamePreview.warnings.length > 0}
+				{:else if store.preview}
+					{#if store.preview.warnings.length > 0}
 						<div
 							class="mb-3 space-y-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300"
 						>
-							{#each filenamePreview.warnings as warning (warning)}
+							{#each store.preview.warnings as warning (warning)}
 								<p>{warning}</p>
 							{/each}
 						</div>
 					{/if}
 
 					<div class="space-y-2">
-						{#each filenamePreview.items as item (item.key)}
+						{#each store.preview.items as item (item.key)}
 							{#each item.files as file (`${item.key}-${file.path}`)}
 								<div
 									class="bg-background grid grid-cols-1 gap-2 rounded-md border px-3 py-2 {item.active
@@ -391,7 +427,7 @@
 
 			<div class="space-y-2">
 				<Label for="folder-structure">文件夹结构模板</Label>
-				<Input id="folder-structure" bind:value={folderStructure} placeholder="Season 1" />
+				<Input id="folder-structure" bind:value={store.folderStructure} placeholder="Season 1" />
 				<p class="text-muted-foreground text-sm">定义视频文件的文件夹层级结构</p>
 			</div>
 
@@ -400,13 +436,13 @@
 					<Label for="collection-folder-mode">合集/投稿目录模式</Label>
 					<CustomSelect
 						id="collection-folder-mode"
-						value={collectionFolderMode}
+						value={store.collectionFolderMode}
 						options={[
 							{ value: 'separate', label: '分离模式' },
 							{ value: 'unified', label: '统一模式' },
 							{ value: 'up_seasonal', label: '投稿源同UP分季（仅投稿源）' }
 						]}
-						onChange={(nextValue) => (collectionFolderMode = String(nextValue ?? 'unified'))}
+						onChange={(nextValue) => (store.collectionFolderMode = String(nextValue ?? 'unified'))}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 					<p class="text-muted-foreground text-sm">
@@ -418,7 +454,7 @@
 
 				<div class="space-y-2">
 					<Label for="time-format">时间格式</Label>
-					<Input id="time-format" bind:value={timeFormat} placeholder="%Y%m%d%H%M%S" />
+					<Input id="time-format" bind:value={store.timeFormat} placeholder="%Y%m%d%H%M%S" />
 					<p class="text-muted-foreground text-sm">控制时间变量的显示格式</p>
 				</div>
 
@@ -426,14 +462,12 @@
 					<Label for="collection-unified-name">合集统一命名模板</Label>
 					<Input
 						id="collection-unified-name"
-						bind:value={collectionUnifiedName}
+						bind:value={store.collectionUnifiedName}
 						placeholder={`S01E{{episode_pad}}{{#if is_multi_page}}P{{pid_pad}}{{/if}} - {{title}}`}
-						class={collectionUnifiedNameValid ? '' : 'border-red-500 focus:border-red-500'}
-						oninput={(e) =>
-							onValidateCollectionUnifiedName((e.target as HTMLInputElement)?.value || '')}
+						class={store.collectionUnifiedNameValid ? '' : 'border-red-500 focus:border-red-500'}
 					/>
-					{#if collectionUnifiedNameError}
-						<p class="text-xs text-red-500 dark:text-red-400">{collectionUnifiedNameError}</p>
+					{#if store.collectionUnifiedNameError}
+						<p class="text-xs text-red-500 dark:text-red-400">{store.collectionUnifiedNameError}</p>
 					{/if}
 					<p class="text-muted-foreground text-xs">
 						仅在“合集/投稿目录模式=统一模式/投稿源同UP分季”生效，默认保持 S01E.. 命名。<strong
@@ -447,9 +481,9 @@
 				<Label for="nfo-time-type">NFO文件时间类型</Label>
 				<CustomSelect
 					id="nfo-time-type"
-					value={nfoTimeType}
+					value={store.nfoTimeType}
 					options={nfoTimeTypeOptions}
-					onChange={(nextValue) => (nfoTimeType = String(nextValue ?? 'favtime'))}
+					onChange={(nextValue) => (store.nfoTimeType = String(nextValue ?? 'favtime'))}
 					class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 				/>
 				<p class="text-muted-foreground text-sm">
@@ -464,7 +498,7 @@
 					<input
 						type="checkbox"
 						id="nfo-include-genre"
-						bind:checked={nfoIncludeGenre}
+						bind:checked={store.nfoIncludeGenre}
 						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 					/>
 					<Label for="nfo-include-genre" class="text-sm">NFO写入&lt;genre&gt;标签</Label>
@@ -509,10 +543,10 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={saving || !pageNameValid} class="w-full">
+			<Button type="submit" disabled={saving || !store.pageNameValid} class="w-full">
 				{saving ? '保存中...' : '保存设置'}
 			</Button>
-			{#if !pageNameValid}
+			{#if !store.pageNameValid}
 				<p class="text-center text-xs text-red-500 dark:text-red-400">请修复配置错误后再保存</p>
 			{/if}
 		</SheetFooter>

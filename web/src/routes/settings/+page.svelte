@@ -42,6 +42,7 @@
 	import { runRequest } from '$lib/utils/request.js';
 	import { normalizeConcurrencyValue, normalizeNumberInput } from '$lib/utils/number';
 	import { NotificationSettingsStore } from '$lib/stores/settings/notification.svelte';
+	import { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
@@ -51,6 +52,7 @@
 
 	// 各设置域的状态容器（runes class，见 $lib/stores/settings）
 	const notification = new NotificationSettingsStore();
+	const naming = new SettingsNamingStore();
 
 	// 控制各个抽屉的开关状态
 	let openSheet: string | null = null;
@@ -216,17 +218,7 @@
 	} as const;
 
 
-	// 表单数据
-	let videoName = '{{upper_name}}';
-	let pageName = '{{pubtime}}-{{bvid}}';
-	let multiPageName = 'P{{pid_pad}}.{{ptitle}}';
-	let bangumiName = '{{title}} S{{season_pad}}E{{pid_pad}} - {{ptitle}}';
-	let folderStructure = 'Season {{season_pad}}';
-	let bangumiFolderName = '{{title}}';
-	let collectionFolderMode = 'unified';
-	let collectionUnifiedName =
-		'S01E{{episode_pad}}{{#if is_multi_page}}P{{pid_pad}}{{/if}} - {{title}}';
-	let timeFormat = '%Y%m%d%H%M%S';
+	// 表单数据（命名域字段见 naming store）
 	let interval = 1200;
 	let nfoTimeType = 'favtime';
 	let nfoIncludeGenre = true;
@@ -355,15 +347,6 @@
 	let aria2HealthCheckInterval = 300;
 
 
-	// 多P视频目录结构配置
-	let multiPageUseSeasonStructure = false;
-
-	// 合集目录结构配置
-	let collectionUseSeasonStructure = false;
-
-	// 番剧目录结构配置
-	let bangumiUseSeasonStructure = false;
-
 	// AI重命名配置
 	let aiRenameEnabled = false;
 	let aiRenameProvider = 'deepseek';
@@ -434,103 +417,8 @@
 	};
 
 	// 验证相关状态
-	let pageNameError = '';
-	let pageNameValid = true;
-	let multiPageNameError = '';
-	let multiPageNameValid = true;
-	let collectionUnifiedNameError = '';
-	let collectionUnifiedNameValid = true;
 	let bindAddressError = '';
 	let bindAddressValid = true;
-	let filenamePreview: FilenamePreviewResponse | null = null;
-	let filenamePreviewLoading = false;
-	let filenamePreviewError = '';
-	let filenamePreviewTimer: ReturnType<typeof setTimeout> | null = null;
-	let filenamePreviewRequestId = 0;
-	let filenamePreviewSignature = '';
-
-	// 互斥逻辑：视频文件名模板 vs 多P视频文件名模板
-	let videoNameHasPath = false;
-	let multiPageNameHasPath = false;
-
-	// 变量说明
-	const variableHelp = {
-		video: [
-			{
-				name: '{{title}}',
-				desc: '视频标题'
-			},
-			{ name: '{{show_title}}', desc: '节目标题（与title相同）' },
-			{ name: '{{bvid}}', desc: 'BV号（视频编号）' },
-			{ name: '{{upper_name}}', desc: 'UP主名称' },
-			{ name: '{{upper_mid}}', desc: 'UP主ID' },
-			{ name: '{{pubtime}}', desc: '视频发布时间' },
-			{ name: '{{fav_time}}', desc: '视频收藏时间' },
-			{ name: '{{ctime}}', desc: '视频创建时间' }
-		],
-		page: [
-			{
-				name: '{{title}}',
-				desc: '视频标题（单P/多P模板可用）'
-			},
-			{ name: '{{bvid}}', desc: 'BV号（视频编号，单P/多P模板可用）' },
-			{ name: '{{upper_name}}', desc: 'UP主名称（单P/多P模板可用）' },
-			{ name: '{{upper_mid}}', desc: 'UP主ID（单P/多P模板可用）' },
-			{ name: '{{pubtime}}', desc: '视频发布时间（单P/多P模板可用）' },
-			{ name: '{{fav_time}}', desc: '视频收藏时间（单P/多P模板可用）' },
-			{ name: '{{show_title}}', desc: '节目标题（与title相同）' },
-			{ name: '{{ptitle}}', desc: '分页标题（页面名称）' },
-			{ name: '{{long_title}}', desc: '分页长标题（非番剧可用）' },
-			{ name: '{{pid}}', desc: '分页页号' },
-			{ name: '{{pid_pad}}', desc: '补零的分页页号（如001、002）' },
-			{ name: '{{episode}}', desc: '剧集号（番剧/重命名/合集统一模式可用）' },
-			{ name: '{{episode_pad}}', desc: '补零的剧集号（番剧/重命名/合集统一模式可用）' },
-			{ name: '{{is_multi_page}}', desc: '是否多P视频（合集统一模式可用）' },
-			{ name: '{{season}}', desc: '季度号（番剧/多P视频可用）' },
-			{ name: '{{season_pad}}', desc: '补零的季度号（番剧/多P视频可用）' },
-			{ name: '{{series_title}}', desc: '番剧系列标题（仅番剧可用）' },
-			{ name: '{{version}}', desc: '番剧版本信息（仅番剧可用）' },
-			{ name: '{{year}}', desc: '发布年份（番剧/多P视频可用）' },
-			{ name: '{{studio}}', desc: '制作公司/UP主名称（番剧/多P视频可用）' },
-			{ name: '{{actors}}', desc: '演员信息（番剧/多P视频可用）' },
-			{ name: '{{share_copy}}', desc: '分享文案（番剧/多P视频可用）' },
-			{ name: '{{category}}', desc: '视频分类' },
-			{ name: '{{content_type}}', desc: '内容类型（仅番剧可用）' },
-			{ name: '{{status}}', desc: '播出状态（仅番剧可用）' },
-			{ name: '{{ep_id}}', desc: '剧集ID（仅番剧可用）' },
-			{ name: '{{season_id}}', desc: '季度ID（仅番剧可用）' },
-			{ name: '{{resolution}}', desc: '视频分辨率（番剧/多P视频可用）' },
-			{ name: '{{duration}}', desc: '视频时长（仅重命名可用）' },
-			{ name: '{{width}}', desc: '视频宽度（仅重命名可用）' },
-			{ name: '{{height}}', desc: '视频高度（仅重命名可用）' }
-		],
-		common: [
-			{ name: '{{truncate title 10}}', desc: '截取函数示例：截取标题前10个字符' },
-			{
-				name: '{{truncate_bytes title 200}}',
-				desc: '按 UTF-8 字节截取（中文约3字节/字）：把变量字节数控制在 200 以内，避免整个文件名超过 255 字节'
-			},
-			{
-				name: '自动截断',
-				desc: '生成的文件名超过 255 字节（中文按字节计）时会自动按字节智能截断并预留后缀空间，无需手动处理'
-			},
-			{ name: '路径分隔符', desc: '支持使用 / 或 \\\\ 创建子文件夹' }
-		],
-		time: [
-			{ name: '%Y', desc: '年份（如2023）' },
-			{ name: '%m', desc: '月份（如01-12）' },
-			{ name: '%d', desc: '日期（如01-31）' },
-			{ name: '%H', desc: '小时（如00-23）' },
-			{ name: '%M', desc: '分钟（如00-59）' },
-			{ name: '%S', desc: '秒数（如00-59）' }
-		]
-	};
-
-	// NFO 时间类型选项
-	const nfoTimeTypeOptions = [
-		{ value: 'favtime', label: '收藏时间' },
-		{ value: 'pubtime', label: '发布时间' }
-	];
 
 	// 视频质量选项
 	const videoQualityOptions = [
@@ -629,19 +517,8 @@
 
 		config = response.data;
 
-		// 填充表单
-		videoName = config.video_name || '';
-		pageName = config.page_name || '';
-		multiPageName = config.multi_page_name || '';
-		bangumiName = config.bangumi_name || '';
-		folderStructure = config.folder_structure || '';
-		bangumiFolderName = config.bangumi_folder_name || '{{title}}';
-		collectionFolderMode = config.collection_folder_mode || 'separate';
-		collectionUnifiedName = config.collection_unified_name || collectionUnifiedName;
-		timeFormat = config.time_format || '';
-		interval = config.interval || 1200;
-		nfoTimeType = config.nfo_time_type || 'favtime';
-		nfoIncludeGenre = config.nfo_include_genre ?? DEFAULT_CONFIG_VALUES.nfoIncludeGenre;
+		// 填充表单（命名域交给 store）
+		naming.applyFromConfig(config);
 		bindAddress = config.bind_address || '0.0.0.0:12345';
 		parallelDownloadEnabled = config.parallel_download_enabled || false;
 		parallelDownloadThreads = config.parallel_download_threads || 4;
@@ -761,13 +638,10 @@
 		aria2HealthCheckInterval = config.aria2_health_check_interval ?? 300;
 
 		// 多P视频目录结构配置
-		multiPageUseSeasonStructure = config.multi_page_use_season_structure ?? false;
 
 		// 合集目录结构配置
-		collectionUseSeasonStructure = config.collection_use_season_structure ?? false;
 
 		// 番剧目录结构配置
-		bangumiUseSeasonStructure = config.bangumi_use_season_structure ?? false;
 
 		// AI重命名配置
 		aiRenameEnabled = config.ai_rename?.enabled ?? false;
@@ -781,160 +655,16 @@
 		aiRenameRenameParentDir = config.ai_rename?.rename_parent_dir ?? false;
 	}
 
-	function scheduleFilenamePreview() {
-		if (filenamePreviewTimer) {
-			clearTimeout(filenamePreviewTimer);
-		}
-		filenamePreviewTimer = setTimeout(() => {
-			void loadFilenamePreview();
-		}, 300);
-	}
 
-	function getRequestErrorMessage(error: unknown) {
-		if (error instanceof Error) return error.message;
-		if (error && typeof error === 'object' && 'message' in error) {
-			const message = (error as { message?: unknown }).message;
-			if (typeof message === 'string') return message;
-		}
-		return '命名模板预览失败';
-	}
 
-	async function loadFilenamePreview() {
-		if (!config || openSheet !== 'naming') return;
 
-		const requestId = ++filenamePreviewRequestId;
-		filenamePreviewLoading = true;
-		filenamePreviewError = '';
+	// 命名模板变化时按需刷新预览（签名比较在 store 内完成）
+	$: naming.refreshOnChange(naming.signature, openSheet === 'naming');
 
-		try {
-			const response = await api.previewFilenameTemplates({
-				video_name: videoName,
-				page_name: pageName,
-				multi_page_name: multiPageName,
-				bangumi_name: bangumiName,
-				folder_structure: folderStructure,
-				bangumi_folder_name: bangumiFolderName,
-				collection_folder_mode: collectionFolderMode,
-				collection_unified_name: collectionUnifiedName,
-				time_format: timeFormat,
-				multi_page_use_season_structure: multiPageUseSeasonStructure,
-				collection_use_season_structure: collectionUseSeasonStructure,
-				bangumi_use_season_structure: bangumiUseSeasonStructure
-			});
-			if (requestId !== filenamePreviewRequestId) return;
-			filenamePreview = response.data;
-		} catch (error) {
-			if (requestId !== filenamePreviewRequestId) return;
-			filenamePreview = null;
-			filenamePreviewError = getRequestErrorMessage(error);
-		} finally {
-			if (requestId === filenamePreviewRequestId) {
-				filenamePreviewLoading = false;
-			}
-		}
-	}
 
-	$: {
-		const nextSignature = JSON.stringify({
-			openSheet,
-			videoName,
-			pageName,
-			multiPageName,
-			bangumiName,
-			folderStructure,
-			bangumiFolderName,
-			collectionFolderMode,
-			collectionUnifiedName,
-			timeFormat,
-			multiPageUseSeasonStructure,
-			collectionUseSeasonStructure,
-			bangumiUseSeasonStructure
-		});
-		if (config && openSheet === 'naming' && nextSignature !== filenamePreviewSignature) {
-			filenamePreviewSignature = nextSignature;
-			scheduleFilenamePreview();
-		}
-	}
 
-	// 检查模板是否包含路径
-	function hasPathSeparator(value: string) {
-		return value.includes('/') || value.includes('\\');
-	}
 
-	// 仅检查 Handlebars 标签外的路径分隔符（避免把 {{/if}} 误判为路径）
-	function hasPathSeparatorOutsideHandlebars(value: string) {
-		let inTag = false;
-		let tagEndLen = 0;
 
-		for (let i = 0; i < value.length; i++) {
-			if (!inTag && value[i] === '{' && value[i + 1] === '{') {
-				let startLen = 2;
-				while (i + startLen < value.length && value[i + startLen] === '{' && startLen < 4) {
-					startLen++;
-				}
-				inTag = true;
-				tagEndLen = startLen;
-				i += startLen - 1;
-				continue;
-			}
-
-			if (inTag) {
-				const end = '}'.repeat(tagEndLen);
-				if (tagEndLen > 0 && value.startsWith(end, i)) {
-					inTag = false;
-					tagEndLen = 0;
-					i += end.length - 1;
-				}
-				continue;
-			}
-
-			if (value[i] === '/' || value[i] === '\\') return true;
-		}
-
-		return false;
-	}
-
-	// 验证单P视频文件名模板
-	function validatePageName(value: string) {
-		if (hasPathSeparatorOutsideHandlebars(value)) {
-			pageNameError = '单P视频文件名模板不应包含路径分隔符 / 或 \\';
-			pageNameValid = false;
-			return false;
-		}
-		pageNameError = '';
-		pageNameValid = true;
-		return true;
-	}
-
-	// 验证多P视频文件名模板
-	function validateMultiPageName(value: string) {
-		if (hasPathSeparatorOutsideHandlebars(value)) {
-			multiPageNameError = '多P视频文件名模板不应包含路径分隔符 / 或 \\';
-			multiPageNameValid = false;
-			return false;
-		}
-		multiPageNameError = '';
-		multiPageNameValid = true;
-		return true;
-	}
-
-	// 验证合集统一命名模板（统一模式/投稿源同UP分季生效）
-	function validateCollectionUnifiedName(value: string) {
-		const trimmed = value.trim();
-		if (!trimmed) {
-			collectionUnifiedNameError = '';
-			collectionUnifiedNameValid = true;
-			return true;
-		}
-		if (hasPathSeparatorOutsideHandlebars(trimmed)) {
-			collectionUnifiedNameError = '合集统一命名模板不应包含路径分隔符 / 或 \\\\';
-			collectionUnifiedNameValid = false;
-			return false;
-		}
-		collectionUnifiedNameError = '';
-		collectionUnifiedNameValid = true;
-		return true;
-	}
 
 	// 验证服务器绑定地址
 	function validateBindAddress(value: string) {
@@ -979,52 +709,8 @@
 	// 实时校验端口输入
 	$: validateBindAddress(bindAddress);
 
-	// 互斥逻辑处理
-	function handleVideoNameChange(value: string) {
-		videoNameHasPath = hasPathSeparator(value);
-		if (videoNameHasPath && multiPageNameHasPath) {
-			// 如果视频文件名模板设置了路径，清空多P模板中的路径
-			if (multiPageName.includes('/') || multiPageName.includes('\\')) {
-				// 提取文件名部分，移除路径部分
-				const parts = multiPageName.split(/[/\\]/);
-				multiPageName = parts[parts.length - 1] || '{{title}}-P{{pid_pad}}';
-				toast.info('已自动调整多P模板', {
-					description: '移除了多P模板中的路径设置，避免冲突'
-				});
-			}
-		}
-	}
 
-	function handleMultiPageNameChange(value: string) {
-		validateMultiPageName(value);
-		multiPageNameHasPath = hasPathSeparator(value);
-		if (multiPageNameHasPath && videoNameHasPath) {
-			// 如果多P模板设置了路径，清空视频文件名模板中的路径
-			if (videoName.includes('/') || videoName.includes('\\')) {
-				// 提取最后一个路径组件
-				const parts = videoName.split(/[/\\]/);
-				videoName = parts[parts.length - 1] || '{{title}}';
-				toast.info('已自动调整视频模板', {
-					description: '移除了视频模板中的路径设置，避免冲突'
-				});
-			}
-		}
-	}
 
-	// 监听变化，实时验证和处理互斥
-	$: {
-		if (pageName) {
-			validatePageName(pageName);
-		}
-		if (multiPageName) {
-			validateMultiPageName(multiPageName);
-		}
-		if (collectionUnifiedName) {
-			validateCollectionUnifiedName(collectionUnifiedName);
-		}
-		videoNameHasPath = hasPathSeparator(videoName);
-		multiPageNameHasPath = hasPathSeparator(multiPageName);
-	}
 
 	// ===== 数据库管理 =====
 	function formatBytes(bytes: number): string {
@@ -1160,18 +846,8 @@
 
 	async function saveConfig() {
 		// 保存前验证
-		if (!validatePageName(pageName)) {
-			toast.error('配置验证失败', { description: pageNameError });
-			return;
-		}
-
-		if (!validateMultiPageName(multiPageName)) {
-			toast.error('配置验证失败', { description: multiPageNameError });
-			return;
-		}
-
-		if (!validateCollectionUnifiedName(collectionUnifiedName)) {
-			toast.error('配置验证失败', { description: collectionUnifiedNameError });
+		if (!naming.validateAll()) {
+			toast.error('配置验证失败', { description: naming.firstValidationError });
 			return;
 		}
 
@@ -1181,18 +857,8 @@
 		}
 
 		const params: UpdateConfigRequest = {
-			video_name: videoName,
-			page_name: pageName,
-			multi_page_name: multiPageName,
-			bangumi_name: bangumiName,
-			folder_structure: folderStructure,
-			bangumi_folder_name: bangumiFolderName,
-			collection_folder_mode: collectionFolderMode,
-			collection_unified_name: collectionUnifiedName,
-			time_format: timeFormat,
+			...naming.toPayload(),
 			interval: normalizeNumberInput(interval, DEFAULT_CONFIG_VALUES.interval),
-			nfo_time_type: nfoTimeType,
-			nfo_include_genre: nfoIncludeGenre,
 			bind_address: bindAddress,
 			parallel_download_enabled: parallelDownloadEnabled,
 			parallel_download_threads: normalizeNumberInput(
@@ -1379,12 +1045,6 @@
 				aria2HealthCheckInterval,
 				DEFAULT_CONFIG_VALUES.aria2HealthCheckInterval
 			),
-			// 多P视频目录结构配置
-			multi_page_use_season_structure: multiPageUseSeasonStructure,
-			// 合集目录结构配置
-			collection_use_season_structure: collectionUseSeasonStructure,
-			// 番剧目录结构配置
-			bangumi_use_season_structure: bangumiUseSeasonStructure,
 			// 风控验证配置
 			risk_control_enabled: riskControlEnabled,
 			risk_control_mode: riskControlMode,
@@ -1707,37 +1367,9 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:videoName
-	bind:pageName
-	bind:multiPageName
-	bind:bangumiName
-	bind:folderStructure
-	bind:bangumiFolderName
-	bind:collectionFolderMode
-	bind:collectionUnifiedName
-	bind:timeFormat
-	bind:multiPageUseSeasonStructure
-	bind:collectionUseSeasonStructure
-	bind:bangumiUseSeasonStructure
-	bind:nfoTimeType
-	bind:nfoIncludeGenre
-	videoNameHasPath={videoNameHasPath}
-	multiPageNameHasPath={multiPageNameHasPath}
-	pageNameValid={pageNameValid}
-	pageNameError={pageNameError}
-	multiPageNameValid={multiPageNameValid}
-	multiPageNameError={multiPageNameError}
-	collectionUnifiedNameValid={collectionUnifiedNameValid}
-	collectionUnifiedNameError={collectionUnifiedNameError}
-	filenamePreview={filenamePreview}
-	filenamePreviewLoading={filenamePreviewLoading}
-	filenamePreviewError={filenamePreviewError}
-	saving={saving}
-	variableHelp={variableHelp}
+	store={naming}
+	{saving}
 	onSave={saveConfig}
-	onVideoNameChange={handleVideoNameChange}
-	onMultiPageNameChange={handleMultiPageNameChange}
-	onValidateCollectionUnifiedName={validateCollectionUnifiedName}
 />
 
 <QualitySheet
