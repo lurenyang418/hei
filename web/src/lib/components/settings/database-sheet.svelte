@@ -5,74 +5,28 @@
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
-	type DatabaseStatus = {
-		path: string;
-		db_size_bytes: number;
-		wal_size_bytes: number;
-		reclaimable_bytes: number;
-		tables: { table: string; rows: number; label: string }[];
-	} | null;
+	import type { DatabaseSettingsStore } from '$lib/stores/settings/database.svelte';
+	import { formatBytes } from '$lib/stores/settings/database.svelte';
 
-	type DatabaseBackup = {
-		name: string;
-		path: string;
-		size_bytes: number;
-		created_at: string;
-		is_import: boolean;
-	};
-
-	type DatabaseActionType =
-		| 'clear_image_cache'
-		| 'clear_ai_history'
-		| 'clear_queue_history'
-		| 'clean_orphans'
-		| 'vacuum'
-		| 'backup'
-		| 'clean_logs';
-
-	type DatabaseAction = {
-		action: DatabaseActionType;
-		label: string;
-		description: string;
-		danger: boolean;
-		keepDays: number;
-	} | null;
-
+	export let store: DatabaseSettingsStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-	export let databaseStatus: DatabaseStatus = null;
-	export let databaseLoading = false;
-	export let databaseBackups: DatabaseBackup[] = [];
-	export let databaseBackupsLoading = false;
-	export let databaseAction: DatabaseAction = null;
-	export let databaseActionRunning = false;
-	export let restoreTarget: { name: string; size_bytes: number; created_at: string } | null = null;
-	export let restoreRunning = false;
-	export let importRestoreTarget: { file: File; name: string; size_bytes: number } | null = null;
-	export let importRestoreRunning = false;
-	export let importFileInput: HTMLInputElement | undefined = undefined;
 
-	export let onLoadStatus: () => void = () => {};
-	export let onLoadBackups: () => void = () => {};
-	export let onRequestAction: (
-		action: DatabaseActionType,
-		label: string,
-		description: string,
-		danger?: boolean,
-		keepDays?: number
-	) => void = () => {};
-	export let onRunAction: () => void = () => {};
-	export let onRestore: () => void = () => {};
-	export let onConfirmRestore: (backup: {
-		name: string;
-		size_bytes: number;
-		created_at: string;
-	}) => void = () => {};
-	export let onSelectImport: () => void = () => {};
-	export let onImportPicked: (event: Event) => void = () => {};
-	export let onImportRestore: () => void = () => {};
-	export let formatBytes: (bytes: number) => string = () => '';
+	// 文件选择框属于 DOM，由抽屉自己持有；store 只接收选中的 File
+	let importFileInput: HTMLInputElement | undefined = undefined;
+
+	function selectImportFile() {
+		importFileInput?.click();
+	}
+
+	function handleImportPicked(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		store.requestImportRestore(file);
+	}
 </script>
 
 <!-- 数据库管理抽屉 -->
@@ -85,11 +39,11 @@
 >
 	<div class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}">
 		<div class="min-h-0 flex-1 space-y-6 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-			{#if databaseLoading && !databaseStatus}
+			{#if store.loading && !store.status}
 				<div class="flex justify-center py-12">
 					<Loading />
 				</div>
-			{:else if databaseStatus}
+			{:else if store.status}
 				<!-- 数据库信息 -->
 				<div class="space-y-3">
 					<h3 class="text-base font-semibold">数据库信息</h3>
@@ -97,19 +51,19 @@
 						<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
 							<div>
 								<span class="text-muted-foreground">主库大小：</span>
-								<span class="font-medium">{formatBytes(databaseStatus.db_size_bytes)}</span>
+								<span class="font-medium">{formatBytes(store.status.db_size_bytes)}</span>
 							</div>
 							<div>
 								<span class="text-muted-foreground">WAL：</span>
-								<span class="font-medium">{formatBytes(databaseStatus.wal_size_bytes)}</span>
+								<span class="font-medium">{formatBytes(store.status.wal_size_bytes)}</span>
 							</div>
 							<div>
 								<span class="text-muted-foreground">可回收空间：</span>
-								<span class="font-medium">{formatBytes(databaseStatus.reclaimable_bytes)}</span>
+								<span class="font-medium">{formatBytes(store.status.reclaimable_bytes)}</span>
 							</div>
 						</div>
-						<p class="text-muted-foreground mt-2 text-xs break-all">{databaseStatus.path}</p>
-						{#if databaseStatus.reclaimable_bytes > 1024 * 1024}
+						<p class="text-muted-foreground mt-2 text-xs break-all">{store.status.path}</p>
+						{#if store.status.reclaimable_bytes > 1024 * 1024}
 							<div
 								class="mt-2 rounded-md bg-amber-100 px-3 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
 							>
@@ -123,7 +77,7 @@
 				<div class="space-y-3">
 					<h3 class="text-base font-semibold">数据量统计</h3>
 					<div class="grid grid-cols-3 gap-1 sm:grid-cols-4 lg:grid-cols-6">
-						{#each databaseStatus.tables as stat (stat.table)}
+						{#each store.status.tables as stat (stat.table)}
 							<div class="flex items-center justify-between gap-1 rounded border px-2 py-1">
 								<span class="text-muted-foreground truncate text-[11px]">{stat.label}</span>
 								<span class="text-xs font-semibold tabular-nums">{stat.rows}</span>
@@ -140,7 +94,7 @@
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction(
+								store.requestAction(
 									'clear_image_cache',
 									'清理图片代理缓存',
 									'清空网页图片代理缓存，图片将按需重新拉取。'
@@ -153,7 +107,7 @@
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction(
+								store.requestAction(
 									'clear_ai_history',
 									'清理 AI 对话历史',
 									'清空 AI 重命名使用的历史对话记录，不影响已完成的命名。'
@@ -166,7 +120,7 @@
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction(
+								store.requestAction(
 									'clear_queue_history',
 									'清理任务队列历史',
 									'删除已经完成或失败的任务队列记录（删除来源/添加来源等历史任务）。'
@@ -179,7 +133,7 @@
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction('clean_orphans', '清理孤立记录', '删除无主分P记录。', true)}
+								store.requestAction('clean_orphans', '清理孤立记录', '删除无主分P记录。', true)}
 						>
 							<span class="text-sm font-medium">清理孤立记录</span>
 							<span class="text-muted-foreground text-xs">无主分P</span>
@@ -188,7 +142,7 @@
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction(
+								store.requestAction(
 									'vacuum',
 									'压缩数据库',
 									'执行 VACUUM 回收删除数据后留下的磁盘空间，可能需要几秒到几十秒。'
@@ -196,14 +150,14 @@
 						>
 							<span class="text-sm font-medium">压缩数据库</span>
 							<span class="text-muted-foreground text-xs">
-								回收可释放空间（当前约 {formatBytes(databaseStatus.reclaimable_bytes)}）
+								回收可释放空间（当前约 {formatBytes(store.status.reclaimable_bytes)}）
 							</span>
 						</button>
 						<button
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction(
+								store.requestAction(
 									'backup',
 									'备份数据库',
 									'生成一份完整数据库快照到配置目录（data-backup-时间戳.sqlite），不影响当前运行。'
@@ -216,7 +170,7 @@
 							type="button"
 							class="hover:bg-accent flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors"
 							onclick={() =>
-								onRequestAction(
+								store.requestAction(
 									'clean_logs',
 									'清理旧日志',
 									'删除保留期以外的旧日志文件，释放磁盘空间；保留天数可在确认框中自由调整（1-365 天），当前正在写入的日志不受影响。',
@@ -246,12 +200,12 @@
 								type="file"
 								accept=".sqlite,.db"
 								class="hidden"
-								onchange={onImportPicked}
+								onchange={handleImportPicked}
 							/>
 							<button
 								type="button"
 								class="hover:bg-accent flex-shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
-								onclick={onSelectImport}
+								onclick={selectImportFile}
 							>
 								选择文件
 							</button>
@@ -262,13 +216,13 @@
 						<button
 							type="button"
 							class="text-muted-foreground hover:text-foreground text-xs transition-colors"
-							onclick={onLoadBackups}
-							disabled={databaseBackupsLoading}
+							onclick={() => store.loadBackups()}
+							disabled={store.backupsLoading}
 						>
-							{databaseBackupsLoading ? '刷新中...' : '刷新列表'}
+							{store.backupsLoading ? '刷新中...' : '刷新列表'}
 						</button>
 					</div>
-					{#if databaseBackups.length === 0}
+					{#if store.backups.length === 0}
 						<div
 							class="text-muted-foreground rounded-lg border border-dashed p-4 text-center text-sm"
 						>
@@ -276,7 +230,7 @@
 						</div>
 					{:else}
 						<div class="space-y-2">
-							{#each databaseBackups as backup (backup.name)}
+							{#each store.backups as backup (backup.name)}
 								<div
 									class="hover:bg-accent flex items-center justify-between rounded-lg border p-3 transition-colors"
 								>
@@ -297,7 +251,7 @@
 									<button
 										type="button"
 										class="text-destructive hover:text-destructive/80 border-destructive/40 flex-shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-										onclick={() => onConfirmRestore(backup)}
+										onclick={() => store.confirmRestore(backup)}
 									>
 										恢复
 									</button>
@@ -312,8 +266,8 @@
 			{/if}
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="button" variant="outline" onclick={onLoadStatus} disabled={databaseLoading} class="w-full">
-				{databaseLoading ? '刷新中...' : '刷新统计'}
+			<Button type="button" variant="outline" onclick={() => store.loadStatus()} disabled={store.loading} class="w-full">
+				{store.loading ? '刷新中...' : '刷新统计'}
 			</Button>
 		</SheetFooter>
 	</div>
@@ -321,18 +275,18 @@
 
 <!-- 数据库维护确认对话框 -->
 <AlertDialog.Root
-	open={!!databaseAction}
+	open={!!store.action}
 	onOpenChange={(next) => {
-		if (!next) databaseAction = null;
+		if (!next) store.action = null;
 	}}
 >
 	<AlertDialog.Content class="max-w-md">
 		<AlertDialog.Header>
-			<AlertDialog.Title class={databaseAction?.danger ? 'text-destructive dark:text-red-400' : ''}>
-				{databaseAction?.label}
+			<AlertDialog.Title class={store.action?.danger ? 'text-destructive dark:text-red-400' : ''}>
+				{store.action?.label}
 			</AlertDialog.Title>
-			<AlertDialog.Description>{databaseAction?.description}</AlertDialog.Description>
-			{#if databaseAction?.action === 'clean_logs'}
+			<AlertDialog.Description>{store.action?.description}</AlertDialog.Description>
+			{#if store.action?.action === 'clean_logs'}
 				<div class="mt-3 flex items-center gap-2">
 					<label for="keep-log-days" class="text-muted-foreground text-sm whitespace-nowrap"
 						>保留天数</label
@@ -342,10 +296,10 @@
 						type="number"
 						min="1"
 						max="365"
-						value={databaseAction.keepDays}
+						value={store.action.keepDays}
 						oninput={(e) => {
 							const value = Number((e.currentTarget as HTMLInputElement).value);
-							if (databaseAction) databaseAction.keepDays = value >= 1 ? Math.min(value, 365) : 1;
+							if (store.action) store.action.keepDays = value >= 1 ? Math.min(value, 365) : 1;
 						}}
 						class="border-input bg-background w-28 rounded-md border px-3 py-1.5 text-sm"
 					/>
@@ -357,18 +311,18 @@
 			<button
 				type="button"
 				class="hover:bg-accent rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={databaseActionRunning}
-				onclick={() => (databaseAction = null)}
+				disabled={store.actionRunning}
+				onclick={() => (store.action = null)}
 			>
 				取消
 			</button>
 			<button
 				type="button"
 				class="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={databaseActionRunning}
-				onclick={onRunAction}
+				disabled={store.actionRunning}
+				onclick={() => store.runAction()}
 			>
-				{databaseActionRunning ? '执行中...' : '确认执行'}
+				{store.actionRunning ? '执行中...' : '确认执行'}
 			</button>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
@@ -376,9 +330,9 @@
 
 <!-- 数据库恢复确认对话框 -->
 <AlertDialog.Root
-	open={!!restoreTarget}
+	open={!!store.restoreTarget}
 	onOpenChange={(next) => {
-		if (!next) restoreTarget = null;
+		if (!next) store.restoreTarget = null;
 	}}
 >
 	<AlertDialog.Content class="max-w-md">
@@ -387,9 +341,9 @@
 			<AlertDialog.Description>
 				<p class="mb-2">确定要用以下备份替换当前数据库吗？</p>
 				<div class="bg-muted/50 rounded-md border p-3 font-mono text-xs">
-					<p class="break-all">{restoreTarget?.name}</p>
+					<p class="break-all">{store.restoreTarget?.name}</p>
 					<p class="text-muted-foreground mt-1">
-						{formatBytes(restoreTarget?.size_bytes ?? 0)} · {restoreTarget?.created_at}
+						{formatBytes(store.restoreTarget?.size_bytes ?? 0)} · {store.restoreTarget?.created_at}
 					</p>
 				</div>
 				<div
@@ -404,18 +358,18 @@
 			<button
 				type="button"
 				class="hover:bg-accent rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={restoreRunning}
-				onclick={() => (restoreTarget = null)}
+				disabled={store.restoreRunning}
+				onclick={() => (store.restoreTarget = null)}
 			>
 				取消
 			</button>
 			<button
 				type="button"
 				class="rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={restoreRunning}
-				onclick={onRestore}
+				disabled={store.restoreRunning}
+				onclick={() => store.runRestore()}
 			>
-				{restoreRunning ? '安排中...' : '确认恢复'}
+				{store.restoreRunning ? '安排中...' : '确认恢复'}
 			</button>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
@@ -423,9 +377,9 @@
 
 <!-- 数据库导入备份确认对话框 -->
 <AlertDialog.Root
-	open={!!importRestoreTarget}
+	open={!!store.importRestoreTarget}
 	onOpenChange={(next) => {
-		if (!next) importRestoreTarget = null;
+		if (!next) store.importRestoreTarget = null;
 	}}
 >
 	<AlertDialog.Content class="max-w-md">
@@ -436,9 +390,9 @@
 			<AlertDialog.Description>
 				<p class="mb-2">确定要导入以下备份包并替换当前数据库吗？</p>
 				<div class="bg-muted/50 rounded-md border p-3 font-mono text-xs">
-					<p class="break-all">{importRestoreTarget?.name}</p>
+					<p class="break-all">{store.importRestoreTarget?.name}</p>
 					<p class="text-muted-foreground mt-1">
-						{formatBytes(importRestoreTarget?.size_bytes ?? 0)}
+						{formatBytes(store.importRestoreTarget?.size_bytes ?? 0)}
 					</p>
 				</div>
 				<div
@@ -453,18 +407,18 @@
 			<button
 				type="button"
 				class="hover:bg-accent rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={importRestoreRunning}
-				onclick={() => (importRestoreTarget = null)}
+				disabled={store.importRestoreRunning}
+				onclick={() => (store.importRestoreTarget = null)}
 			>
 				取消
 			</button>
 			<button
 				type="button"
 				class="rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={importRestoreRunning}
-				onclick={onImportRestore}
+				disabled={store.importRestoreRunning}
+				onclick={() => store.runImportRestore()}
 			>
-				{importRestoreRunning ? '导入中...' : '确认导入并恢复'}
+				{store.importRestoreRunning ? '导入中...' : '确认导入并恢复'}
 			</button>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>

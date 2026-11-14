@@ -40,6 +40,7 @@
 	import { CredentialSettingsStore } from '$lib/stores/settings/credential.svelte';
 	import { CaptchaSettingsStore } from '$lib/stores/settings/captcha.svelte';
 	import { AiRenameSettingsStore } from '$lib/stores/settings/ai-rename.svelte';
+	import { DatabaseSettingsStore } from '$lib/stores/settings/database.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
@@ -63,6 +64,8 @@
 		reloadConfig: loadConfig,
 		closeSheet: () => (openSheet = null)
 	});
+
+	const database = new DatabaseSettingsStore();
 
 	// 控制各个抽屉的开关状态
 	let openSheet: string | null = null;
@@ -338,43 +341,6 @@
 	// AI重命名配置
 
 	// 数据库管理
-	let databaseStatus: {
-		path: string;
-		db_size_bytes: number;
-		wal_size_bytes: number;
-		reclaimable_bytes: number;
-		tables: { table: string; rows: number; label: string }[];
-	} | null = null;
-	let databaseLoading = false;
-	let databaseActionRunning = false;
-	let databaseAction: {
-		action:
-			| 'clear_image_cache'
-			| 'clear_ai_history'
-			| 'clear_queue_history'
-			| 'clean_orphans'
-			| 'vacuum'
-			| 'backup'
-			| 'clean_logs';
-		label: string;
-		description: string;
-		danger: boolean;
-		keepDays: number;
-	} | null = null;
-
-	let databaseBackups: {
-		name: string;
-		path: string;
-		size_bytes: number;
-		created_at: string;
-		is_import: boolean;
-	}[] = [];
-	let databaseBackupsLoading = false;
-	let restoreTarget: { name: string; size_bytes: number; created_at: string } | null = null;
-	let restoreRunning = false;
-	let importFileInput: HTMLInputElement | undefined;
-	let importRestoreTarget: { file: File; name: string; size_bytes: number } | null = null;
-	let importRestoreRunning = false;
 
 
 	// 显示帮助信息的状态（在文件命名抽屉中使用）
@@ -665,135 +631,18 @@
 
 
 
-	// ===== 数据库管理 =====
-	function formatBytes(bytes: number): string {
-		if (!bytes || bytes <= 0) return '0 B';
-		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-		const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-		const value = bytes / Math.pow(1024, index);
-		return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[index]}`;
-	}
 
-	async function loadDatabaseStatus() {
-		databaseLoading = true;
-		try {
-			const response = await runRequest(() => api.getDatabaseStatus(), {
-				context: '获取数据库状态失败'
-			});
-			if (response) databaseStatus = response.data;
-		} finally {
-			databaseLoading = false;
-		}
-	}
 
-	async function loadDatabaseBackups() {
-		databaseBackupsLoading = true;
-		try {
-			const response = await runRequest(() => api.getDatabaseBackups(), {
-				context: '获取数据库备份列表失败'
-			});
-			if (response) databaseBackups = response.data.backups;
-		} finally {
-			databaseBackupsLoading = false;
-		}
-	}
 
-	async function confirmRestore(backup: { name: string; size_bytes: number; created_at: string }) {
-		restoreTarget = backup;
-	}
 
-	async function runRestore() {
-		if (!restoreTarget) return;
-		const name = restoreTarget.name;
-		restoreRunning = true;
-		try {
-			const response = await runRequest(() => api.restoreDatabase(name), {
-				context: '恢复数据库失败'
-			});
-			if (response?.data?.success) {
-				toast.success('恢复已安排', { description: response.data.message });
-			} else if (response?.data) {
-				toast.error('恢复失败', { description: response.data.message });
-			}
-		} finally {
-			restoreRunning = false;
-			restoreTarget = null;
-		}
-	}
 
-	function selectImportFile() {
-		importFileInput?.click();
-	}
 
-	function onImportFilePicked(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
-		if (!file) return;
-		importRestoreTarget = { file, name: file.name, size_bytes: file.size };
-	}
 
-	async function runImportRestore() {
-		if (!importRestoreTarget) return;
-		const target = importRestoreTarget;
-		importRestoreRunning = true;
-		try {
-			const response = await runRequest(() => api.uploadRestoreBackup(target.file, target.name), {
-				context: '导入备份包失败'
-			});
-			if (response?.data?.success) {
-				toast.success('备份包已导入', { description: response.data.message });
-				await loadDatabaseBackups();
-			} else if (response?.data) {
-				toast.error('导入备份包失败', { description: response.data.message });
-			}
-		} finally {
-			importRestoreRunning = false;
-			importRestoreTarget = null;
-		}
-	}
 
-	function requestDatabaseAction(
-		action:
-			| 'clear_image_cache'
-			| 'clear_ai_history'
-			| 'clear_queue_history'
-			| 'clean_orphans'
-			| 'vacuum'
-			| 'backup'
-			| 'clean_logs',
-		label: string,
-		description: string,
-		danger = false,
-		keepDays = 7
-	) {
-		databaseAction = { action, label, description, danger, keepDays };
-	}
 
-	async function runDatabaseAction() {
-		if (!databaseAction) return;
-		const { action, label } = databaseAction;
-		const keepDays = action === 'clean_logs' ? databaseAction.keepDays : undefined;
-		databaseActionRunning = true;
-		try {
-			const response = await runRequest(() => api.runDatabaseMaintenance(action, keepDays), {
-				context: `${label}失败`
-			});
-			if (response?.data?.success) {
-				toast.success(`${label}成功`, { description: response.data.message });
-				await loadDatabaseStatus();
-			} else if (response?.data) {
-				toast.error(`${label}失败`, { description: response.data.message });
-			}
-		} finally {
-			databaseActionRunning = false;
-			databaseAction = null;
-		}
-	}
 
 	$: if (openSheet === 'database') {
-		loadDatabaseStatus();
-		loadDatabaseBackups();
+		database.loadAll();
 	}
 
 
@@ -1303,25 +1152,5 @@
 		if (!next) openSheet = null;
 	}}
 	{isMobile}
-	{databaseStatus}
-	{databaseLoading}
-	{databaseBackups}
-	{databaseBackupsLoading}
-	bind:databaseAction
-	{databaseActionRunning}
-	bind:restoreTarget
-	{restoreRunning}
-	bind:importRestoreTarget
-	{importRestoreRunning}
-	bind:importFileInput
-	onLoadStatus={loadDatabaseStatus}
-	onLoadBackups={loadDatabaseBackups}
-	onRequestAction={requestDatabaseAction}
-	onRunAction={runDatabaseAction}
-	onRestore={runRestore}
-	onConfirmRestore={confirmRestore}
-	onSelectImport={selectImportFile}
-	onImportPicked={onImportFilePicked}
-	onImportRestore={runImportRestore}
-	{formatBytes}
+	store={database}
 />
