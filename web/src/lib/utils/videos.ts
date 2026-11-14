@@ -23,7 +23,7 @@ export function buildVideosRequest({
 	maxHeight?: number | null;
 	sortBy?: SortBy;
 	sortOrder?: SortOrder;
-	platform?: 'bilibili' | 'youtube' | 'douyin' | 'tiktok';
+	platform?: 'bilibili';
 }): VideosRequest {
 	const params: VideosRequest = {
 		page,
@@ -52,11 +52,6 @@ export function buildVideosRequest({
 		const sourceId = Number.parseInt(videoSource.id, 10);
 		if (Number.isFinite(sourceId)) {
 			switch (videoSource.type) {
-				case 'youtube':
-				case 'douyin':
-				case 'tiktok':
-					params.youtube = sourceId;
-					break;
 				case 'collection':
 					params.collection = sourceId;
 					break;
@@ -74,9 +69,6 @@ export function buildVideosRequest({
 					break;
 				case 'pugv':
 					params.pugv = sourceId;
-					break;
-				case 'manga':
-					params.manga = sourceId;
 					break;
 			}
 		}

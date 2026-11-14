@@ -12,21 +12,10 @@ use utoipa::Modify;
 
 use crate::api::wrapper::ApiResponse;
 
-/// 统一视频资源 ID：B 站为纯数字，外源为 `youtube-` / `douyin-` / `tiktok-{id}`。
-/// 三个平台的封面与原图都由 `<img>` 直接加载，浏览器不会附带 Authorization 头，
-/// 漏掉任何一个平台都会让图片静默 401（表现是图裂或反复回源重试）。
+/// 视频封面由 `<img>` 直接加载，浏览器不会附带 Authorization 头，
+/// 因此封面路径需要免认证。
 fn is_public_video_resource_id(value: &str) -> bool {
-    if value.is_empty() {
-        return false;
-    }
-    if value.chars().all(|ch| ch.is_ascii_digit()) {
-        return true;
-    }
-    ["youtube-", "douyin-", "tiktok-"].iter().any(|prefix| {
-        value
-            .strip_prefix(prefix)
-            .is_some_and(|id| !id.is_empty() && id.chars().all(|ch| ch.is_ascii_digit()))
-    })
+    !value.is_empty() && value.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn is_public_video_cover_path(path: &str) -> bool {
@@ -37,18 +26,6 @@ fn is_public_video_cover_path(path: &str) -> bool {
         return false;
     };
     is_public_video_resource_id(video_id)
-}
-
-fn is_public_video_image_path(path: &str) -> bool {
-    let Some(rest) = path.strip_prefix("/api/videos/") else {
-        return false;
-    };
-    let Some((video_id, image_index)) = rest.split_once("/images/") else {
-        return false;
-    };
-    is_public_video_resource_id(video_id)
-        && !image_index.is_empty()
-        && image_index.chars().all(|ch| ch.is_ascii_digit())
 }
 
 pub async fn auth(headers: HeaderMap, request: Request, next: Next) -> Result<Response, StatusCode> {
@@ -63,7 +40,6 @@ pub async fn auth(headers: HeaderMap, request: Request, next: Next) -> Result<Re
         "/api/setup/auth-token",      // 设置auth token不需要认证
         "/api/credential",            // 更新凭证在初始设置时不需要认证
         "/api/videos/stream",         // 视频流API不需要认证（供播放器使用）
-        "/api/manga/page",            // 漫画单页图片不需要认证（供网页阅读器的 <img> 使用）
         "/api/videos/proxy-stream",   // 视频流代理API不需要认证（供在线播放器使用）
         "/api/auth/qr/generate",      // 生成登录二维码不需要认证
         "/api/auth/qr/poll",          // 轮询登录状态不需要认证
@@ -119,8 +95,7 @@ pub async fn auth(headers: HeaderMap, request: Request, next: Next) -> Result<Re
 
     let needs_auth = path.starts_with("/api/")
         && !excluded_paths.iter().any(|&excluded| path.starts_with(excluded))
-        && !is_public_video_cover_path(path)
-        && !is_public_video_image_path(path);
+        && !is_public_video_cover_path(path);
 
     if needs_auth {
         return Ok(ApiResponse::unauthorized(()).into_response());
@@ -146,16 +121,11 @@ impl Modify for OpenAPIAuth {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_public_video_cover_path, is_public_video_image_path};
+    use super::is_public_video_cover_path;
 
     #[test]
-    fn public_cover_path_accepts_all_platforms() {
-        for path in [
-            "/api/videos/123/cover",
-            "/api/videos/youtube-9/cover",
-            "/api/videos/douyin-16925/cover",
-            "/api/videos/tiktok-16928/cover",
-        ] {
+    fn public_cover_path_accepts_bilibili_video_ids() {
+        for path in ["/api/videos/123/cover", "/api/videos/0/cover"] {
             assert!(is_public_video_cover_path(path), "{path} 应当免认证");
         }
 
@@ -163,36 +133,10 @@ mod tests {
             "/api/videos",
             "/api/videos/123",
             "/api/videos//cover",
-            "/api/videos/douyin-/cover",
-            "/api/videos/douyin-abc/cover",
-            "/api/videos/tiktok-16928/cover/extra",
+            "/api/videos/abc/cover",
+            "/api/videos/123/cover/extra",
         ] {
             assert!(!is_public_video_cover_path(path), "{path} 不应免认证");
-        }
-    }
-
-    #[test]
-    fn public_image_path_accepts_all_platforms() {
-        for path in [
-            "/api/videos/123/images/1",
-            "/api/videos/youtube-9/images/1",
-            "/api/videos/douyin-16926/images/1",
-            "/api/videos/tiktok-16928/images/1",
-        ] {
-            assert!(is_public_video_image_path(path), "{path} 应当免认证");
-        }
-
-        for path in [
-            "/api/videos",
-            "/api/videos/123",
-            "/api/videos/douyin-/images/1",
-            "/api/videos/douyin-abc/images/1",
-            "/api/videos/tiktok-16928/images/",
-            "/api/videos/tiktok-16928/images/x",
-            "/api/videos/douyin-16928/files/1",
-            "/api/videos/tiktok-16928/images/1/2",
-        ] {
-            assert!(!is_public_video_image_path(path), "{path} 不应免认证");
         }
     }
 }

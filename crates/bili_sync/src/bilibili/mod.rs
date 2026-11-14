@@ -28,7 +28,6 @@ pub use video::{
 };
 pub use watch_later::WatchLater;
 pub mod bangumi;
-pub mod manga;
 pub mod pugv;
 
 mod analyzer;
@@ -327,27 +326,6 @@ pub enum VideoInfo {
         lecturer_id: Option<i64>,
         /// 讲师头像（课程详情的 `up_info.avatar`）
         lecturer_face: Option<String>,
-    },
-    /// 哔哩哔哩漫画的一话
-    ///
-    /// 同样受 untagged enum 的顺序约束，必须放在最后。
-    Manga {
-        /// 作品名
-        title: String,
-        ep_id: String,
-        /// 漫画没有 bvid，用 `ep_id` 占位，保证同一作品内唯一
-        bvid: String,
-        cover: String,
-        intro: String,
-        #[serde(with = "ts_seconds")]
-        pubtime: DateTime<Utc>,
-        /// 话标题
-        show_title: Option<String>,
-        /// 正篇集序（特典 / 番外为 None）
-        episode_number: Option<i32>,
-        share_copy: Option<String>,
-        /// 作者（B 漫 `author_name` 数组拼接）
-        author: Option<String>,
     },
 }
 

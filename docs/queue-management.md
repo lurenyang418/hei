@@ -10,11 +10,10 @@ bili-sync 会把「添加视频源」「删除视频源」「删除视频」「�
 
 ## 在哪里看
 
-Web 界面左侧导航 → **任务队列**（`/queue`）。页面分三块：
+Web 界面左侧导航 → **任务队列**（`/queue`）。页面分两块：
 
 1. **队列状态卡片**：视频源删除队列、视频删除队列、添加队列、配置队列、弹幕刷新队列、AI 重命名队列，每张卡片显示队列长度，正在执行时显示「处理中」。
 2. **队列详情**：列出每个队列里等待中的任务（任务描述、创建时间）。等待中的任务可以点「取消」；已经开始执行的任务不能取消。
-3. **YouTube 下载队列**：单独展示，显示等待 / 下载中 / 跳过 / 失败，失败的任务可以点「重试」。
 
 页面通过 SSE 实时刷新，不需要手动刷新浏览器。
 
@@ -29,7 +28,6 @@ Web 界面左侧导航 → **任务队列**（`/queue`）。页面分三块：
 | 弹幕刷新队列 | 触发刷新弹幕 | 重新拉取并生成弹幕文件 |
 | AI 重命名队列 | 在视频源页面触发「AI 批量重命名」 | 任务写进 `task_queue` 表，可持久化、重启恢复；同一视频源已在排队时不会重复入队，细节见下一节 |
 
-YouTube 源的下载任务单独排队展示（见上面第三块），不属于这六类队列。
 
 ## AI 批量重命名队列
 
@@ -38,7 +36,7 @@ YouTube 源的下载任务单独排队展示（见上面第三块），不属于
 - `POST /api/{source_type}/{id}/ai-rename-history` 只做参数校验，然后把任务写进 `task_queue`（`task_type = ai_rename_history`）和内存队列，**立即返回 `queued: true`**。返回时 `renamed_count` 固定是 0，表示「只是入队」，不是「一个文件都没改」。
 - 同一视频源已经有等待中的任务时，重复请求不会重复入队，返回的 message 会提示「已在队列中」。
 - 真正的重命名由后台的 `process_ai_rename_history_tasks` 串行执行，一次只跑一个任务；执行期间会暂停定时扫描，结束后自动恢复，避免扫描和批量改名同时动文件。
-- `source_type` 支持 `collection` / `favorite` / `submission` / `watch_later` / `bangumi` / `pugv` / `manga` / `youtube` / `douyin` / `tiktok`；请求里没传提示词时，回退到视频源自己的配置。AI 重命名的总开关没开时任务会直接失败，队列状态里能看到失败记录。
+- `source_type` 支持 `collection` / `favorite` / `submission` / `watch_later` / `bangumi` / `pugv`；请求里没传提示词时，回退到视频源自己的配置。AI 重命名的总开关没开时任务会直接失败，队列状态里能看到失败记录。
 
 **查进度**：队列页的「AI 重命名队列」卡片显示排队数量和处理中状态；也可以直接看 `GET /api/queue-status` 返回的 `ai_rename_queue` 字段。这里只有队列长度和 `is_processing`，没有按文件计的百分比进度——任务执行完会在日志里打一行「重命名 X 个，跳过 Y 个，失败 Z 个」，同时视频列表会自动刷新。
 
@@ -76,8 +74,6 @@ YouTube 源的下载任务单独排队展示（见上面第三块），不属于
 | POST | `/api/task-control/pause` | 停止扫描和下载 |
 | POST | `/api/task-control/resume` | 恢复扫描和下载 |
 | POST | `/api/task-control/refresh` | 任务刷新 |
-| GET | `/api/youtube/queue-status` | YouTube 下载队列 |
-| GET | `/api/douyin/queue-status` | 抖音下载队列 |
 | GET | `/api/downloads/progress` | 当前下载进度 |
 
 `GET /api/queue-status` 的 `data` 结构：

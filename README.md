@@ -38,18 +38,11 @@
 
 ### 群晖 NAS 套件安装（推荐）
 
-**方式一：添加套件源（可在套件中心直接安装 / 升级）**
+**添加套件源（可在套件中心直接安装 / 升级）**
 
 1. DSM → **套件中心** → **设置** → **套件来源** → **新增**
 2. 名称随意（如 `dnof`），位置填：`https://ssp.dnof.net/`
 3. 保存后回到「套件中心 → **社群**」，找到 **Bili Sync Up** → 安装
-
-**方式二：手动安装 `.spk`**
-
-1. 到 [Releases](https://github.com/NeeYoonc/bili-sync-up/releases/latest) 下载对应架构：
-   - x86_64 机型：`bili-sync-up_x86_64-<版本>.spk`
-   - ARM 机型：`bili-sync-up_armv8-<版本>.spk`
-2. 套件中心 → **手动安装** → 选择下载的 `.spk`
 
 安装向导可设置 **Web 访问端口**（默认 12345）、**访问 Token**、是否放行防火墙。
 装完点套件中心「打开」，或访问 `http://<NAS-IP>:<端口>`（填了 Token 会先要求输入）。
@@ -65,17 +58,17 @@ docker run -d \
   -p 12345:12345 \
   -v ./config:/app/.config/bili-sync \
   -v ./Downloads:/Downloads \
-  qq1582185982/bili-sync:latest
+  ghcr.io/lurenyang418/hei:latest
 ```
 
-> 镜像同时发布在 Docker Hub（`qq1582185982/bili-sync`）和 CNB（`docker.cnb.cool/sviplk.com/docker/bili-sync`）两个仓库：首选 Docker Hub，国内网络拉不动时把上面的镜像名换成 CNB 地址即可（tag 相同）。
+> 镜像发布在 GitHub Container Registry：`ghcr.io/lurenyang418/hei`。首次使用前请在仓库的 Packages 页面把该包可见性设为 Public；私有包需要先 `docker login ghcr.io`。
 
 ### docker-compose
 ```yaml
 services:
 
   bili-sync:
-    image: qq1582185982/bili-sync:latest   # 国内网络拉不动 Docker Hub 时，换成 docker.cnb.cool/sviplk.com/docker/bili-sync:latest
+    image: ghcr.io/lurenyang418/hei:latest
     # build:
     #   context: .
     #   dockerfile: Dockerfile
@@ -114,7 +107,7 @@ services:
 
 ### 二进制文件
 
-从 [Releases](https://github.com/NeeYoonc/bili-sync-up/releases) 下载对应平台的可执行文件。
+从 [Releases](https://github.com/NeeYoonc/bili-sync-up/releases) 下载 Linux amd64 / arm64 可执行文件；Windows / macOS 需自行从源码编译。
 
 ### 开发环境
 
@@ -123,9 +116,14 @@ services:
 git clone https://github.com/NeeYoonc/bili-sync-up
 cd bili-sync-up
 
-# 安装依赖并启动
-./make.bat setup
-./make.bat dev
+# 构建前端
+cd web
+npm install
+npm run build
+cd ..
+
+# 启动
+cargo run -p bili_sync
 ```
 
 访问 `http://localhost:12345` 进入管理界面。

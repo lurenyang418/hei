@@ -13,7 +13,7 @@ use crate::utils::live_updates::{notify_queue_status_changed, notify_videos_chan
 use crate::utils::time_format::now_standard_string;
 use anyhow::{anyhow, Result};
 use bili_sync_entity::task_queue::{self, Entity as TaskQueueEntity, TaskStatus, TaskType};
-use bili_sync_entity::{collection, favorite, page, submission, video, video_source, watch_later, youtube_source};
+use bili_sync_entity::{collection, favorite, page, submission, video, video_source, watch_later};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
@@ -27,7 +27,7 @@ use tracing::{debug, error, info};
 /// AI 批量重命名任务（序列化后存 `task_queue.task_data`）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiRenameHistoryTask {
-    /// 视频源类型：collection/favorite/submission/watch_later/bangumi/pugv/manga/youtube/douyin/tiktok
+    /// 视频源类型：collection/favorite/submission/watch_later/bangumi/pugv
     pub source_type: String,
     /// 视频源 ID
     pub source_id: i32,
@@ -371,8 +371,7 @@ impl Drop for ScanResumeGuard {
 /// 执行单个 AI 批量重命名任务
 ///
 /// 该函数在任务队列的后台 worker 中运行，内部负责暂停/恢复定时扫描，并按视频源类型
-/// 分流到 B 站（合集/收藏夹/投稿/稍后观看/番剧/课程/漫画）或外部平台（YouTube/抖音/
-/// TikTok）的重命名实现。
+/// 分流到 B 站（合集/收藏夹/投稿/稍后观看/番剧/课程）的重命名实现。
 pub async fn execute_ai_rename_history_task(
     db: &DatabaseConnection,
     task: &AiRenameHistoryTask,
@@ -394,28 +393,6 @@ pub async fn execute_ai_rename_history_task(
     info!("[{}] AI 批量重命名任务开始执行，暂停扫描任务...", source_key);
     crate::task::pause_scanning().await;
     let _guard = ScanResumeGuard;
-
-    // 外部平台（YouTube/抖音/TikTok）使用 platform 适配层的 AI 重命名实现
-    if matches!(task.source_type.as_str(), "youtube" | "douyin" | "tiktok") {
-        let source = youtube_source::Entity::find_by_id(task.source_id)
-            .one(db)
-            .await?
-            .ok_or_else(|| anyhow!("未找到指定的外部平台视频源"))?;
-
-        let result = crate::youtube::ai_rename_external_history(
-            db,
-            &source,
-            &task.video_prompt,
-            &task.audio_prompt,
-            task.rename_parent_dir,
-        )
-        .await?;
-        notify_videos_changed();
-
-        let outcome = AiRenameHistoryOutcome::from(result);
-        info!("[{}] AI 批量重命名完成：{}", source_key, outcome.describe());
-        return Ok(outcome);
-    }
 
     // B 站视频源：取源配置（提示词回退 + 目录结构）和已下载视频列表
     let (source_video_prompt, source_audio_prompt, flat_folder) =
@@ -518,7 +495,7 @@ async fn load_bilibili_source_config(
                 source.flat_folder,
             ))
         }
-        "bangumi" | "pugv" | "manga" => {
+        "bangumi" | "pugv" => {
             let source = video_source::Entity::find_by_id(source_id)
                 .one(db)
                 .await?
@@ -536,8 +513,6 @@ async fn load_bilibili_source_config(
 /// 根据源类型计算目录结构提示（帮助 AI 按单 P/多 P/番剧结构生成与文件一一对应的文件名）
 fn compute_structure_hint(source_type: &str, config: &crate::config::Config) -> &'static str {
     match source_type {
-        // 漫画按「系列目录 + 每话一个 CBZ」落盘，不参与 S/E 结构
-        "manga" => "",
         "bangumi" | "pugv" => {
             if config.bangumi_use_season_structure {
                 "番剧Season结构"
@@ -596,7 +571,7 @@ async fn get_videos_with_pages_for_source(
                 .all(db)
                 .await?
         }
-        "bangumi" | "pugv" | "manga" => {
+        "bangumi" | "pugv" => {
             video::Entity::find()
                 .filter(video::Column::SourceId.eq(source_id))
                 .order_by_asc(video::Column::Pubtime)

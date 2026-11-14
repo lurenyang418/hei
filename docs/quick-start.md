@@ -10,12 +10,12 @@ docker run -d \
   -p 12345:12345 \
   -v /path/to/data:/app/.config/bili-sync \
   -v /path/to/videos:/Downloads \
-  qq1582185982/bili-sync:latest
+  ghcr.io/lurenyang418/hei:latest
 ```
 
 ### 方式二：下载二进制文件
 
-1. 从 [GitHub Releases](https://github.com/NeeYoonc/bili-sync-up/releases) 下载对应平台的二进制文件
+1. 从 [GitHub Releases](https://github.com/NeeYoonc/bili-sync-up/releases) 下载 Linux amd64 / arm64 二进制文件
 2. 解压并运行：
    ```bash
    ./bili-sync-rs
@@ -45,8 +45,6 @@ cargo build --release
 
 > 💡 获取方法：登录 B站后，F12 打开开发者工具，在 Application > Cookies 中查找
 
-YouTube 登录状态在 **设置 → YouTube 登录状态** 中通过电脑端登录助手或
-Netscape `cookies.txt` 导入。Docker 不需要内嵌浏览器或额外登录端口。
 
 ### 3. 添加视频源
 
@@ -67,7 +65,7 @@ Netscape `cookies.txt` 导入。Docker 不需要内嵌浏览器或额外登录�
 
 ### 基础设置
 - **扫描间隔**：默认 1200 秒（20 分钟）
-- **下载线程数**：默认 4；YouTube 另用「YouTube 单文件连接数」（默认 16，范围 1~32），两者互不影响
+- **下载线程数**：默认 4
 - **视频质量**：默认最高画质（上限 8K，实际受账号权限限制）
 
 ### 过滤规则

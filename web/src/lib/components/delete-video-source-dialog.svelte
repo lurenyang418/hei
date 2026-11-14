@@ -35,8 +35,7 @@
 			submission: 'UP主投稿',
 			watch_later: '稍后观看',
 			bangumi: '番剧',
-			youtube: 'YouTube',
-			douyin: '抖音'
+			pugv: '课程'
 		};
 		return typeMap[type] || type;
 	}

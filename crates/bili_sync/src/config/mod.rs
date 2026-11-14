@@ -203,20 +203,14 @@ pub struct Config {
     pub bangumi_quick_subscribe_path: Cow<'static, str>,
     #[serde(default = "default_quick_subscribe_path_template")]
     pub pugv_quick_subscribe_path: Cow<'static, str>,
-    /// 漫画（哔哩哔哩漫画）快捷订阅路径模板
-    #[serde(default = "default_quick_subscribe_path_template")]
-    pub manga_quick_subscribe_path: Cow<'static, str>,
     /// 可选的 ffmpeg 路径（可填 ffmpeg.exe 文件路径或其所在目录）
     #[serde(default = "default_ffmpeg_path")]
     pub ffmpeg_path: String,
     #[serde(default = "default_split_chapters_after_download")]
     pub split_chapters_after_download: bool,
-    /// 外源网络代理（YouTube/TikTok 等平台的 yt-dlp 与直链下载共用）。
+    /// 网络代理（下载与 API 请求共用）。
     #[serde(default)]
     pub proxy: String,
-    /// 兼容旧配置：早期仅供 YouTube 使用的代理字段，新值写入 `proxy`。
-    #[serde(default)]
-    pub youtube_proxy: String,
     #[serde(default)]
     pub nfo_time_type: NFOTimeType,
     #[serde(default)]
@@ -675,7 +669,6 @@ impl Clone for Config {
                 no_dolby_audio: self.filter_option.no_dolby_audio,
                 no_hdr: self.filter_option.no_hdr,
                 no_hires: self.filter_option.no_hires,
-                prefer_douyin_original: self.filter_option.prefer_douyin_original,
             },
             danmaku_option: DanmakuOption {
                 duration: self.danmaku_option.duration,
@@ -707,11 +700,9 @@ impl Clone for Config {
             submission_quick_subscribe_path: self.submission_quick_subscribe_path.clone(),
             bangumi_quick_subscribe_path: self.bangumi_quick_subscribe_path.clone(),
             pugv_quick_subscribe_path: self.pugv_quick_subscribe_path.clone(),
-            manga_quick_subscribe_path: self.manga_quick_subscribe_path.clone(),
             ffmpeg_path: self.ffmpeg_path.clone(),
             split_chapters_after_download: self.split_chapters_after_download,
             proxy: self.proxy.clone(),
-            youtube_proxy: self.youtube_proxy.clone(),
             nfo_time_type: self.nfo_time_type.clone(),
             nfo_config: self.nfo_config.clone(),
             concurrent_limit: self.concurrent_limit.clone(),
@@ -761,11 +752,9 @@ impl Default for Config {
             submission_quick_subscribe_path: default_quick_subscribe_path_template(),
             bangumi_quick_subscribe_path: default_quick_subscribe_path_template(),
             pugv_quick_subscribe_path: default_quick_subscribe_path_template(),
-            manga_quick_subscribe_path: default_quick_subscribe_path_template(),
             ffmpeg_path: default_ffmpeg_path(),
             split_chapters_after_download: default_split_chapters_after_download(),
             proxy: String::new(),
-            youtube_proxy: String::new(),
             nfo_time_type: NFOTimeType::FavTime,
             nfo_config: NFOConfig::default(),
             concurrent_limit: ConcurrentLimit::default(),

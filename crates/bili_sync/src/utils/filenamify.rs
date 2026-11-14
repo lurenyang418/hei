@@ -265,8 +265,8 @@ mod tests {
         assert_eq!(filenamify("file:///file.tar.gz"), "file_file.tar.gz");
         assert_eq!(filenamify("http://www.google.com"), "http_www.google.com");
         assert_eq!(
-            filenamify("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
-            "https_www.youtube.com_watch_v=dQw4w9WgXcQ"
+            filenamify("https://www.bilibili.com/video/BV1xx411c7mD"),
+            "https_www.bilibili.com_video_BV1xx411c7mD"
         );
     }
 

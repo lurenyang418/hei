@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import type { SortBy, SortOrder } from '$lib/types';
 
 export interface AppState {
-	platform: 'bilibili' | 'youtube' | 'douyin' | 'tiktok';
+	platform: 'bilibili';
 	query: string;
 	currentPage: number;
 	videoSource: {
@@ -146,7 +146,7 @@ export const clearAll = () => {
 	}));
 };
 
-export const setPlatform = (platform: 'bilibili' | 'youtube' | 'douyin' | 'tiktok') => {
+export const setPlatform = (platform: 'bilibili') => {
 	appStateStore.update((state) => ({
 		...state,
 		platform

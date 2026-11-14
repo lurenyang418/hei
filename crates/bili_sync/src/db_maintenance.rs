@@ -1,7 +1,7 @@
 //! 数据库管理：状态概览与维护操作（设置页 → 数据库管理）。
 //!
 //! 所有操作直接面向 SQLite 主库 `CONFIG_DIR/data.sqlite`：
-//! - 只读概览：文件大小 / WAL / 可回收空间 / 各表记录数 / YouTube 视频状态统计
+//! - 只读概览：文件大小 / WAL / 可回收空间 / 各表记录数
 //! - 清理类：图片代理缓存、AI 对话历史、任务队列历史、孤立记录
 //! - 维护类：VACUUM 压缩、VACUUM INTO 快照备份（不锁库、不影响运行）
 
@@ -12,7 +12,7 @@ use tracing::info;
 use crate::api::request::DatabaseMaintenanceAction;
 use crate::api::response::{
     DatabaseBackupInfo, DatabaseBackupListResponse, DatabaseMaintenanceResponse, DatabaseRestoreResponse,
-    DatabaseStatusCount, DatabaseStatusResponse, DatabaseTableStat,
+    DatabaseStatusResponse, DatabaseTableStat,
 };
 use crate::config::CONFIG_DIR;
 
@@ -30,8 +30,6 @@ fn table_label(table: &str) -> &'static str {
         "video" => "B站视频",
         "page" => "B站分P",
         "video_source" => "B站视频源",
-        "you_tube_source" => "YouTube 来源",
-        "you_tube_video" => "YouTube 视频",
         "task_queue" => "任务队列",
         "ai_conversation_history" => "AI 对话历史",
         "image_proxy_cache" => "图片代理缓存",
@@ -50,8 +48,6 @@ const STATUS_TABLES: &[&str] = &[
     "video",
     "page",
     "video_source",
-    "you_tube_source",
-    "you_tube_video",
     "task_queue",
     "ai_conversation_history",
     "image_proxy_cache",
@@ -114,31 +110,12 @@ pub async fn database_status(db: &DatabaseConnection) -> Result<DatabaseStatusRe
     }
     tables.sort_by_key(|table| std::cmp::Reverse(table.rows));
 
-    let backend = db.get_database_backend();
-    let youtube_video_status = db
-        .query_all(Statement::from_string(
-            backend,
-            "SELECT download_status AS status, COUNT(*) AS count FROM you_tube_video GROUP BY download_status ORDER BY count DESC",
-        ))
-        .await
-        .map(|rows| {
-            rows.iter()
-                .filter_map(|row| {
-                    let status = row.try_get_by_index::<String>(0).ok();
-                    let count = row.try_get_by_index::<i64>(1).ok();
-                    status.zip(count).map(|(status, count)| DatabaseStatusCount { status, count })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
     Ok(DatabaseStatusResponse {
         path: path.display().to_string(),
         db_size_bytes,
         wal_size_bytes,
         reclaimable_bytes: reclaimable,
         tables,
-        youtube_video_status,
     })
 }
 
@@ -198,20 +175,11 @@ pub async fn run_maintenance(
             })
         }
         DatabaseMaintenanceAction::CleanOrphans => {
-            let removed_youtube = delete_where(
-                db,
-                "DELETE FROM you_tube_video WHERE source_id NOT IN (SELECT id FROM you_tube_source)",
-            )
-            .await?;
-            let removed_pages =
-                delete_where(db, "DELETE FROM page WHERE video_id NOT IN (SELECT id FROM video)").await?;
-            let removed = removed_youtube + removed_pages;
-            info!(removed_youtube, removed_pages, "数据库管理：已清理孤立记录");
+            let removed = delete_where(db, "DELETE FROM page WHERE video_id NOT IN (SELECT id FROM video)").await?;
+            info!(removed, "数据库管理：已清理孤立记录");
             Ok(DatabaseMaintenanceResponse {
                 success: true,
-                message: format!(
-                    "已清理孤立记录 {removed} 条（YouTube 视频 {removed_youtube}，无主分P {removed_pages}）"
-                ),
+                message: format!("已清理无主分P {removed} 条"),
                 removed_rows: Some(removed),
                 ..Default::default()
             })
@@ -475,8 +443,6 @@ mod tests {
     async fn test_db() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.expect("创建内存测试库失败");
         for sql in [
-            "CREATE TABLE you_tube_video (id INTEGER PRIMARY KEY, source_id INTEGER NOT NULL, youtube_id TEXT, url TEXT, title TEXT, uploader TEXT, download_status TEXT NOT NULL DEFAULT 'pending', retry_count INTEGER DEFAULT 0)",
-            "CREATE TABLE you_tube_source (id INTEGER PRIMARY KEY, name TEXT)",
             "CREATE TABLE video (id INTEGER PRIMARY KEY, name TEXT)",
             "CREATE TABLE page (id INTEGER PRIMARY KEY, video_id INTEGER NOT NULL, cid INTEGER, pid INTEGER, name TEXT, duration INTEGER DEFAULT 0)",
             "CREATE TABLE task_queue (id INTEGER PRIMARY KEY, task_type TEXT, task_data TEXT, status TEXT, retry_count INTEGER DEFAULT 0)",
@@ -539,8 +505,6 @@ mod tests {
     async fn status_reports_counts_and_sizes() {
         let db = test_db().await;
         for sql in [
-            "INSERT INTO you_tube_video (source_id, youtube_id, url, title, uploader, download_status) VALUES (1,'a','u','t','x','completed')",
-            "INSERT INTO you_tube_video (source_id, youtube_id, url, title, uploader, download_status) VALUES (2,'b','u','t','x','failed')",
             "INSERT INTO video (id, name) VALUES (1,'v')",
             "INSERT INTO page (video_id, cid, pid, name) VALUES (1, 100, 1, 'p')",
             "INSERT INTO image_proxy_cache (cache_key, url) VALUES ('k','u')",
@@ -557,20 +521,15 @@ mod tests {
                 .map(|t| t.rows)
                 .unwrap_or(0)
         };
-        assert_eq!(rows("you_tube_video"), 2);
         assert_eq!(rows("video"), 1);
         assert_eq!(rows("page"), 1);
         assert_eq!(rows("image_proxy_cache"), 1);
-        assert_eq!(status.youtube_video_status.len(), 2);
     }
 
     #[tokio::test]
     async fn maintenance_clears_tables_and_orphans() {
         let db = test_db().await;
         for sql in [
-            "INSERT INTO you_tube_video (source_id, youtube_id, url, title, uploader) VALUES (1,'a','u','t','x')",
-            "INSERT INTO you_tube_video (source_id, youtube_id, url, title, uploader) VALUES (99,'o','u','t','x')",
-            "INSERT INTO you_tube_source (id, name) VALUES (1,'s')",
             "INSERT INTO video (id, name) VALUES (1,'v')",
             "INSERT INTO video (id, name) VALUES (2,'gone')",
             "INSERT INTO page (video_id, cid, pid, name) VALUES (1, 100, 1, 'ok')",
@@ -587,7 +546,7 @@ mod tests {
             .await
             .expect("清理孤立记录失败");
         assert!(resp.success);
-        assert_eq!(resp.removed_rows, Some(2)); // 孤儿 youtube_video + 孤儿 page
+        assert_eq!(resp.removed_rows, Some(1)); // 孤儿 page
         async fn count(db: &DatabaseConnection, sql: &str) -> i64 {
             let backend = db.get_database_backend();
             let row = db
@@ -597,7 +556,6 @@ mod tests {
                 .unwrap();
             row.try_get_by_index::<i64>(0).unwrap()
         }
-        assert_eq!(count(&db, "SELECT COUNT(*) FROM you_tube_video").await, 1);
         assert_eq!(count(&db, "SELECT COUNT(*) FROM page").await, 1);
 
         let resp = run_maintenance(&db, DatabaseMaintenanceAction::ClearQueueHistory, None)

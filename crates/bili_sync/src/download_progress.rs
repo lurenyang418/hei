@@ -10,9 +10,9 @@ use tokio::sync::{Mutex, RwLock};
 /// 单条下载任务进度快照（推送 / API 使用）。
 #[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
 pub struct DownloadProgressItem {
-    /// 任务唯一键（B 站：`bilibili:{video_id}:{page_id}`，外源：`youtube:{id}`）
+    /// 任务唯一键（`bilibili:{video_id}:{page_id}`）
     pub key: String,
-    /// 平台：bilibili / youtube / douyin / tiktok
+    /// 平台：bilibili
     pub platform: String,
     /// 视频标题
     pub title: String,
@@ -315,10 +315,10 @@ mod tests {
     #[tokio::test]
     async fn phase_switch_is_visible() {
         let p = new_progress();
-        p.begin_task("youtube:42", "youtube", "外源", "下载中", "").await;
-        p.set_phase("youtube:42", "合并中").await;
+        p.begin_task("bilibili:42:1", "bilibili", "B站", "下载中", "").await;
+        p.set_phase("bilibili:42:1", "合并中").await;
         let snap = p.snapshot().await;
         assert_eq!(snap[0].phase, "合并中");
-        assert_eq!(snap[0].platform, "youtube");
+        assert_eq!(snap[0].platform, "bilibili");
     }
 }

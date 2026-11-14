@@ -39,7 +39,6 @@
 	import VideoIcon from '@lucide/svelte/icons/video';
 	import TvIcon from '@lucide/svelte/icons/tv';
 	import GraduationCapIcon from '@lucide/svelte/icons/graduation-cap';
-	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import MemoryStickIcon from '@lucide/svelte/icons/memory-stick';
@@ -74,9 +73,9 @@
 	let showDownloadsSheet = false;
 	type IngestView = 'latest' | 'recent';
 	let ingestView: IngestView = 'latest';
-	type IngestPlatform = 'all' | 'bilibili' | 'youtube' | 'douyin' | 'tiktok';
+	type IngestPlatform = 'all' | 'bilibili';
 	let ingestPlatform: IngestPlatform = 'all';
-	type MonitoringPlatform = 'bilibili' | 'youtube' | 'douyin' | 'tiktok';
+	type MonitoringPlatform = 'bilibili';
 	let monitoringPlatform: MonitoringPlatform = 'bilibili';
 	let unsubscribeSysInfo: (() => void) | null = null;
 	let unsubscribeTasks: (() => void) | null = null;
@@ -223,17 +222,11 @@
 	const INGEST_PLATFORM_LABEL: Record<IngestPlatform, string> = {
 		all: '全部',
 		bilibili: 'B站',
-		youtube: 'YouTube',
-		douyin: '抖音',
-		tiktok: 'TikTok'
 	};
 
 	const INGEST_PLATFORM_TABS: Array<{ value: IngestPlatform; label: string }> = [
 		{ value: 'all', label: '全部' },
-		{ value: 'bilibili', label: 'B站' },
-		{ value: 'youtube', label: 'YouTube' },
-		{ value: 'douyin', label: '抖音' },
-		{ value: 'tiktok', label: 'TikTok' }
+		{ value: 'bilibili', label: 'B站' }
 	];
 
 	async function loadIngests(
@@ -426,59 +419,15 @@
 		? ((sysInfo.total_disk - sysInfo.available_disk) / sysInfo.total_disk) * 100
 		: 0;
 
-	// 图表配置
+	// B 站近七日新增视频
 	const videoChartConfig = {
-		bilibili: {
-			label: 'B站',
-			color: 'var(--color-sky-600)'
-		},
-		youtube: {
-			label: 'YouTube',
-			color: 'var(--color-red-600)'
-		},
-		douyin: {
-			label: '抖音',
-			color: 'var(--color-purple-600)'
-		},
-		tiktok: {
-			label: 'TikTok',
-			color: 'var(--color-emerald-600)'
-		}
+		bilibili: { label: 'B站', color: 'var(--color-sky-600)' }
 	} satisfies Chart.ChartConfig;
-
-	// 合并各平台近七日新增视频为多序列图表数据（按天对齐，缺失补 0）
-	type DayMultiCount = {
-		day: string;
-		bilibili: number;
-		youtube: number;
-		douyin: number;
-		tiktok: number;
-	};
+	type DayMultiCount = { day: string; bilibili: number };
 	let dayMultiCounts: DayMultiCount[] = [];
-	$: if (dashboardData) {
-		const sources = [
-			dashboardData.videos_by_day,
-			dashboardData.youtube_videos_by_day ?? [],
-			dashboardData.douyin_videos_by_day ?? [],
-			dashboardData.tiktok_videos_by_day ?? []
-		];
-		const dayCount = Math.max(...sources.map((list) => list.length), 0);
-		dayMultiCounts = [];
-		for (let i = 0; i < dayCount; i++) {
-			dayMultiCounts.push({
-				day:
-					dashboardData.videos_by_day[i]?.day ??
-					dashboardData.youtube_videos_by_day[i]?.day ??
-					dashboardData.douyin_videos_by_day[i]?.day ??
-					dashboardData.tiktok_videos_by_day[i]?.day ??
-					'',
-				bilibili: dashboardData.videos_by_day[i]?.cnt ?? 0,
-				youtube: dashboardData.youtube_videos_by_day?.[i]?.cnt ?? 0,
-				douyin: dashboardData.douyin_videos_by_day?.[i]?.cnt ?? 0,
-				tiktok: dashboardData.tiktok_videos_by_day?.[i]?.cnt ?? 0
-			});
-		}
-	}
+	$: dayMultiCounts = dashboardData
+		? dashboardData.videos_by_day.map(({ day, cnt }) => ({ day, bilibili: cnt }))
+		: [];
 
 	const memoryChartConfig = {
 		used: {
@@ -555,7 +504,7 @@
 					<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
 						<CardTitle
 							class="text-sm font-medium"
-							title="显示当前监听的 B站、YouTube 和抖音视频源状态、下次扫描时间和监听统计"
+							title="显示当前监听的 B 站视频源状态、下次扫描时间和监听统计"
 						>
 							当前监听
 						</CardTitle>
@@ -619,15 +568,6 @@
 									</div>
 								</div>
 
-								<!-- 按平台切换具体监听项统计 -->
-								<Tabs.Root bind:value={monitoringPlatform}>
-									<Tabs.List class="grid w-full max-w-lg grid-cols-4">
-										<Tabs.Trigger value="bilibili">B 站视频源</Tabs.Trigger>
-										<Tabs.Trigger value="youtube">YouTube 视频源</Tabs.Trigger>
-										<Tabs.Trigger value="douyin">抖音视频源</Tabs.Trigger>
-										<Tabs.Trigger value="tiktok">TikTok 视频源</Tabs.Trigger>
-									</Tabs.List>
-
 									{#if monitoringPlatform === 'bilibili'}
 										<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
 											<div class="flex items-center justify-between">
@@ -686,164 +626,8 @@
 													>{dashboardData.enabled_pugv} / {dashboardData.total_pugv}</Badge
 												>
 											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<BookOpenIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">漫画</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_manga} / {dashboardData.total_manga}</Badge
-												>
-											</div>
-										</div>
-									{:else if monitoringPlatform === 'youtube'}
-										<div class="mt-4">
-											<div class="grid grid-cols-2 gap-4 lg:grid-cols-3">
-												<div class="flex items-center justify-between">
-													<div class="flex items-center gap-2">
-														<BellIcon class="text-muted-foreground h-4 w-4" />
-														<span class="text-sm">订阅动态</span>
-													</div>
-													<Badge variant="outline">
-														{dashboardData.enabled_youtube_subscriptions} / {dashboardData.total_youtube_subscriptions}
-													</Badge>
-												</div>
-												<div class="flex items-center justify-between">
-													<div class="flex items-center gap-2">
-														<UserIcon class="text-muted-foreground h-4 w-4" />
-														<span class="text-sm">频道</span>
-													</div>
-													<Badge variant="outline">
-														{dashboardData.enabled_youtube_channels} / {dashboardData.total_youtube_channels}
-													</Badge>
-												</div>
-												<div class="flex items-center justify-between">
-													<div class="flex items-center gap-2">
-														<ListVideoIcon class="text-muted-foreground h-4 w-4" />
-														<span class="text-sm">播放列表</span>
-													</div>
-													<Badge variant="outline">
-														{dashboardData.enabled_youtube_playlists} / {dashboardData.total_youtube_playlists}
-													</Badge>
-												</div>
-												<div class="flex items-center justify-between">
-													<div class="flex items-center gap-2">
-														<HeartIcon class="text-muted-foreground h-4 w-4" />
-														<span class="text-sm">喜欢的视频</span>
-													</div>
-													<Badge variant="outline">
-														{dashboardData.enabled_youtube_liked} / {dashboardData.total_youtube_liked}
-													</Badge>
-												</div>
-												<div class="flex items-center justify-between">
-													<div class="flex items-center gap-2">
-														<ClockIcon class="text-muted-foreground h-4 w-4" />
-														<span class="text-sm">稍后观看</span>
-													</div>
-													<Badge variant="outline">
-														{dashboardData.enabled_youtube_watch_later} / {dashboardData.total_youtube_watch_later}
-													</Badge>
-												</div>
-											</div>
-										</div>
-									{:else if monitoringPlatform === 'douyin'}
-										<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<UserIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">作者投稿</span>
-												</div>
-												<Badge variant="outline">
-													{dashboardData.enabled_douyin_authors} / {dashboardData.total_douyin_authors}
-												</Badge>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<LayersIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">合集</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_douyin_mixes} / {dashboardData.total_douyin_mixes}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<HeartIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">我的喜欢</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_douyin_liked} / {dashboardData.total_douyin_liked}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<FolderIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">收藏夹</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_douyin_collections} / {dashboardData.total_douyin_collections}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<ClockIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">稍后再看</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_douyin_watch_later} / {dashboardData.total_douyin_watch_later}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<TvIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">放映厅</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_douyin_theaters} / {dashboardData.total_douyin_theaters}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<ListVideoIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">短剧</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_douyin_series} / {dashboardData.total_douyin_series}</Badge
-												>
-											</div>
-										</div>
-									{:else}
-										<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<UserIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">作者投稿</span>
-												</div>
-												<Badge variant="outline">
-													{dashboardData.enabled_tiktok_authors} / {dashboardData.total_tiktok_authors}
-												</Badge>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<HeartIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">我的喜欢</span>
-												</div>
-												<Badge variant="outline">
-													{dashboardData.enabled_tiktok_liked} / {dashboardData.total_tiktok_liked}
-												</Badge>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<FolderIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">收藏夹</span>
-												</div>
-												<Badge variant="outline">
-													{dashboardData.enabled_tiktok_collections} / {dashboardData.total_tiktok_collections}
-												</Badge>
-											</div>
 										</div>
 									{/if}
-								</Tabs.Root>
 							</div>
 						{:else}
 							<Loading size="sm" align="start" textClass="text-sm" />
@@ -868,13 +652,13 @@
 									<span>近七日新增视频</span>
 									<span class="font-medium">
 										{dayMultiCounts.reduce(
-											(sum, v) => sum + v.bilibili + v.youtube + v.douyin + v.tiktok,
+											(sum, v) => sum + v.bilibili,
 											0
 										)}&nbsp; 个
 									</span>
 								</div>
 								<div class="flex flex-wrap gap-3 text-xs">
-									{#each ['bilibili', 'youtube', 'douyin', 'tiktok'] as key (key)}
+									{#each ['bilibili'] as key (key)}
 										<span class="flex items-center gap-1">
 											<span
 												class="inline-block h-2 w-2 rounded-sm"
@@ -899,21 +683,7 @@
 											label: 'B站',
 											color: videoChartConfig.bilibili.color
 										},
-										{
-											key: 'youtube',
-											label: 'YouTube',
-											color: videoChartConfig.youtube.color
-										},
-										{
-											key: 'douyin',
-											label: '抖音',
-											color: videoChartConfig.douyin.color
-										},
-										{
-											key: 'tiktok',
-											label: 'TikTok',
-											color: videoChartConfig.tiktok.color
-										}
+
 									]}
 									props={{
 										bars: {
@@ -1330,7 +1100,7 @@
 						class="border-0 bg-transparent py-8"
 					/>
 				{:else}
-					{#each latestIngests as item (item.platform + '-' + item.video_id)}
+					{#each latestIngests as item (item.video_id)}
 						<div class="hover:bg-muted/30 rounded-lg border p-3 transition-colors">
 							<div class="flex items-start justify-between gap-3">
 								<div class="min-w-0 flex-1">
@@ -1338,9 +1108,6 @@
 										<div class="truncate font-medium" title={item.video_name}>
 											{item.video_name}
 										</div>
-										<Badge variant="outline" class="shrink-0 px-1.5 py-0 text-[10px]">
-											{INGEST_PLATFORM_LABEL[item.platform]}
-										</Badge>
 									</div>
 									<div class="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
 										{#if item.upper_name && item.upper_name.trim() !== ''}

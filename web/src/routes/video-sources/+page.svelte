@@ -34,8 +34,7 @@
 		VideoCodec,
 		VideoQuality,
 		VideoSource,
-		VideoSourcesResponse,
-		YouTubeSource
+		VideoSourcesResponse
 	} from '$lib/types';
 
 	// 图标导入
@@ -110,111 +109,14 @@
 		no_dolby_video: false,
 		no_dolby_audio: false,
 		no_hdr: false,
-		no_hires: false,
-		prefer_douyin_original: true
+		no_hires: false
 	};
-	const YOUTUBE_SOURCE_SECTIONS = {
-		YOUTUBE_SUBSCRIPTIONS: {
-			type: 'youtube',
-			youtubeSourceType: 'subscriptions',
-			title: '订阅动态',
-			icon: ActivityIcon
-		},
-		YOUTUBE_CHANNEL: {
-			type: 'youtube',
-			youtubeSourceType: 'channel',
-			title: '频道投稿',
-			icon: UserIcon
-		},
-		YOUTUBE_PLAYLIST: {
-			type: 'youtube',
-			youtubeSourceType: 'playlist',
-			title: '播放列表 / 收藏',
-			icon: ListTreeIcon
-		},
-		YOUTUBE_LIKED: {
-			type: 'youtube',
-			youtubeSourceType: 'liked',
-			title: '喜欢的视频',
-			icon: HeartIcon
-		},
-		YOUTUBE_WATCH_LATER: {
-			type: 'youtube',
-			youtubeSourceType: 'watch_later',
-			title: '稍后再看',
-			icon: HistoryIcon
-		}
-	} as const;
-	const TIKTOK_SOURCE_SECTIONS = {
-		TIKTOK_AUTHOR: {
-			type: 'tiktok',
-			youtubeSourceType: 'tiktok',
-			title: 'TikTok 作者',
-			icon: UserIcon
-		},
-		TIKTOK_FAVORITE: {
-			type: 'tiktok',
-			youtubeSourceType: 'tiktok_favorite',
-			title: '我的喜欢',
-			icon: HeartIcon
-		},
-		TIKTOK_COLLECTION: {
-			type: 'tiktok',
-			youtubeSourceType: 'tiktok_collection',
-			title: '收藏夹',
-			icon: ListTreeIcon
-		}
-	} as const;
-	const DOUYIN_SOURCE_SECTIONS = {
-		DOUYIN_AUTHOR: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin',
-			title: '作者投稿',
-			icon: UserIcon
-		},
-		DOUYIN_MIX: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin_mix',
-			title: '合集',
-			icon: LayersIcon
-		},
-		DOUYIN_LIKED: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin_liked',
-			title: '我的喜欢',
-			icon: HeartIcon
-		},
-		DOUYIN_COLLECTION: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin_collection',
-			title: '收藏夹',
-			icon: ListTreeIcon
-		},
-		DOUYIN_WATCH_LATER: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin_watch_later',
-			title: '稍后再看',
-			icon: HistoryIcon
-		},
-		DOUYIN_THEATER: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin_theater',
-			title: '放映厅',
-			icon: ListVideoIcon
-		},
-		DOUYIN_SERIES: {
-			type: 'douyin',
-			youtubeSourceType: 'douyin_series',
-			title: '短剧',
-			icon: ListTreeIcon
-		}
-	} as const;
+
 
 	let loading = false;
-	let platformTab: 'youtube' | 'douyin' | 'tiktok' | 'bilibili' = 'bilibili';
+	let platformTab = 'bilibili';
 	let bulkUpdating = false;
 	const videoSourcesStream = createManagedEventSource();
-	let youtubeRefreshTimer: ReturnType<typeof setInterval> | null = null;
 	const queuedDeleteNoticeMap = new SvelteMap<
 		string,
 		{ sourceType: VideoSourceType; sourceId: number; sourceName: string }
@@ -349,73 +251,12 @@
 		return 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300';
 	}
 
-	function youtubeSourceToVideoSource(source: YouTubeSource): VideoSource {
-		return {
-			id: source.id,
-			name: source.name,
-			enabled: source.enabled,
-			path: source.path,
-			url: source.url,
-			source_type: source.source_type,
-			last_scan_at: source.last_scan_at,
-			latest_row_at: source.last_scan_at,
-			pending_count: source.pending_count,
-			completed_count: source.completed_count,
-			failed_count: source.failed_count,
-			scan_deleted_videos: source.scan_deleted_videos,
-			scan_deleted_videos_once: source.scan_deleted_videos_once,
-			collection_aggregate_enabled: false,
-			filter_option: source.filter_option,
-			blacklist_keywords: source.blacklist_keywords,
-			whitelist_keywords: source.whitelist_keywords,
-			case_sensitive: source.case_sensitive,
-			min_duration_seconds: source.min_duration_seconds ?? undefined,
-			max_duration_seconds: source.max_duration_seconds ?? undefined,
-			published_after: source.published_after ?? undefined,
-			published_before: source.published_before ?? undefined,
-			audio_only: source.audio_only,
-			audio_only_m4a_only: source.audio_only_m4a_only,
-			flat_folder: source.flat_folder,
-			generate_image_post_video: source.generate_image_post_video,
-			split_chapters_after_download: false,
-			download_charge_videos: false,
-			download_danmaku: source.download_danmaku,
-			download_subtitle: source.download_subtitle,
-			download_ai_subtitle: source.download_subtitle,
-			ai_subtitle_language: source.ai_subtitle_language,
-			ai_rename: source.ai_rename,
-			ai_rename_video_prompt: source.ai_rename_video_prompt,
-			ai_rename_audio_prompt: source.ai_rename_audio_prompt,
-			ai_rename_enable_multi_page: source.ai_rename_enable_multi_page,
-			ai_rename_enable_collection: source.ai_rename_enable_collection,
-			ai_rename_enable_bangumi: source.ai_rename_enable_bangumi,
-			ai_rename_rename_parent_dir: source.ai_rename_rename_parent_dir
-		};
-	}
 
 	async function loadVideoSources(silent = false) {
-		const response = await runRequest(
-			async () => {
-				const [bilibili, youtube, douyin, tiktok] = await Promise.all([
-					api.getVideoSources(),
-					api.getYouTubeSources(),
-					api.getDouyinSources(),
-					api.getTikTokSources()
-				]);
-				return {
-					data: {
-						...bilibili.data,
-						youtube: youtube.data.map(youtubeSourceToVideoSource),
-						douyin: douyin.data.map(youtubeSourceToVideoSource),
-						tiktok: tiktok.data.map(youtubeSourceToVideoSource)
-					} satisfies VideoSourcesResponse
-				};
-			},
-			{
-				setLoading: silent ? undefined : (value) => (loading = value),
-				context: '加载视频源失败'
-			}
-		);
+		const response = await runRequest(() => api.getVideoSources(), {
+			setLoading: silent ? undefined : (value) => (loading = value),
+			context: '加载视频源失败'
+		});
 		if (!response) return;
 		setVideoSources(response.data);
 	}
@@ -470,9 +311,7 @@
 						const payload = JSON.parse(event.data) as VideoSourcesResponse;
 						notifyCompletedQueuedDeletions(payload);
 						setVideoSources({
-							...payload,
-							youtube: $videoSourceStore?.youtube ?? [],
-							douyin: $videoSourceStore?.douyin ?? []
+							...payload
 						});
 					} catch (error) {
 						console.error('解析视频源实时更新失败:', error);
@@ -619,9 +458,7 @@
 			no_dolby_video: config.no_dolby_video ?? DEFAULT_FILTER_OPTION.no_dolby_video,
 			no_dolby_audio: config.no_dolby_audio ?? DEFAULT_FILTER_OPTION.no_dolby_audio,
 			no_hdr: config.no_hdr ?? DEFAULT_FILTER_OPTION.no_hdr,
-			no_hires: config.no_hires ?? DEFAULT_FILTER_OPTION.no_hires,
-			prefer_douyin_original:
-				config.prefer_douyin_original ?? DEFAULT_FILTER_OPTION.prefer_douyin_original
+			no_hires: config.no_hires ?? DEFAULT_FILTER_OPTION.no_hires
 		};
 	}
 
@@ -1580,60 +1417,28 @@
 		}
 	}
 
-	function isExternalSourceType(sourceType: string): sourceType is 'youtube' | 'douyin' | 'tiktok' {
-		return sourceType === 'youtube' || sourceType === 'douyin' || sourceType === 'tiktok';
-	}
-
-	function navigateToAddSource(
-		platform: 'bilibili' | 'youtube' | 'douyin' | 'tiktok' = 'bilibili'
-	) {
-		const path = resolve('/add-source');
-		goto(platform === 'bilibili' ? path : resolve(`/add-source?platform=${platform}`));
+	function navigateToAddSource() {
+		goto(resolve('/add-source'));
 	}
 
 	function sourceEntriesForPlatform() {
-		return platformTab === 'youtube'
-			? Object.entries(YOUTUBE_SOURCE_SECTIONS)
-			: platformTab === 'douyin'
-				? Object.entries(DOUYIN_SOURCE_SECTIONS)
-				: platformTab === 'tiktok'
-					? Object.entries(TIKTOK_SOURCE_SECTIONS)
-					: Object.entries(VIDEO_SOURCES).filter(
-							([, source]) => !isExternalSourceType(source.type)
-						);
+		return Object.entries(VIDEO_SOURCES);
 	}
 
-	function getSourcesForSection(sourceConfig: {
-		type: VideoSourceType;
-		youtubeSourceType?: YouTubeSource['source_type'];
-	}): VideoSource[] {
-		const sources = $videoSourceStore?.[sourceConfig.type] ?? [];
-		if (!isExternalSourceType(sourceConfig.type) || !sourceConfig.youtubeSourceType) return sources;
-		return sources.filter((source) => source.source_type === sourceConfig.youtubeSourceType);
+	function getSourcesForSection(sourceConfig: { type: VideoSourceType }): VideoSource[] {
+		return $videoSourceStore?.[sourceConfig.type] ?? [];
 	}
 
 	onMount(() => {
-		const requestedPlatform = $page.url.searchParams.get('platform');
-		platformTab =
-			requestedPlatform === 'youtube'
-				? 'youtube'
-				: requestedPlatform === 'douyin'
-					? 'douyin'
-					: requestedPlatform === 'tiktok'
-						? 'tiktok'
-						: 'bilibili';
 		setBreadcrumb([{ label: '视频源管理' }]);
 		loadVideoSources();
 		startVideoSourcesStream();
 		loadSubmissionScanConfig();
-		youtubeRefreshTimer = setInterval(() => {
-			if (platformTab !== 'bilibili') void loadVideoSources(true);
-		}, 5000);
+
 	});
 
 	onDestroy(() => {
 		stopVideoSourcesStream();
-		if (youtubeRefreshTimer) clearInterval(youtubeRefreshTimer);
 	});
 </script>
 
@@ -1646,65 +1451,28 @@
 	<SectionHeader
 		as="h1"
 		title="视频源管理"
-		description="统一管理 B 站、YouTube 与抖音视频源；所有来源共用下载调度、路径模板、质量设置和并发控制。"
+		description="管理 B 站视频源和下载设置。"
 		titleTooltip="管理和配置收藏夹、合集、投稿、番剧与稍后再看视频源"
 		titleClass="font-bold {isMobileQuery.current ? 'text-xl' : 'text-2xl'}"
 		descriptionClass="text-muted-foreground {isMobileQuery.current ? 'text-sm' : 'text-base'} mt-1"
 	>
 		{#snippet actions()}
-			{#if platformTab === 'bilibili'}
-				<Button
-					onclick={() => navigateToAddSource('bilibili')}
-					class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
-					title="添加新的 B 站视频源"
-				>
-					<PlusIcon class="h-4 w-4" />
-					添加 B 站视频源
-				</Button>
-			{:else if platformTab === 'youtube'}
-				<Button
-					onclick={() => navigateToAddSource('youtube')}
-					class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
-					title="添加新的 YouTube 视频源"
-				>
-					<PlusIcon class="h-4 w-4" />
-					添加 YouTube 视频源
-				</Button>
-			{:else if platformTab === 'douyin'}
-				<Button
-					onclick={() => navigateToAddSource('douyin')}
-					class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
-					title="添加新的抖音视频源"
-				>
-					<PlusIcon class="h-4 w-4" />
-					添加抖音视频源
-				</Button>
-			{:else}
-				<Button
-					onclick={() => navigateToAddSource('tiktok')}
-					class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
-					title="添加新的 TikTok 视频源"
-				>
-					<PlusIcon class="h-4 w-4" />
-					添加 TikTok 视频源
-				</Button>
-			{/if}
+			<Button
+				onclick={navigateToAddSource}
+				class="flex items-center gap-2 {isMobileQuery.current ? 'w-full' : 'w-auto'}"
+				title="添加新的 B 站视频源"
+			>
+				<PlusIcon class="h-4 w-4" />
+				添加 B 站视频源
+			</Button>
 		{/snippet}
 	</SectionHeader>
 
-	<Tabs.Root bind:value={platformTab}>
-		<Tabs.List class="grid w-full max-w-xl grid-cols-4">
-			<Tabs.Trigger value="bilibili">B 站视频源</Tabs.Trigger>
-			<Tabs.Trigger value="youtube">YouTube 视频源</Tabs.Trigger>
-			<Tabs.Trigger value="douyin">抖音视频源</Tabs.Trigger>
-			<Tabs.Trigger value="tiktok">TikTok 视频源</Tabs.Trigger>
-		</Tabs.List>
 
 		<div class="mt-6">
 			{#if loading}
 				<Loading />
 			{:else}
-				{#if platformTab === 'bilibili'}
 					<Card class="mb-6">
 						<CardContent class="pt-6">
 							<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1748,7 +1516,6 @@
 							</div>
 						</CardContent>
 					</Card>
-				{/if}
 				<div class="grid gap-6">
 					{#each sourceEntriesForPlatform() as [sourceKey, sourceConfig] (sourceKey)}
 						{@const sources = getSourcesForSection(sourceConfig)}
@@ -1913,22 +1680,9 @@
 																{#if source.media_id}<span class="block"
 																		>Media ID: {source.media_id}</span
 																	>{/if}
-															{:else if sourceConfig.type === 'manga'}
-																{#if source.media_id}
-																	<span class="block">漫画ID: {source.media_id}</span>
-																{/if}
-																<span class="block">按「作品目录 + 每话一个 CBZ」落盘</span>
 															{:else if sourceConfig.type === 'watch_later'}
 																稍后再看 (无特定ID)
-															{:else if isExternalSourceType(sourceConfig.type)}
-																<span class="block">来源：{source.source_type ?? 'YouTube'}</span>
-																{#if source.url}<span class="block truncate" title={source.url}
-																		>{source.url}</span
-																	>{/if}
-																<span class="block">
-																	待下载 {source.pending_count ?? 0} · 已完成 {source.completed_count ??
-																		0} · 失败 {source.failed_count ?? 0}
-																</span>
+
 															{/if}
 														</div>
 														{#if source.scan_deleted_videos}
@@ -1952,16 +1706,14 @@
 															{#if source.flat_folder}
 																<span class="text-purple-600">平铺目录</span>
 															{/if}
-															{#if (sourceConfig.type === 'douyin' || sourceConfig.type === 'tiktok') && source.generate_image_post_video === false}
-																<span class="text-sky-600">图文不生成视频</span>
-															{/if}
+
 															{#if source.split_chapters_after_download}
 																<span class="text-emerald-600">分章下载</span>
 															{/if}
 															{#if source.filter_option}
 																<span class="text-cyan-600">自定义码率</span>
 															{/if}
-															{#if !isExternalSourceType(sourceConfig.type) && source.download_charge_videos === false}
+															{#if source.download_charge_videos === false}
 																<span class="text-pink-600">充电视频下载已禁用</span>
 															{/if}
 															{#if source.use_dynamic_api}
@@ -1969,18 +1721,16 @@
 															{/if}
 															{#if source.download_danmaku === false}
 																<span class="text-gray-500"
-																	>{sourceConfig.type === 'youtube'
-																		? '直播聊天下载已禁用'
-																		: '弹幕下载已禁用'}</span
+																	>弹幕下载已禁用</span
 																>
 															{/if}
 															{#if source.download_subtitle === false}
 																<span class="text-gray-500">字幕下载已禁用</span>
-															{:else if !isExternalSourceType(sourceConfig.type) && source.download_ai_subtitle === false}
+															{:else if source.download_ai_subtitle === false}
 																<span class="text-gray-500">AI 字幕已禁用</span>
 															{:else}
 																<span class="text-blue-600">
-																	{isExternalSourceType(sourceConfig.type) ? '字幕' : 'AI 字幕'}
+																	AI 字幕
 																	{getAiSubtitleLanguageLabel(source.ai_subtitle_language)}
 																</span>
 															{/if}
@@ -2051,7 +1801,7 @@
 															</Button>
 														{/if}
 
-														{#if !isExternalSourceType(sourceConfig.type)}
+														{#if true}
 															<Button
 																size="sm"
 																variant="ghost"
@@ -2073,7 +1823,7 @@
 																/>
 															</Button>
 
-															{#if sourceConfig.type !== 'bangumi' && sourceConfig.type !== 'pugv' && sourceConfig.type !== 'manga'}
+															{#if sourceConfig.type !== 'bangumi' && sourceConfig.type !== 'pugv'}
 																<Button
 																	size="sm"
 																	variant="ghost"
@@ -2255,31 +2005,10 @@
 														</Button>
 
 														<!-- 图文作品合成视频 -->
-														{#if sourceConfig.type === 'douyin' || sourceConfig.type === 'tiktok'}
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleToggleGenerateImagePostVideo(
-																		sourceConfig.type,
-																		source.id,
-																		source.generate_image_post_video ?? true
-																	)}
-																title={source.generate_image_post_video === false
-																	? '启用图文作品合成视频'
-																	: '关闭图文作品合成视频（仅保存原图和配乐）'}
-																class="h-8 w-8 p-0"
-															>
-																<ImageIcon
-																	class="h-4 w-4 {source.generate_image_post_video === false
-																		? 'text-gray-400'
-																		: 'text-sky-600'}"
-																/>
-															</Button>
-														{/if}
+
 
 														<!-- 分章下载 -->
-														{#if !isExternalSourceType(sourceConfig.type)}
+														{#if true}
 															<Button
 																size="sm"
 																variant="ghost"
@@ -2312,13 +2041,7 @@
 																	source.id,
 																	source.download_danmaku ?? true
 																)}
-															title={sourceConfig.type === 'youtube'
-																? source.download_danmaku !== false
-																	? '禁用直播聊天下载'
-																	: '启用直播聊天下载'
-																: source.download_danmaku !== false
-																	? '禁用弹幕下载'
-																	: '启用弹幕下载'}
+															title={source.download_danmaku !== false ? '禁用弹幕下载' : '启用弹幕下载'}
 															class="h-8 w-8 p-0"
 														>
 															<MessageSquareTextIcon
@@ -2351,7 +2074,7 @@
 														</Button>
 
 														<!-- AI 字幕 -->
-														{#if !isExternalSourceType(sourceConfig.type)}
+														{#if true}
 															<Button
 																size="sm"
 																variant="ghost"
@@ -2380,11 +2103,9 @@
 															value={normalizeAiSubtitleLanguage(source.ai_subtitle_language)}
 															options={AI_SUBTITLE_LANGUAGE_OPTIONS}
 															disabled={source.download_subtitle === false ||
-																(!isExternalSourceType(sourceConfig.type) &&
+																(true &&
 																	source.download_ai_subtitle === false)}
-															title={isExternalSourceType(sourceConfig.type)
-																? `${sourceConfig.type === 'douyin' ? '抖音' : 'YouTube'} 字幕优先语言，缺失时按来源语言回退`
-																: 'AI 字幕优先语言，目标语言缺失时回退中文'}
+															title="AI 字幕优先语言，目标语言缺失时回退中文"
 															class="h-8 w-[76px] rounded-md border border-gray-200 bg-white px-1 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
 															size="sm"
 															onChange={(nextValue) =>
@@ -2481,11 +2202,7 @@
 													size="sm"
 													variant="outline"
 													onclick={() =>
-														navigateToAddSource(
-															isExternalSourceType(sourceConfig.type)
-																? sourceConfig.type
-																: 'bilibili'
-														)}
+														navigateToAddSource()}
 												>
 													<PlusIcon class="mr-2 h-4 w-4" />
 													添加{sourceConfig.title}
@@ -2500,7 +2217,6 @@
 				</div>
 			{/if}
 		</div>
-	</Tabs.Root>
 </div>
 
 <!-- B站源扫描优化弹窗 -->

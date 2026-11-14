@@ -3406,7 +3406,7 @@ mod tests {
                 chrono::NaiveTime::from_hms_opt(14, 30, 0).unwrap(),
             ),
             bvid: "BV1bSJez1Et8".to_string(),
-            tags: Some(serde_json::json!(["推理", "智斗", "漫画改"])),
+            tags: Some(serde_json::json!(["推理", "智斗", "悬疑"])),
             ..Default::default()
         };
 

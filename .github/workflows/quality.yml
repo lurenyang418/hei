@@ -1,6 +1,6 @@
 # 质量门禁 v1（2026-11-08）
 #
-# 六道：Rust 格式检查 / Rust Clippy / Rust 测试 / 前端 svelte-check / 前端 lint（prettier + eslint）/ 文档站构建。
+# 五道：Rust 格式检查 / Rust Clippy / Rust 测试 / 前端检查（svelte-check + lint）/ 文档站构建。
 #
 # 几个刻意不做的事：
 # - 不用 `npm run check:node20` / `build:node20`：那是 Windows 本地给 npx 用的包装脚本，
@@ -10,9 +10,9 @@ name: 质量门禁
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -26,6 +26,7 @@ jobs:
   fmt:
     name: Rust 格式检查
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: 检出代码
         uses: actions/checkout@v6
@@ -49,6 +50,7 @@ jobs:
   frontend:
     name: 前端检查
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: 检出代码
         uses: actions/checkout@v6
@@ -64,22 +66,6 @@ jobs:
       - name: svelte-check
         working-directory: web
         run: npm run check
-
-  lint:
-    name: 前端 lint
-    runs-on: ubuntu-24.04
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v6
-      - name: 安装 Node 20
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: 安装依赖
-        working-directory: web
-        run: npm ci
       - name: prettier --check + eslint
         working-directory: web
         run: npm run lint
@@ -87,13 +73,14 @@ jobs:
   docs:
     name: 文档站构建
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: 检出代码
         uses: actions/checkout@v6
-      - name: 安装 Node 18
+      - name: 安装 Node 20
         uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 20
           cache: npm
           cache-dependency-path: docs/package-lock.json
       - name: 安装依赖并构建
@@ -105,6 +92,7 @@ jobs:
   clippy:
     name: Rust Clippy
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - name: 检出代码
         uses: actions/checkout@v6
@@ -153,7 +141,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ steps.toolchain.outputs.channel }}
+      - name: 缓存 cargo 编译产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: '占位前端产物目录（rust-embed 的 #[folder = "../../web/build"] 缺目录会编译失败）'
         run: mkdir -p web/build && touch web/build/index.html
       - name: cargo test
-        run: cargo test --bin bili-sync-rs
+        run: cargo test --workspace

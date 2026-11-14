@@ -20,9 +20,6 @@ pub struct VideoSourcesResponse {
     /// B 站课程（pugv / cheese）
     #[serde(default)]
     pub pugv: Vec<VideoSource>,
-    /// 哔哩哔哩漫画
-    #[serde(default)]
-    pub manga: Vec<VideoSource>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -386,19 +383,8 @@ pub struct VideoInfo {
     pub cover: String,
     pub valid: bool,
     pub is_charge_video: bool,
-    pub is_image_post: bool,
-    /// 图集作品是否只由视频段组成（抖音多段视频/动态）：这类作品没有可查看的原图，
-    /// 前端据此显示「动态」徽标，并区分「本来没有原图」与「原图还没下载完」。
-    #[serde(default)]
-    pub image_post_video_only: bool,
-    #[serde(default)]
-    pub is_story: bool, // 抖音「日常」（story）作品标记
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub image_urls: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bangumi_title: Option<String>, // 番剧真实标题，用于番剧类型视频的显示
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>, // 平台原始视频地址（YouTube/抖音/TikTok 外部平台使用）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skip_reason: Option<String>, // 主动跳过下载的原因（如未达到最低分辨率）；None 表示正常
 }
@@ -429,12 +415,7 @@ impl From<(i32, String, String, String, String, i32, u32, String, bool, bool)> f
             cover,
             valid,
             is_charge_video,
-            is_image_post: false,
-            image_post_video_only: false,
-            is_story: false,
-            image_urls: Vec::new(),
             bangumi_title: None, // 默认为None，将在API层根据视频类型填充
-            url: None,
             skip_reason: None,
         }
     }
@@ -516,7 +497,6 @@ pub struct ConfigResponse {
     pub parallel_download_enabled: bool,
     pub parallel_download_threads: usize,
     pub parallel_download_use_aria2: bool,
-    pub parallel_download_googlevideo_max_connections: usize,
     // 视频质量设置
     pub video_max_quality: String,
     pub video_min_quality: String,
@@ -527,7 +507,6 @@ pub struct ConfigResponse {
     pub no_dolby_audio: bool,
     pub no_hdr: bool,
     pub no_hires: bool,
-    pub prefer_douyin_original: bool,
     // 弹幕设置
     pub danmaku_duration: f64,
     pub danmaku_font: String,
@@ -610,15 +589,11 @@ pub struct ConfigResponse {
     // 添加源页：番剧快捷订阅路径模板
     pub bangumi_quick_subscribe_path: String,
     pub pugv_quick_subscribe_path: String,
-    // 添加源页：漫画快捷订阅路径模板
-    pub manga_quick_subscribe_path: String,
     // ffmpeg 路径（可填 ffmpeg.exe 文件路径或其所在目录）
     pub ffmpeg_path: String,
     pub split_chapters_after_download: bool,
-    // 外源网络代理（YouTube/TikTok 等平台共用）
+    // 网络代理
     pub proxy: String,
-    // 兼容旧配置：旧版仅 YouTube 使用的代理字段
-    pub youtube_proxy: String,
     // B站凭证信息
     pub credential: Option<CredentialInfo>,
     // 推送通知配置
@@ -761,71 +736,6 @@ pub struct PugvUpCoursesResponse {
     pub success: bool,
     pub up_id: String,
     pub data: Vec<PugvCourseItem>,
-}
-
-/// 漫画一话里的单页（网页阅读器用）
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MangaChapterPageResponse {
-    /// 页号，从 0 起
-    pub index: usize,
-    /// CBZ 里的条目名（如 `0001.jpg`）
-    pub name: String,
-    pub size: u64,
-}
-
-/// 漫画一话的清单（网页阅读器用）
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MangaChapterResponse {
-    pub success: bool,
-    pub video_id: i32,
-    /// 话名
-    pub title: String,
-    /// CBZ 文件路径
-    pub path: String,
-    pub size_bytes: u64,
-    pub page_count: u64,
-    pub pages: Vec<MangaChapterPageResponse>,
-}
-
-/// 哔哩哔哩漫画搜索结果条目
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MangaSearchItemResponse {
-    /// comic_id，可直接作为漫画源 ID
-    pub comic_id: String,
-    pub title: String,
-    pub author: String,
-    pub cover: String,
-    /// 题材标签
-    pub styles: Vec<String>,
-    pub is_finish: bool,
-    /// 站点详情页链接
-    pub url: String,
-}
-
-/// 哔哩哔哩漫画关键词搜索响应
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MangaSearchResponse {
-    pub success: bool,
-    pub keyword: String,
-    pub page: u32,
-    /// 本页之后是否还有更多结果
-    pub has_more: bool,
-    pub results: Vec<MangaSearchItemResponse>,
-}
-
-/// 哔哩哔哩漫画作品信息（添加漫画源时自动填名用）
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct MangaComicResponse {
-    pub success: bool,
-    /// 规范化后的 comic_id
-    pub comic_id: String,
-    pub title: String,
-    pub author: String,
-    pub cover: String,
-    pub intro: String,
-    /// 章节总数
-    pub episode_count: u64,
-    pub is_finish: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -1120,8 +1030,6 @@ pub struct DashBoardResponse {
     pub enabled_bangumi: u64,
     /// 已启用的课程（pugv）源数量
     pub enabled_pugv: u64,
-    /// 已启用的漫画源数量
-    pub enabled_manga: u64,
     pub enable_watch_later: bool,
     pub total_favorites: u64,
     pub total_collections: u64,
@@ -1129,53 +1037,9 @@ pub struct DashBoardResponse {
     pub total_bangumi: u64,
     /// 课程（pugv）源总数
     pub total_pugv: u64,
-    /// 漫画源总数
-    pub total_manga: u64,
     pub total_watch_later: u64,
-    pub enabled_youtube_sources: u64,
-    pub total_youtube_sources: u64,
-    pub enabled_douyin_sources: u64,
-    pub total_douyin_sources: u64,
-    pub enabled_douyin_authors: u64,
-    pub total_douyin_authors: u64,
-    pub enabled_douyin_liked: u64,
-    pub total_douyin_liked: u64,
-    pub enabled_douyin_collections: u64,
-    pub total_douyin_collections: u64,
-    pub enabled_douyin_watch_later: u64,
-    pub total_douyin_watch_later: u64,
-    pub enabled_douyin_theaters: u64,
-    pub total_douyin_theaters: u64,
-    pub enabled_douyin_series: u64,
-    pub total_douyin_series: u64,
-    pub enabled_douyin_mixes: u64,
-    pub total_douyin_mixes: u64,
-    pub enabled_tiktok_sources: u64,
-    pub total_tiktok_sources: u64,
-    pub enabled_tiktok_authors: u64,
-    pub total_tiktok_authors: u64,
-    pub enabled_tiktok_liked: u64,
-    pub total_tiktok_liked: u64,
-    pub enabled_tiktok_collections: u64,
-    pub total_tiktok_collections: u64,
-    pub enabled_youtube_subscriptions: u64,
-    pub total_youtube_subscriptions: u64,
-    pub enabled_youtube_channels: u64,
-    pub total_youtube_channels: u64,
-    pub enabled_youtube_playlists: u64,
-    pub total_youtube_playlists: u64,
-    pub enabled_youtube_liked: u64,
-    pub total_youtube_liked: u64,
-    pub enabled_youtube_watch_later: u64,
-    pub total_youtube_watch_later: u64,
     /// B 站近七日新增视频
     pub videos_by_day: Vec<DayCountPair>,
-    /// YouTube 近七日新增视频
-    pub youtube_videos_by_day: Vec<DayCountPair>,
-    /// 抖音近七日新增视频
-    pub douyin_videos_by_day: Vec<DayCountPair>,
-    /// TikTok 近七日新增视频
-    pub tiktok_videos_by_day: Vec<DayCountPair>,
     /// 当前监听状态
     pub monitoring_status: MonitoringStatus,
 }
@@ -1350,8 +1214,6 @@ pub struct LatestIngestItemResponse {
     pub status: String,
     /// 番剧系列名称（从share_copy的《》中提取）
     pub series_name: Option<String>,
-    /// 视频平台：bilibili / youtube / douyin / tiktok
-    pub platform: String,
 }
 
 // 最新入库列表响应
@@ -1441,13 +1303,6 @@ pub struct DatabaseTableStat {
     pub label: String,
 }
 
-/// 数据库管理：按状态统计。
-#[derive(Debug, Serialize, ToSchema)]
-pub struct DatabaseStatusCount {
-    pub status: String,
-    pub count: i64,
-}
-
 /// 数据库管理：数据库状态概览。
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DatabaseStatusResponse {
@@ -1461,8 +1316,6 @@ pub struct DatabaseStatusResponse {
     pub reclaimable_bytes: u64,
     /// 各表记录数
     pub tables: Vec<DatabaseTableStat>,
-    /// YouTube 视频下载状态统计
-    pub youtube_video_status: Vec<DatabaseStatusCount>,
 }
 
 /// 数据库管理：维护操作结果。

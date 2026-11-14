@@ -11,12 +11,9 @@ use std::sync::Arc;
 use tokio::fs;
 use tracing::{debug, error, info, warn};
 
-use bili_sync_entity::entities::{page, video, youtube_video};
+use bili_sync_entity::entities::{page, video};
 
 /// 视频流请求参数。
-///
-/// 外源图集作品的视频段各自成页（`<作品>-P01.mp4`…），播放时用 `pid`
-/// 指定要取哪一段；不传时按第一段处理，单页作品不受影响。
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct VideoStreamQuery {
     pub pid: Option<i32>,
@@ -108,7 +105,7 @@ async fn stream_video_impl(
     debug!("请求视频流: {} (pid={:?})", video_id, requested_pid);
 
     // 从数据库查询视频文件路径
-    let video_path = find_video_file(&video_id, requested_pid, &db).await?;
+    let video_path = find_video_file(&video_id, &db).await?;
 
     // 兼容历史文件：有些老视频只提供 FLV 混合流，若被保存为 .mp4 会导致网页端无法播放
     // 这里在播放前进行一次轻量自愈转封装，成功后会原地替换为可播放的 mp4
@@ -119,17 +116,8 @@ async fn stream_video_impl(
     debug!("视频文件路径: {:?}, 大小: {} bytes", video_path, file_size);
 
     if file_size == 0 {
-        let is_douyin = video_id.starts_with("douyin-");
-        let is_tiktok = video_id.starts_with("tiktok-");
         info!("检测到充电/付费视频占位文件，返回不可播放提示: {:?}", video_path);
-        let mut response = Response::new(
-            if is_douyin || is_tiktok {
-                "付费视频未付费"
-            } else {
-                "充电视频未充电"
-            }
-            .into(),
-        );
+        let mut response = Response::new("充电视频未充电".into());
         *response.status_mut() = StatusCode::FORBIDDEN;
         let headers = response.headers_mut();
         headers.insert(
@@ -214,41 +202,8 @@ async fn maybe_remux_flv_in_mp4(video_path: &PathBuf) -> Result<()> {
 }
 
 /// 查找视频文件路径
-async fn find_video_file(video_id: &str, requested_pid: Option<i32>, db: &DatabaseConnection) -> Result<PathBuf> {
+async fn find_video_file(video_id: &str, db: &DatabaseConnection) -> Result<PathBuf> {
     debug!("查找视频文件: {}", video_id);
-
-    let external = video_id
-        .strip_prefix("youtube-")
-        .map(|value| ("YouTube", value))
-        .or_else(|| video_id.strip_prefix("douyin-").map(|value| ("抖音", value)))
-        .or_else(|| video_id.strip_prefix("tiktok-").map(|value| ("TikTok", value)));
-    if let Some((platform, id)) =
-        external.and_then(|(platform, value)| value.parse::<i32>().ok().map(|id| (platform, id)))
-    {
-        let record = youtube_video::Entity::find_by_id(id)
-            .one(db)
-            .await
-            .with_context(|| format!("查询{platform}视频记录失败"))?
-            .ok_or_else(|| anyhow::anyhow!("{platform}视频记录不存在: {id}"))?;
-        let output_path = record
-            .output_path
-            .filter(|path| !path.trim().is_empty())
-            .map(PathBuf::from)
-            .ok_or_else(|| anyhow::anyhow!("{platform}视频尚无本地文件: {id}"))?;
-        // 图集作品的视频段各自成页，按前端传来的分页号取对应的那一段。
-        let page_paths = crate::douyin::image_post_page_paths(&output_path);
-        let requested_pid = requested_pid.unwrap_or(1).max(1) as usize;
-        let resolved = page_paths.get(requested_pid - 1).cloned().unwrap_or(output_path);
-        if !resolved.is_file() {
-            bail!(
-                "{platform}视频文件不存在: {:?}（分页 {}，共 {} 页）",
-                resolved,
-                requested_pid,
-                page_paths.len()
-            );
-        }
-        return Ok(resolved);
-    }
 
     // 首先尝试作为分页ID查找
     if let Ok(page_id) = video_id.parse::<i32>() {

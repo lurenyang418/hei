@@ -1,11 +1,5 @@
 # 安装指南
 
-## Windows
-
-1. 下载最新版 exe 文件
-2. 双击运行 `bili-sync-rs.exe`
-3. 打开浏览器访问 `http://localhost:12345`
-
 ## Docker（推荐）
 
 ### 一键部署
@@ -15,10 +9,10 @@ docker run -d \
   -p 12345:12345 \
   -v /path/to/data:/app/.config/bili-sync \
   -v /path/to/videos:/Downloads \
-  qq1582185982/bili-sync:latest
+  ghcr.io/lurenyang418/hei:latest
 ```
 
-> 镜像同时发布在 Docker Hub（`qq1582185982/bili-sync`）和 CNB（`docker.cnb.cool/sviplk.com/docker/bili-sync`）两个仓库：首选 Docker Hub，国内网络拉不动时把上面的镜像名换成 CNB 地址即可（tag 相同）。
+> 镜像发布在 GitHub Container Registry：`ghcr.io/lurenyang418/hei`。首次使用前请在仓库的 Packages 页面把该包可见性设为 Public；私有包需要先 `docker login ghcr.io`。
 
 > 程序默认下载目录是容器内的 `/Downloads`（添加视频源时「保存路径」默认就是 `/Downloads`），所以视频卷要挂到 `/Downloads`；挂到别的容器内路径等于下载进容器，容器重建后文件会丢。
 
@@ -27,7 +21,7 @@ docker run -d \
 services:
 
   bili-sync:
-    image: qq1582185982/bili-sync:latest   # 国内网络拉不动 Docker Hub 时，换成 docker.cnb.cool/sviplk.com/docker/bili-sync:latest
+    image: ghcr.io/lurenyang418/hei:latest
     # build:
     #   context: .
     #   dockerfile: Dockerfile
@@ -73,7 +67,6 @@ services:
 1. DSM → **套件中心** → **设置** → **套件来源** → **新增**
 2. 名称随意（如 `dnof`），位置填 `https://ssp.dnof.net/`
 3. 保存后回到「套件中心 → **社群**」，找到 **Bili Sync Up** → 安装
-4. 也可以到 [Releases](https://github.com/NeeYoonc/bili-sync-up/releases/latest) 下载 `.spk`，在套件中心「手动安装」
 
 安装向导可设置 **Web 访问端口**（默认 12345）、**访问 Token**、是否放行防火墙。装完点套件中心「打开」，或访问 `http://<NAS-IP>:<端口>`（填了 Token 会先要求输入）。
 
@@ -82,24 +75,22 @@ services:
 ### 方式二：Container Manager（Docker）
 
 1. 打开 Container Manager (Docker)
-2. 搜索 `qq1582185982/bili-sync`
+2. 在「注册表」页签选择「添加 → 从 URL 添加」，填入 `ghcr.io/lurenyang418/hei:latest`（GHCR 镜像不在 Docker Hub 搜索里）
 3. 下载并创建容器
 4. 设置端口映射和文件夹映射（视频目录挂到容器内 `/Downloads`）
 
-> 镜像同样发布在 CNB：国内网络可在 Container Manager 里把镜像地址填成 `docker.cnb.cool/sviplk.com/docker/bili-sync:latest`。
+> 首次使用前请在仓库的 Packages 页面把该包可见性设为 Public；私有包需要先在 Container Manager 里登录 `ghcr.io`。
 
 ## 升级方法
 
-### Windows
-下载新版 exe 替换旧文件即可
+### Linux 二进制
+下载新版压缩包，替换旧文件后重启即可。当前仅发布 Linux amd64 / arm64 预编译产物；Windows / macOS 需自行从源码编译。
 
 ### Docker
 ```bash
-docker pull qq1582185982/bili-sync
+docker pull ghcr.io/lurenyang418/hei
 docker restart bili-sync
 ```
-
-国内网络可用 CNB 镜像：`docker pull docker.cnb.cool/sviplk.com/docker/bili-sync:latest`。
 
 ## 注意事项
 

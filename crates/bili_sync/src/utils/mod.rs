@@ -12,7 +12,6 @@ pub mod format_arg;
 pub mod keyword_filter;
 pub mod live_updates;
 pub mod model;
-pub mod netscape_cookies;
 pub mod nfo;
 pub mod notification;
 pub mod process;
@@ -24,7 +23,6 @@ pub mod submission_checkpoint;
 pub mod subtitle;
 pub mod task_notifier;
 pub mod time_format;
-pub mod title_clean;
 
 use std::fmt;
 use tracing::{Event, Subscriber};
@@ -68,18 +66,7 @@ where
                 message.push('：');
                 message.push_str(&error);
             }
-            let mut target = event.metadata().target().to_string();
-            if target == "bili_sync_rs::youtube"
-                && (visitor
-                    .platform
-                    .as_deref()
-                    .is_some_and(|platform| platform.eq_ignore_ascii_case("douyin") || platform == "抖音")
-                    || message.starts_with("抖音")
-                    || message.starts_with("下载抖音")
-                    || message.starts_with("扫描抖音"))
-            {
-                target = "bili_sync_rs::douyin".to_string();
-            }
+            let target = event.metadata().target().to_string();
 
             // 写入文件日志
             if let Some(ref writer) = *file_logger::FILE_LOG_WRITER {
@@ -96,7 +83,6 @@ where
 struct MessageVisitor {
     message: Option<String>,
     error: Option<String>,
-    platform: Option<String>,
 }
 
 impl MessageVisitor {
@@ -104,7 +90,6 @@ impl MessageVisitor {
         Self {
             message: None,
             error: None,
-            platform: None,
         }
     }
 }
@@ -115,7 +100,6 @@ impl tracing::field::Visit for MessageVisitor {
         match field.name() {
             "message" => self.message = Some(value),
             "error" => self.error = Some(value.trim_matches('"').to_string()),
-            "platform" => self.platform = Some(value.trim_matches('"').to_string()),
             _ => {}
         }
     }
@@ -124,7 +108,6 @@ impl tracing::field::Visit for MessageVisitor {
         match field.name() {
             "message" => self.message = Some(value.to_string()),
             "error" => self.error = Some(value.to_string()),
-            "platform" => self.platform = Some(value.to_string()),
             _ => {}
         }
     }

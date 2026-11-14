@@ -80,7 +80,6 @@ pub struct UpdateConfigTask {
     pub parallel_download_enabled: Option<bool>,
     pub parallel_download_threads: Option<usize>,
     pub parallel_download_use_aria2: Option<bool>,
-    pub parallel_download_googlevideo_max_connections: Option<usize>,
     // 视频质量设置
     pub video_max_quality: Option<String>,
     pub video_min_quality: Option<String>,
@@ -91,7 +90,6 @@ pub struct UpdateConfigTask {
     pub no_dolby_audio: Option<bool>,
     pub no_hdr: Option<bool>,
     pub no_hires: Option<bool>,
-    pub prefer_douyin_original: Option<bool>,
     // 弹幕设置
     pub danmaku_duration: Option<f64>,
     pub danmaku_font: Option<String>,
@@ -162,12 +160,10 @@ pub struct UpdateConfigTask {
     pub submission_quick_subscribe_path: Option<String>,
     pub bangumi_quick_subscribe_path: Option<String>,
     pub pugv_quick_subscribe_path: Option<String>,
-    pub manga_quick_subscribe_path: Option<String>,
     // ffmpeg 路径（可填 ffmpeg.exe 文件路径或其所在目录）
     pub ffmpeg_path: Option<String>,
     pub split_chapters_after_download: Option<bool>,
     pub proxy: Option<String>,
-    pub youtube_proxy: Option<String>,
     pub ai_rename_rename_parent_dir: Option<bool>,
     pub task_id: String, // 唯一任务ID，用于追踪
 }
@@ -2365,7 +2361,6 @@ impl ConfigTaskQueue {
                 parallel_download_enabled: task.parallel_download_enabled,
                 parallel_download_threads: task.parallel_download_threads,
                 parallel_download_use_aria2: task.parallel_download_use_aria2,
-                parallel_download_googlevideo_max_connections: task.parallel_download_googlevideo_max_connections,
                 // 视频质量设置
                 video_max_quality: task.video_max_quality.clone(),
                 video_min_quality: task.video_min_quality.clone(),
@@ -2376,7 +2371,6 @@ impl ConfigTaskQueue {
                 no_dolby_audio: task.no_dolby_audio,
                 no_hdr: task.no_hdr,
                 no_hires: task.no_hires,
-                prefer_douyin_original: task.prefer_douyin_original,
                 // 弹幕设置
                 danmaku_duration: task.danmaku_duration,
                 danmaku_font: task.danmaku_font.clone(),
@@ -2454,12 +2448,10 @@ impl ConfigTaskQueue {
                 submission_quick_subscribe_path: task.submission_quick_subscribe_path.clone(),
                 bangumi_quick_subscribe_path: task.bangumi_quick_subscribe_path.clone(),
                 pugv_quick_subscribe_path: task.pugv_quick_subscribe_path.clone(),
-                manga_quick_subscribe_path: task.manga_quick_subscribe_path.clone(),
                 // ffmpeg 路径
                 ffmpeg_path: task.ffmpeg_path.clone(),
                 split_chapters_after_download: task.split_chapters_after_download,
                 proxy: task.proxy.clone(),
-                youtube_proxy: task.youtube_proxy.clone(),
                 // 风控验证配置，任务队列中不使用
                 risk_control_enabled: None,
                 risk_control_mode: None,

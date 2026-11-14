@@ -14,7 +14,7 @@
 
 ```bash
 # Docker 一键启动
-docker run -d -p 12345:12345 -v /path/to/data:/app/.config/bili-sync -v /path/to/videos:/Downloads qq1582185982/bili-sync:latest
+docker run -d -p 12345:12345 -v /path/to/data:/app/.config/bili-sync -v /path/to/videos:/Downloads ghcr.io/lurenyang418/hei:latest
 
 # 或下载二进制文件直接运行
 ./bili-sync-rs
@@ -22,7 +22,7 @@ docker run -d -p 12345:12345 -v /path/to/data:/app/.config/bili-sync -v /path/to
 
 访问 `http://localhost:12345` 开始使用
 
-> 镜像同时发布在 Docker Hub（`qq1582185982/bili-sync`）和 CNB（`docker.cnb.cool/sviplk.com/docker/bili-sync`）；国内网络拉不动 Docker Hub 时换成 CNB 地址即可（tag 相同）。
+> 镜像发布在 GitHub Container Registry：`ghcr.io/lurenyang418/hei`。首次使用前请在仓库的 Packages 页面把该包可见性设为 Public；私有包需要先 `docker login ghcr.io`。
 
 ## 📖 文档
 

@@ -36,8 +36,6 @@
 		RefreshCwIcon,
 		DatabaseIcon,
 		EyeIcon,
-		YoutubeIcon,
-		Music2Icon
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -47,9 +45,6 @@
 	// import type { Theme } from '$lib/stores/theme'; // 未使用，已注释
 	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import Loading from '$lib/components/ui/Loading.svelte';
-	import YouTubeLoginPanel from '$lib/components/youtube-login-panel.svelte';
-	import DouyinLoginPanel from '$lib/components/douyin-login-panel.svelte';
-	import TikTokLoginPanel from '$lib/components/tiktok-login-panel.svelte';
 
 	let config: ConfigResponse | null = null;
 	let loading = false;
@@ -97,30 +92,10 @@
 			description: '配置B站登录凭证信息',
 			icon: KeyIcon
 		},
-		{
-			id: 'youtube_login',
-			title: 'YouTube 登录状态',
-			description: '从电脑端助手或 cookies.txt 导入',
-			icon: YoutubeIcon
-		},
-		{
-			id: 'network_proxy',
-			title: '网络代理',
-			description: '外源网络代理（YouTube / TikTok）',
-			icon: SettingsIcon
-		},
-		{
-			id: 'douyin_login',
-			title: '抖音登录状态',
-			description: '从电脑端助手或 cookies.txt 导入',
-			icon: Music2Icon
-		},
-		{
-			id: 'tiktok_login',
-			title: 'TikTok 登录状态',
-			description: '从 cookies.txt 导入，公开内容无需登录',
-			icon: Music2Icon
-		},
+
+
+
+
 		{
 			id: 'risk',
 			title: '风控配置',
@@ -177,13 +152,6 @@
 		download: '控制下载并发、速率限制、任务执行方式和下载器行为。',
 		danmaku: '配置弹幕文件的显示样式、布局参数和同步策略。',
 		credential: '填写 B 站登录凭证，影响会员画质、互动内容和受限接口访问。',
-		youtube_login: '通过电脑端登录助手或 cookies.txt 管理 yt-dlp 使用的 YouTube 登录状态。',
-		network_proxy:
-			'外源网络代理：YouTube 与 TikTok 的搜索、扫描、直链解析和下载共用；B站与抖音不受影响。',
-		douyin_login:
-			'通过同一个电脑端登录助手或 cookies.txt 管理抖音作者作品扫描和下载所需的 Cookie。',
-		tiktok_login:
-			'管理 TikTok 作者扫描所用的 cookies.txt；TikTok 公开作者主页无需登录即可同步，导入后 yt-dlp 可访问需要登录的私密/受限内容。',
 		risk: '调整投稿源扫描时的风控规避策略、批量设置和延迟参数。',
 		captcha: '设置遇到验证码风控时的处理模式、超时和自动识别参数。',
 		aria2: '配置外部 Aria2 的健康检查、自动重启和监控策略。',
@@ -204,7 +172,6 @@
 		nfoIncludeGenre: true,
 		bindAddress: '0.0.0.0:12345',
 		parallelDownloadThreads: 4,
-		parallelDownloadGooglevideoMaxConnections: 16,
 		codecs: ['AVC', 'HEV', 'AV1'],
 		danmakuDuration: 15.0,
 		danmakuFontSize: 25,
@@ -295,7 +262,6 @@
 	let parallelDownloadEnabled = false;
 	let parallelDownloadThreads = 4;
 	let parallelDownloadUseAria2 = false;
-	let parallelDownloadGooglevideoMaxConnections = 16;
 
 	// 视频质量设置
 	let videoMaxQuality = 'Quality8k';
@@ -307,7 +273,6 @@
 	let noDolbyAudio = false;
 	let noHdr = false;
 	let noHires = false;
-	let preferDouyinOriginal = true;
 
 	// 弹幕设置
 	let danmakuDuration = 15.0;
@@ -338,15 +303,8 @@
 
 	// 「下载线程数」兜底后的值（空/0 时按默认 4 处理）
 	$: effectiveDownloadThreads = normalizeConcurrencyValue(parallelDownloadThreads, 4);
-	// 「YouTube 单文件连接数」兜底后的值（空/0 时按默认 16 处理）
-	$: effectiveGooglevideoMaxConnections = normalizeConcurrencyValue(
-		parallelDownloadGooglevideoMaxConnections,
-		16
-	);
-	// YouTube 单文件连接数独立生效，不再与「下载线程数」取较小值
-	$: effectiveYoutubeConnections = effectiveGooglevideoMaxConnections;
-	// 单文件最多使用的连接数：YouTube 用上面的连接数，其它平台用下载线程数
-	$: effectiveMaxFileConnections = Math.max(effectiveDownloadThreads, effectiveYoutubeConnections);
+	// 单文件最多使用的连接数
+	$: effectiveMaxFileConnections = effectiveDownloadThreads;
 	// 预估最大连接数（理论峰值）= 单文件最多连接数 × 同时处理视频数 × 每视频并发分页数
 	$: effectiveConcurrentVideo = normalizeConcurrencyValue(concurrentVideo, 3);
 	$: effectiveConcurrentPage = normalizeConcurrencyValue(concurrentPage, 2);
@@ -362,7 +320,6 @@
 	let submissionQuickSubscribePath = ''; // 添加源页：UP主投稿快捷订阅路径模板
 	let bangumiQuickSubscribePath = ''; // 添加源页：番剧快捷订阅路径模板
 	let pugvQuickSubscribePath = ''; // 添加源页：课程快捷订阅路径模板
-	let mangaQuickSubscribePath = ''; // 添加源页：漫画快捷订阅路径模板
 	let ffmpegPath = ''; // ffmpeg可执行路径（文件或目录）
 
 	// B站凭证设置
@@ -424,14 +381,7 @@
 	let enableAria2HealthCheck = false;
 	let enableAria2AutoRestart = false;
 	let aria2HealthCheckInterval = 300;
-	let networkProxy = '';
-	let proxyTesting = false;
-	let proxyTestResult: {
-		success: boolean;
-		latency_ms: number;
-		status?: number | null;
-		error?: string | null;
-	} | null = null;
+
 
 	// 多P视频目录结构配置
 	let multiPageUseSeasonStructure = false;
@@ -490,7 +440,6 @@
 		wal_size_bytes: number;
 		reclaimable_bytes: number;
 		tables: { table: string; rows: number; label: string }[];
-		youtube_video_status: { status: string; count: number }[];
 	} | null = null;
 	let databaseLoading = false;
 	let databaseActionRunning = false;
@@ -574,9 +523,8 @@
 		video: [
 			{
 				name: '{{title}}',
-				desc: '视频标题（抖音/TikTok/YouTube 会自动去掉话题标签、只保留第一行）'
+				desc: '视频标题'
 			},
-			{ name: '{{title_full}}', desc: '完整原标题（仅抖音/TikTok/YouTube 可用，不做清洗）' },
 			{ name: '{{show_title}}', desc: '节目标题（与title相同）' },
 			{ name: '{{bvid}}', desc: 'BV号（视频编号）' },
 			{ name: '{{upper_name}}', desc: 'UP主名称' },
@@ -588,9 +536,8 @@
 		page: [
 			{
 				name: '{{title}}',
-				desc: '视频标题（单P/多P模板可用；抖音/TikTok/YouTube 会自动去掉话题标签、只保留第一行）'
+				desc: '视频标题（单P/多P模板可用）'
 			},
-			{ name: '{{title_full}}', desc: '完整原标题（仅抖音/TikTok/YouTube 可用，不做清洗）' },
 			{ name: '{{bvid}}', desc: 'BV号（视频编号，单P/多P模板可用）' },
 			{ name: '{{upper_name}}', desc: 'UP主名称（单P/多P模板可用）' },
 			{ name: '{{upper_mid}}', desc: 'UP主ID（单P/多P模板可用）' },
@@ -765,8 +712,6 @@
 		parallelDownloadEnabled = config.parallel_download_enabled || false;
 		parallelDownloadThreads = config.parallel_download_threads || 4;
 		parallelDownloadUseAria2 = config.parallel_download_use_aria2 ?? false;
-		parallelDownloadGooglevideoMaxConnections =
-			config.parallel_download_googlevideo_max_connections ?? 16;
 
 		// 视频质量设置
 		videoMaxQuality = config.video_max_quality || 'Quality8k';
@@ -778,7 +723,6 @@
 		noDolbyAudio = config.no_dolby_audio || false;
 		noHdr = config.no_hdr || false;
 		noHires = config.no_hires || false;
-		preferDouyinOriginal = config.prefer_douyin_original ?? true;
 
 		// 弹幕设置
 		danmakuDuration = config.danmaku_duration || 15.0;
@@ -816,7 +760,6 @@
 		submissionQuickSubscribePath = config.submission_quick_subscribe_path || '';
 		bangumiQuickSubscribePath = config.bangumi_quick_subscribe_path || '';
 		pugvQuickSubscribePath = config.pugv_quick_subscribe_path || '';
-		mangaQuickSubscribePath = config.manga_quick_subscribe_path || '';
 		ffmpegPath = config.ffmpeg_path || '';
 
 		// B站凭证设置
@@ -882,7 +825,6 @@
 		enableAria2HealthCheck = config.enable_aria2_health_check ?? false;
 		enableAria2AutoRestart = config.enable_aria2_auto_restart ?? false;
 		aria2HealthCheckInterval = config.aria2_health_check_interval ?? 300;
-		networkProxy = config.proxy ?? config.youtube_proxy ?? '';
 
 		// 多P视频目录结构配置
 		multiPageUseSeasonStructure = config.multi_page_use_season_structure ?? false;
@@ -1282,20 +1224,6 @@
 		loadDatabaseBackups();
 	}
 
-	async function handleTestProxy() {
-		proxyTesting = true;
-		proxyTestResult = null;
-		try {
-			const proxy = networkProxy.trim();
-			const response = await runRequest(() => api.testProxy(proxy || undefined), {
-				context: '测试代理失败'
-			});
-			if (!response) return;
-			proxyTestResult = response.data;
-		} finally {
-			proxyTesting = false;
-		}
-	}
 
 	async function saveConfig() {
 		// 保存前验证
@@ -1339,10 +1267,6 @@
 				DEFAULT_CONFIG_VALUES.parallelDownloadThreads
 			),
 			parallel_download_use_aria2: parallelDownloadUseAria2,
-			parallel_download_googlevideo_max_connections: normalizeNumberInput(
-				parallelDownloadGooglevideoMaxConnections,
-				DEFAULT_CONFIG_VALUES.parallelDownloadGooglevideoMaxConnections
-			),
 			// 视频质量设置
 			video_max_quality: videoMaxQuality,
 			video_min_quality: videoMinQuality,
@@ -1353,7 +1277,6 @@
 			no_dolby_audio: noDolbyAudio,
 			no_hdr: noHdr,
 			no_hires: noHires,
-			prefer_douyin_original: preferDouyinOriginal,
 			// 弹幕设置
 			danmaku_duration: normalizeNumberInput(
 				danmakuDuration,
@@ -1433,7 +1356,6 @@
 			submission_quick_subscribe_path: submissionQuickSubscribePath,
 			bangumi_quick_subscribe_path: bangumiQuickSubscribePath,
 			pugv_quick_subscribe_path: pugvQuickSubscribePath,
-			manga_quick_subscribe_path: mangaQuickSubscribePath,
 			ffmpeg_path: ffmpegPath,
 			// UP主投稿风控配置
 			large_submission_threshold: normalizeNumberInput(
@@ -1517,7 +1439,6 @@
 				DEFAULT_CONFIG_VALUES.largeSourcePlayurlDurationMs
 			),
 			audio_only_use_low_qn_for_playurl: audioOnlyUseLowQnForPlayurl,
-			proxy: networkProxy.trim(),
 			// aria2监控配置
 			enable_aria2_health_check: enableAria2HealthCheck,
 			enable_aria2_auto_restart: enableAria2AutoRestart,
@@ -2619,22 +2540,6 @@
 				</div>
 			</div>
 
-			<div class="rounded-lg border bg-gray-50 p-4 dark:bg-gray-900">
-				<div class="flex items-center space-x-2">
-					<input
-						type="checkbox"
-						id="prefer-douyin-original"
-						bind:checked={preferDouyinOriginal}
-						class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
-					/>
-					<Label for="prefer-douyin-original" class="text-sm font-medium">
-						优先使用抖音高码率原画
-					</Label>
-				</div>
-				<p class="text-muted-foreground mt-2 pl-6 text-xs">
-					仅对抖音视频生效。原画通常保留更多细节，但文件体积可能明显增大；关闭后直接使用普通最高档。
-				</p>
-			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
 			<Button type="submit" disabled={saving} class="w-full">
@@ -2692,25 +2597,6 @@
 							max="32"
 							placeholder="4"
 						/>
-						<div class="space-y-2">
-							<Label for="googlevideo-max-connections">YouTube 单文件连接数</Label>
-							<Input
-								id="googlevideo-max-connections"
-								type="number"
-								bind:value={parallelDownloadGooglevideoMaxConnections}
-								min="1"
-								max="32"
-								placeholder="16"
-							/>
-							<p class="text-muted-foreground text-xs">
-								YouTube 下载实际生效并发：
-								<span class="text-foreground font-semibold"
-									>{effectiveYoutubeConnections} 条/文件</span
-								>（独立于「下载线程数」，其它平台仍按下载线程数）
-							</p>
-							<p class="text-muted-foreground text-xs">修改只对后续新任务生效。</p>
-						</div>
-
 						<div class="flex items-center space-x-2">
 							<input
 								type="checkbox"
@@ -3420,139 +3306,6 @@
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</div>
-</ResponsiveSheet>
-
-<!-- YouTube 登录状态设置抽屉 -->
-<ResponsiveSheet
-	open={openSheet === 'youtube_login'}
-	onOpenChange={(open) => {
-		if (!open) openSheet = null;
-	}}
-	title="YouTube 登录状态"
-	description="从电脑端登录助手或 cookies.txt 导入 yt-dlp 登录状态"
-	titleTooltip={getSettingTooltip('youtube_login')}
-	{isMobile}
->
-	<div class="min-h-0 flex-1 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-		<YouTubeLoginPanel />
-		<div
-			class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200"
-		>
-			登录成功后，订阅动态、喜欢的视频和稍后再看等账号来源会直接使用这里保存的登录状态。
-			添加视频源请前往“视频源管理 → YouTube 视频源 → 添加 YouTube 视频源”。
-		</div>
-	</div>
-	<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t px-6 pt-4'}>
-		<Button type="button" disabled={saving} class="w-full" onclick={saveConfig}>
-			{saving ? '保存中...' : '保存'}
-		</Button>
-	</SheetFooter>
-</ResponsiveSheet>
-
-<!-- 网络代理设置抽屉 -->
-<ResponsiveSheet
-	open={openSheet === 'network_proxy'}
-	onOpenChange={(open) => {
-		if (!open) openSheet = null;
-	}}
-	title="网络代理"
-	description="YouTube / TikTok 等外源平台共用的代理通道"
-	titleTooltip={getSettingTooltip('network_proxy')}
-	{isMobile}
->
-	<div class="min-h-0 flex-1 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-		<div class="space-y-2 rounded-lg border p-4">
-			<Label for="network-proxy">网络代理地址</Label>
-			<Input
-				id="network-proxy"
-				bind:value={networkProxy}
-				placeholder="例如：http://127.0.0.1:7890 或 socks5://127.0.0.1:7890"
-				autocomplete="off"
-			/>
-			<p class="text-muted-foreground text-sm">
-				YouTube 与 TikTok
-				的搜索、订阅、扫描、直链解析、视频/音频/封面/头像/字幕和直播聊天共用此代理；B站与抖音不会使用。留空关闭。
-			</p>
-			<div class="flex flex-wrap items-center gap-2 pt-1">
-				<Button
-					type="button"
-					size="sm"
-					variant="outline"
-					disabled={proxyTesting}
-					onclick={handleTestProxy}
-				>
-					{proxyTesting ? '测试中...' : '测试连通性'}
-				</Button>
-				{#if proxyTestResult}
-					{#if proxyTestResult.success}
-						<span class="text-sm text-green-600 dark:text-green-400">
-							✓ 谷歌官网连通正常，耗时 {proxyTestResult.latency_ms} ms{proxyTestResult.status
-								? `（HTTP ${proxyTestResult.status}）`
-								: ''}
-						</span>
-					{:else}
-						<span class="text-sm text-red-600 dark:text-red-400">
-							✗ 谷歌官网连接失败{proxyTestResult.error ? `：${proxyTestResult.error}` : ''}
-						</span>
-					{/if}
-				{/if}
-			</div>
-		</div>
-		<div
-			class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200"
-		>
-			后续接入其他外源平台时可直接复用此代理通道。
-		</div>
-	</div>
-	<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t px-6 pt-4'}>
-		<Button type="button" disabled={saving} class="w-full" onclick={saveConfig}>
-			{saving ? '保存中...' : '保存网络代理'}
-		</Button>
-	</SheetFooter>
-</ResponsiveSheet>
-
-<!-- 抖音登录状态设置抽屉 -->
-<ResponsiveSheet
-	open={openSheet === 'douyin_login'}
-	onOpenChange={(open) => {
-		if (!open) openSheet = null;
-	}}
-	title="抖音登录状态"
-	description="从电脑端登录助手或 cookies.txt 导入抖音 Cookie"
-	titleTooltip={getSettingTooltip('douyin_login')}
-	{isMobile}
->
-	<div class="min-h-0 flex-1 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-		<DouyinLoginPanel />
-		<div
-			class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200"
-		>
-			导入后可搜索抖音作者、选择历史作品并持续扫描新作品。媒体仍使用项目现有统一下载器、画质设置、路径模板、封面与
-			NFO 链路。
-		</div>
-	</div>
-</ResponsiveSheet>
-
-<!-- TikTok 登录状态设置抽屉 -->
-<ResponsiveSheet
-	open={openSheet === 'tiktok_login'}
-	onOpenChange={(open) => {
-		if (!open) openSheet = null;
-	}}
-	title="TikTok 登录状态"
-	description="从电脑浏览器导出的 cookies.txt 导入 TikTok 登录状态"
-	titleTooltip={getSettingTooltip('tiktok_login')}
-	{isMobile}
->
-	<div class="min-h-0 flex-1 overflow-y-auto {isMobile ? 'px-4 py-4' : 'px-6 py-6'}">
-		<TikTokLoginPanel />
-		<div
-			class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200"
-		>
-			TikTok 作者主页公开内容无需登录即可同步；导入登录状态后，作者扫描会携带该
-			Cookie，可访问需要登录才可见的私密/受限内容，且不会与 YouTube、抖音的 Cookie 混用。
-		</div>
 	</div>
 </ResponsiveSheet>
 
@@ -4366,7 +4119,7 @@
 					<div class="space-y-1">
 						<h4 class="text-sm font-medium">快捷订阅路径模板</h4>
 						<p class="text-muted-foreground text-sm">
-							添加收藏夹、合集、UP主投稿、番剧、课程、漫画源时可直接带出保存路径。支持使用 <code
+							添加收藏夹、合集、UP主投稿、番剧、课程源时可直接带出保存路径。支持使用 <code
 								>{'{{name}}'}</code
 							>
 							代表源名称。
@@ -4419,15 +4172,6 @@
 								type="text"
 								bind:value={pugvQuickSubscribePath}
 								placeholder={'/Downloads/课程/{{name}}'}
-							/>
-						</div>
-						<div class="space-y-2">
-							<Label for="manga-quick-subscribe-path">漫画快捷订阅路径模板</Label>
-							<Input
-								id="manga-quick-subscribe-path"
-								type="text"
-								bind:value={mangaQuickSubscribePath}
-								placeholder="/Downloads/漫画"
 							/>
 						</div>
 					</div>
@@ -5517,14 +5261,7 @@
 							</div>
 						{/each}
 					</div>
-					{#if databaseStatus.youtube_video_status.length > 0}
-						<div class="flex flex-wrap items-center gap-2">
-							<span class="text-muted-foreground text-xs">YouTube 视频状态：</span>
-							{#each databaseStatus.youtube_video_status as item (item.status)}
-								<Badge variant="secondary">{item.status}：{item.count}</Badge>
-							{/each}
-						</div>
-					{/if}
+
 				</div>
 
 				<!-- 维护操作 -->
@@ -5586,13 +5323,13 @@
 								requestDatabaseAction(
 									'clean_orphans',
 									'清理孤立记录',
-									'删除来源已删除但仍保留在数据库里的 YouTube 视频记录，以及无主分P记录。',
+									'删除无主分P记录。',
 									true
 								)}
 						>
 							<div>
 								<p class="text-sm font-medium">清理孤立记录</p>
-								<p class="text-muted-foreground text-xs">来源已删除的 YouTube 视频 / 无主分P</p>
+								<p class="text-muted-foreground text-xs">无主分P</p>
 							</div>
 							<span class="text-muted-foreground text-xs">→</span>
 						</button>

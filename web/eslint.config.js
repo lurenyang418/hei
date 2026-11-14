@@ -14,7 +14,7 @@ export default ts.config(
 	{
 		// 第三方压缩产物和构建目录不参与 lint：.gitignore 里没有它们（static/ 是要发布的静态资源），
 		// 直接 lint 会在 flv.min.js 这类一行几十万字符的产物上报几百条无意义错误。
-		ignores: ['static/vendor/**', 'static/youtube-login-extension/**', 'build/**', '.svelte-kit/**']
+		ignores: ['static/vendor/**', 'build/**', '.svelte-kit/**']
 	},
 	js.configs.recommended,
 	...ts.configs.recommended,

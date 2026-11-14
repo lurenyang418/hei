@@ -5,205 +5,6 @@ export interface ApiResponse<T> {
 	data: T;
 }
 
-export type YouTubeSourceType =
-	| 'subscriptions'
-	| 'channel'
-	| 'tiktok'
-	| 'tiktok_favorite'
-	| 'tiktok_collection'
-	| 'playlist'
-	| 'liked'
-	| 'watch_later'
-	| 'douyin'
-	| 'douyin_liked'
-	| 'douyin_collection'
-	| 'douyin_watch_later'
-	| 'douyin_theater'
-	| 'douyin_series'
-	| 'douyin_mix';
-
-export interface YouTubeSource {
-	id: number;
-	source_type: YouTubeSourceType;
-	name: string;
-	url: string;
-	path: string;
-	enabled: boolean;
-	scan_deleted_videos: boolean;
-	scan_deleted_videos_once: boolean;
-	audio_only: boolean;
-	audio_only_m4a_only: boolean;
-	flat_folder: boolean;
-	generate_image_post_video: boolean; // 图文作品是否额外合成幻灯片 MP4
-	download_danmaku: boolean;
-	download_subtitle: boolean;
-	ai_subtitle_language: string;
-	ai_rename: boolean;
-	ai_rename_video_prompt: string;
-	ai_rename_audio_prompt: string;
-	ai_rename_enable_multi_page: boolean;
-	ai_rename_enable_collection: boolean;
-	ai_rename_enable_bangumi: boolean;
-	ai_rename_rename_parent_dir: boolean;
-	filter_option?: FilterOption | null;
-	blacklist_keywords: string[];
-	whitelist_keywords: string[];
-	case_sensitive: boolean;
-	min_duration_seconds?: number | null;
-	max_duration_seconds?: number | null;
-	published_after?: string | null;
-	published_before?: string | null;
-	selected_videos: string[];
-	selected_channels: string[];
-	last_scan_at?: string | null;
-	pending_count: number;
-	completed_count: number;
-	failed_count: number;
-	skipped_count: number;
-}
-
-export interface CreateYouTubeSourceRequest {
-	source_type: YouTubeSourceType;
-	name: string;
-	url?: string;
-	path: string;
-	audio_only: boolean;
-	audio_only_m4a_only?: boolean;
-	flat_folder?: boolean;
-	generate_image_post_video?: boolean;
-	download_danmaku?: boolean;
-	download_subtitle: boolean;
-	ai_subtitle_language?: string;
-	ai_rename?: boolean;
-	ai_rename_video_prompt?: string;
-	ai_rename_audio_prompt?: string;
-	ai_rename_enable_multi_page?: boolean;
-	ai_rename_enable_collection?: boolean;
-	ai_rename_enable_bangumi?: boolean;
-	ai_rename_rename_parent_dir?: boolean;
-	filter_option?: FilterOption;
-	blacklist_keywords?: string[];
-	whitelist_keywords?: string[];
-	case_sensitive?: boolean;
-	min_duration_seconds?: number | null;
-	max_duration_seconds?: number | null;
-	published_after?: string;
-	published_before?: string;
-	selected_videos?: string[];
-	selected_channels?: string[];
-}
-
-export interface YouTubeVideo {
-	id: number;
-	source_id: number;
-	youtube_id: string;
-	url: string;
-	title: string;
-	uploader: string;
-	thumbnail?: string | null;
-	published_at?: string | null;
-	duration_seconds?: number | null;
-	download_status: 'pending' | 'downloading' | 'completed' | 'failed' | 'skipped';
-	retry_count: number;
-	output_path?: string | null;
-	error_message?: string | null;
-}
-
-export interface YouTubeStatusResponse {
-	ytdlp_available: boolean;
-	ytdlp_version?: string | null;
-	/** 是否导入过凭证（只读本地，不做联网探测） */
-	logged_in: boolean;
-	/** 最近一次联网登录探测的结论，由后台守护任务刷新；从未检查过时为 null */
-	session_check?: YouTubeSessionCheck | null;
-	default_output_path: string;
-	container_runtime: boolean;
-	cookie_path: string;
-}
-
-export interface YouTubeSessionCheck {
-	/** valid：探测确实登录成功；expired：确实返回未登录；unclear：代理/风控/超时等无法判断 */
-	state: 'valid' | 'expired' | 'unclear';
-	message: string;
-	checked_at: string;
-}
-
-export interface DouyinStatusResponse {
-	logged_in: boolean;
-	cookie_path: string;
-}
-
-export interface TikTokStatusResponse {
-	logged_in: boolean;
-	cookie_path: string;
-}
-
-export interface TikTokSecUidStatusResponse {
-	/** 手动设置并保存的账号 secUid；未设置时为 null */
-	manual_sec_uid: string | null;
-}
-
-export interface YouTubeSearchRequest {
-	keyword: string;
-	source_type: 'channel' | 'playlist';
-}
-
-export interface YouTubeSearchResponse {
-	success: boolean;
-	results: SearchResultItem[];
-	total: number;
-}
-
-export interface YouTubeSourceVideosRequest {
-	url?: string;
-	source_type: 'subscriptions' | 'channel' | 'playlist' | 'liked' | 'watch_later';
-	page?: number;
-	page_size?: number;
-	keyword?: string;
-}
-
-export interface YouTubeLoginResponse {
-	logged_in: boolean;
-	message: string;
-}
-
-export interface UpdateYouTubeSourceRequest {
-	name?: string;
-	path?: string;
-	audio_only?: boolean;
-	audio_only_m4a_only?: boolean;
-	flat_folder?: boolean;
-	generate_image_post_video?: boolean;
-	download_danmaku?: boolean;
-	download_subtitle?: boolean;
-	ai_subtitle_language?: string;
-	ai_rename?: boolean;
-	ai_rename_video_prompt?: string;
-	ai_rename_audio_prompt?: string;
-	ai_rename_enable_multi_page?: boolean;
-	ai_rename_enable_collection?: boolean;
-	ai_rename_enable_bangumi?: boolean;
-	ai_rename_rename_parent_dir?: boolean;
-	filter_option?: FilterOption | null;
-	inherit_filter_option?: boolean;
-	blacklist_keywords?: string[];
-	whitelist_keywords?: string[];
-	case_sensitive?: boolean;
-	min_duration_seconds?: number | null;
-	max_duration_seconds?: number | null;
-	published_after?: string | null;
-	published_before?: string | null;
-}
-
-export interface YouTubeQueueStatusResponse {
-	pending: number;
-	downloading: number;
-	completed: number;
-	failed: number;
-	skipped: number;
-	tasks: YouTubeVideo[];
-}
-
 // 排序字段枚举
 export type SortBy =
 	| 'id'
@@ -219,15 +20,13 @@ export type SortOrder = 'asc' | 'desc';
 
 // 请求参数类型
 export interface VideosRequest {
-	platform?: 'bilibili' | 'youtube' | 'douyin' | 'tiktok';
-	youtube?: number;
+	platform?: 'bilibili';
 	collection?: number;
 	favorite?: number;
 	submission?: number;
 	watch_later?: number;
 	bangumi?: number;
 	pugv?: number;
-	manga?: number;
 	query?: string;
 	page?: number;
 	page_size?: number;
@@ -274,7 +73,6 @@ export interface FilterOption {
 	no_dolby_audio: boolean;
 	no_hdr: boolean;
 	no_hires: boolean;
-	prefer_douyin_original: boolean;
 }
 
 // 视频来源类型
@@ -284,7 +82,6 @@ export interface VideoSource {
 	enabled: boolean;
 	path: string;
 	url?: string;
-	source_type?: YouTubeSourceType;
 	last_scan_at?: string | null;
 	pending_count?: number;
 	completed_count?: number;
@@ -345,10 +142,6 @@ export interface VideoSourcesResponse {
 	watch_later: VideoSource[];
 	bangumi: VideoSource[];
 	pugv: VideoSource[];
-	manga: VideoSource[];
-	youtube: VideoSource[];
-	douyin: VideoSource[];
-	tiktok: VideoSource[];
 }
 
 // 视频信息类型
@@ -363,13 +156,7 @@ export interface VideoInfo {
 	cover: string;
 	valid: boolean;
 	is_charge_video: boolean;
-	is_image_post?: boolean;
-	// 图集作品是否只由视频段组成（多段视频/动态，没有可查看的原图）
-	image_post_video_only?: boolean;
-	is_story?: boolean; // 抖音日常 story 作品
-	image_urls?: string[];
 	bangumi_title?: string; // 番剧真实标题，用于番剧类型视频的显示
-	url?: string; // 平台原始视频地址（外部平台使用）
 	skip_reason?: string; // 主动跳过下载的原因（如未达到最低分辨率）；无此字段表示正常
 }
 
@@ -404,24 +191,6 @@ export interface VideoSourceTag {
 	audio_only_m4a_only: boolean;
 	flat_folder: boolean;
 	generate_image_post_video: boolean;
-}
-
-// 漫画一话（一个 CBZ 压缩包）里的单页
-export interface MangaChapterPage {
-	index: number;
-	name: string;
-	size: number;
-}
-
-// 漫画一话的阅读清单（对应本地 CBZ 压缩包）
-export interface MangaChapterResponse {
-	success: boolean;
-	video_id: number;
-	title: string;
-	path: string;
-	size_bytes: number;
-	page_count: number;
-	pages: MangaChapterPage[];
 }
 
 // 单个视频响应类型
@@ -585,10 +354,8 @@ export interface ConfigResponse {
 	parallel_download_enabled: boolean;
 	parallel_download_threads: number;
 	parallel_download_use_aria2: boolean;
-	parallel_download_googlevideo_max_connections?: number;
 	split_chapters_after_download?: boolean;
 	proxy?: string;
-	youtube_proxy?: string;
 	// 新增视频质量设置
 	video_max_quality?: string;
 	video_min_quality?: string;
@@ -599,7 +366,6 @@ export interface ConfigResponse {
 	no_dolby_audio?: boolean;
 	no_hdr?: boolean;
 	no_hires?: boolean;
-	prefer_douyin_original?: boolean;
 	// 新增弹幕设置
 	danmaku_duration?: number;
 	danmaku_font?: string;
@@ -689,7 +455,6 @@ export interface ConfigResponse {
 	submission_quick_subscribe_path?: string;
 	bangumi_quick_subscribe_path?: string;
 	pugv_quick_subscribe_path?: string;
-	manga_quick_subscribe_path?: string;
 	// ffmpeg 路径（可填 ffmpeg.exe 文件路径或其所在目录）
 	ffmpeg_path?: string;
 	// 风控验证配置
@@ -774,10 +539,8 @@ export interface UpdateConfigRequest {
 	parallel_download_enabled?: boolean;
 	parallel_download_threads?: number;
 	parallel_download_use_aria2?: boolean;
-	parallel_download_googlevideo_max_connections?: number;
 	split_chapters_after_download?: boolean;
 	proxy?: string;
-	youtube_proxy?: string;
 	// 新增视频质量设置
 	video_max_quality?: string;
 	video_min_quality?: string;
@@ -788,7 +551,6 @@ export interface UpdateConfigRequest {
 	no_dolby_audio?: boolean;
 	no_hdr?: boolean;
 	no_hires?: boolean;
-	prefer_douyin_original?: boolean;
 	// 新增弹幕设置
 	danmaku_duration?: number;
 	danmaku_font?: string;
@@ -868,7 +630,6 @@ export interface UpdateConfigRequest {
 	submission_quick_subscribe_path?: string;
 	bangumi_quick_subscribe_path?: string;
 	pugv_quick_subscribe_path?: string;
-	manga_quick_subscribe_path?: string;
 	// ffmpeg 路径（可填 ffmpeg.exe 文件路径或其所在目录）
 	ffmpeg_path?: string;
 	// 风控验证配置
@@ -935,10 +696,6 @@ export interface SearchResultItem {
 	play?: number;
 	danmaku?: number;
 	follower?: number; // 粉丝数（UP主搜索结果）
-	youtube_url?: string;
-	channel_id?: string;
-	/** 漫画搜索结果携带的 comic_id（result_type === 'manga'） */
-	manga_comic_id?: string;
 }
 
 // 搜索响应类型
@@ -997,8 +754,7 @@ export type VideoCategory =
 	| 'submission'
 	| 'watch_later'
 	| 'bangumi'
-	| 'pugv'
-	| 'manga';
+	| 'pugv';
 
 // 番剧季度信息类型
 export interface BangumiSeasonInfo {
@@ -1034,41 +790,6 @@ export interface PugvUpCoursesResponse {
 	success: boolean;
 	up_id: string;
 	data: PugvCourseItem[];
-}
-
-// 哔哩哔哩漫画作品信息（添加漫画源时自动填名）
-export interface MangaComicResponse {
-	success: boolean;
-	comic_id: string;
-	title: string;
-	author: string;
-	cover: string;
-	intro: string;
-	/** 章节总数 */
-	episode_count: number;
-	is_finish: boolean;
-}
-
-// 哔哩哔哩漫画关键词搜索结果
-export interface MangaSearchResult {
-	comic_id: string;
-	title: string;
-	author: string;
-	cover: string;
-	/** 题材标签 */
-	styles: string[];
-	is_finish: boolean;
-	/** 站点详情页链接 */
-	url: string;
-}
-
-export interface MangaSearchResponse {
-	success: boolean;
-	keyword: string;
-	page: number;
-	/** 本页之后是否还有更多结果 */
-	has_more: boolean;
-	results: MangaSearchResult[];
 }
 
 // 番剧源选项（用于合并选择）
@@ -1456,8 +1177,6 @@ export interface DashBoardResponse {
 	enabled_bangumi: number;
 	/** 已启用的课程（pugv）源数量 */
 	enabled_pugv: number;
-	/** 已启用的漫画源数量 */
-	enabled_manga: number;
 	enable_watch_later: boolean;
 	total_favorites: number;
 	total_collections: number;
@@ -1465,49 +1184,8 @@ export interface DashBoardResponse {
 	total_bangumi: number;
 	/** 课程（pugv）源总数 */
 	total_pugv: number;
-	/** 漫画源总数 */
-	total_manga: number;
 	total_watch_later: number;
-	enabled_youtube_sources: number;
-	total_youtube_sources: number;
-	enabled_douyin_sources: number;
-	total_douyin_sources: number;
-	enabled_douyin_authors: number;
-	total_douyin_authors: number;
-	enabled_douyin_liked: number;
-	total_douyin_liked: number;
-	enabled_douyin_collections: number;
-	total_douyin_collections: number;
-	enabled_douyin_watch_later: number;
-	total_douyin_watch_later: number;
-	enabled_douyin_theaters: number;
-	total_douyin_theaters: number;
-	enabled_douyin_series: number;
-	total_douyin_series: number;
-	enabled_douyin_mixes: number;
-	total_douyin_mixes: number;
-	enabled_tiktok_sources: number;
-	total_tiktok_sources: number;
-	enabled_tiktok_authors: number;
-	total_tiktok_authors: number;
-	enabled_tiktok_liked: number;
-	total_tiktok_liked: number;
-	enabled_tiktok_collections: number;
-	total_tiktok_collections: number;
-	enabled_youtube_subscriptions: number;
-	total_youtube_subscriptions: number;
-	enabled_youtube_channels: number;
-	total_youtube_channels: number;
-	enabled_youtube_playlists: number;
-	total_youtube_playlists: number;
-	enabled_youtube_liked: number;
-	total_youtube_liked: number;
-	enabled_youtube_watch_later: number;
-	total_youtube_watch_later: number;
 	videos_by_day: DayCountPair[];
-	youtube_videos_by_day: DayCountPair[];
-	douyin_videos_by_day: DayCountPair[];
-	tiktok_videos_by_day: DayCountPair[];
 	monitoring_status: MonitoringStatus;
 }
 
@@ -1549,7 +1227,7 @@ export interface TaskStatus {
 // 首页「正在下载」实时进度
 export interface DownloadProgressItem {
 	key: string;
-	platform: 'bilibili' | 'youtube' | 'douyin' | 'tiktok';
+	platform: 'bilibili';
 	title: string;
 	phase: string;
 	file_name: string;
@@ -1570,7 +1248,6 @@ export interface LatestIngestItem {
 	download_speed_bps: number | null;
 	status: 'success' | 'failed' | 'deleted' | 'pending';
 	series_name: string | null; // 番剧系列名称（从share_copy的《》中提取）
-	platform: 'bilibili' | 'youtube' | 'douyin' | 'tiktok'; // 视频平台
 }
 
 export interface LatestIngestResponse {
@@ -1604,18 +1281,12 @@ export interface DatabaseTableStat {
 	label: string;
 }
 
-export interface DatabaseStatusCount {
-	status: string;
-	count: number;
-}
-
 export interface DatabaseStatusResponse {
 	path: string;
 	db_size_bytes: number;
 	wal_size_bytes: number;
 	reclaimable_bytes: number;
 	tables: DatabaseTableStat[];
-	youtube_video_status: DatabaseStatusCount[];
 }
 
 export type DatabaseMaintenanceAction =

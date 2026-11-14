@@ -114,7 +114,7 @@ const ALREADY_BILINGUAL_RATIO: f32 = 0.9;
 
 /// 把 `subtitles` 里的目标语言轨与对照语言轨按时间轴重叠度合并成一条双语字幕。
 ///
-/// 时间轴以目标语言轨为准，对照语言（通常是原文）叠在上方，与 YouTube 侧的双语
+/// 时间轴以目标语言轨为准，对照语言（通常是原文）叠在上方，与源站的双语
 /// 输出保持一致：英文在上、中文在下。缺轨或空轨时返回 `Unavailable`，由调用方降级
 /// 为「只落盘分轨文件」，不影响原有行为。
 pub fn merge_bilingual_subtitles(subtitles: &[SubTitle], primary: &str, secondary: &str) -> BilingualMerge {

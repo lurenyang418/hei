@@ -6,17 +6,12 @@ use crate::bilibili::FilterOption;
 
 #[derive(Clone, Deserialize, IntoParams, Default)]
 pub struct VideosRequest {
-    /// 视频平台：bilibili（默认）或 youtube
-    pub platform: Option<String>,
-    /// YouTube 视频源 ID
-    pub youtube: Option<i32>,
     pub collection: Option<i32>,
     pub favorite: Option<i32>,
     pub submission: Option<i32>,
     pub watch_later: Option<i32>,
     pub bangumi: Option<i32>,
     pub pugv: Option<i32>,
-    pub manga: Option<i32>,
     pub query: Option<String>,
     pub page: Option<u64>,
     pub page_size: Option<u64>,
@@ -231,7 +226,6 @@ pub struct UpdateConfigRequest {
     pub parallel_download_enabled: Option<bool>,
     pub parallel_download_threads: Option<usize>,
     pub parallel_download_use_aria2: Option<bool>,
-    pub parallel_download_googlevideo_max_connections: Option<usize>,
     // 视频质量设置
     pub video_max_quality: Option<String>,
     pub video_min_quality: Option<String>,
@@ -242,7 +236,6 @@ pub struct UpdateConfigRequest {
     pub no_dolby_audio: Option<bool>,
     pub no_hdr: Option<bool>,
     pub no_hires: Option<bool>,
-    pub prefer_douyin_original: Option<bool>,
     // 弹幕设置
     pub danmaku_duration: Option<f64>,
     pub danmaku_font: Option<String>,
@@ -326,15 +319,11 @@ pub struct UpdateConfigRequest {
     pub bangumi_quick_subscribe_path: Option<String>,
     // 添加源页：课程快捷订阅路径模板
     pub pugv_quick_subscribe_path: Option<String>,
-    // 添加源页：漫画快捷订阅路径模板
-    pub manga_quick_subscribe_path: Option<String>,
     // ffmpeg 路径（可填 ffmpeg.exe 文件路径或其所在目录）
     pub ffmpeg_path: Option<String>,
     pub split_chapters_after_download: Option<bool>,
-    // 外源网络代理（YouTube/TikTok 等平台共用）
+    // 网络代理
     pub proxy: Option<String>,
-    // 兼容旧配置：旧版仅 YouTube 使用的代理字段
-    pub youtube_proxy: Option<String>,
     // 风控验证配置
     pub risk_control_enabled: Option<bool>,
     pub risk_control_mode: Option<String>,
@@ -406,24 +395,6 @@ pub struct SearchRequest {
 pub struct PugvUpCoursesRequest {
     /// 讲师（UP 主）的 mid
     pub up_id: String,
-}
-
-/// 查询哔哩哔哩漫画作品信息的请求
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct MangaComicRequest {
-    /// 漫画 comic_id（可传 `mc25969` 或完整链接）
-    pub comic_id: String,
-}
-
-/// 关键词搜索漫画的请求
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct MangaSearchRequest {
-    /// 搜索关键词（漫画名 / 作者名）
-    pub keyword: String,
-    #[serde(default = "default_page")]
-    pub page: u32,
-    #[serde(default = "default_page_size")]
-    pub page_size: u32,
 }
 
 fn default_page() -> u32 {
@@ -516,9 +487,6 @@ pub struct ResetSpecificTasksRequest {
     pub watch_later: Option<i32>,
     pub bangumi: Option<i32>,
     pub pugv: Option<i32>,
-    pub manga: Option<i32>,
-    pub platform: Option<String>,
-    pub youtube: Option<i32>,
     // 与 /api/videos 的过滤参数保持一致，便于“按当前筛选批量重置”
     pub query: Option<String>,
     pub show_failed_only: Option<bool>,
@@ -632,7 +600,7 @@ pub struct ConfigMigrationRequest {
     pub dry_run: Option<bool>,
 }
 
-/// 网络代理连通性测试请求：不传 proxy 时使用当前配置的外源代理。
+/// 网络代理连通性测试请求：不传 proxy 时使用当前配置的代理。
 #[derive(Deserialize, ToSchema)]
 pub struct TestProxyRequest {
     /// 待测试的代理地址（http/socks5）；为空时使用当前已保存配置。
@@ -649,7 +617,7 @@ pub enum DatabaseMaintenanceAction {
     ClearAiHistory,
     /// 清理已完成/失败的任务队列记录
     ClearQueueHistory,
-    /// 清理孤立记录（来源已删除的 YouTube 视频、无主分P）
+    /// 清理孤立记录（无主分P）
     CleanOrphans,
     /// VACUUM 压缩数据库
     Vacuum,

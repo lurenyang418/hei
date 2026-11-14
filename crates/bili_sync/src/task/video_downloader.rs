@@ -15,7 +15,6 @@ use crate::task::TASK_CONTROLLER;
 use crate::unified_downloader::UnifiedDownloader;
 use crate::utils::file_logger;
 use crate::utils::live_updates::notify_video_sources_changed;
-use crate::utils::notification::SourceScanResult;
 use crate::utils::scan_collector::ScanCollector;
 use crate::utils::scan_id_tracker::{
     get_last_scanned_ids, group_sources_by_new_old, update_last_scanned_ids, LastScannedIds, MaxIdRecorder,
@@ -60,7 +59,6 @@ fn source_type_label(source_type: SourceType) -> &'static str {
         SourceType::WatchLater => "稍后再看",
         SourceType::Bangumi => "番剧",
         SourceType::Pugv => "课程",
-        SourceType::Manga => "漫画",
     }
 }
 
@@ -810,27 +808,6 @@ async fn load_video_sources_from_db(
         });
     }
 
-    // 加载漫画源（只加载启用的）
-    let manga_sources = entities::video_source::Entity::find()
-        .filter(entities::video_source::Column::Type.eq(3))
-        .filter(entities::video_source::Column::Enabled.eq(true))
-        .all(connection.as_ref())
-        .await?;
-
-    for manga in manga_sources {
-        let Some(media_id) = manga.media_id.clone() else {
-            warn!("漫画源「{}」(ID: {}) 缺少 comic_id，跳过", manga.name, manga.id);
-            continue;
-        };
-        video_sources.push(VideoSourceWithId {
-            id: manga.id,
-            args: Args::Manga { media_id },
-            path: PathBuf::from(manga.path),
-            source_type: SourceType::Manga,
-            last_scan_at: None,
-        });
-    }
-
     Ok(video_sources)
 }
 
@@ -869,13 +846,6 @@ async fn count_all_video_sources(
         .count(connection.as_ref())
         .await?;
     total_count += pugv_count as usize;
-
-    // 统计漫画源
-    let manga_count = entities::video_source::Entity::find()
-        .filter(entities::video_source::Column::Type.eq(3))
-        .count(connection.as_ref())
-        .await?;
-    total_count += manga_count as usize;
 
     Ok(total_count)
 }
@@ -924,13 +894,6 @@ async fn count_enabled_video_sources(
         .await?;
     total_count += pugv_count as usize;
 
-    let manga_count = entities::video_source::Entity::find()
-        .filter(entities::video_source::Column::Type.eq(3))
-        .filter(entities::video_source::Column::Enabled.eq(true))
-        .count(connection.as_ref())
-        .await?;
-    total_count += manga_count as usize;
-
     Ok(total_count)
 }
 
@@ -949,102 +912,6 @@ async fn init_all_sources(
     // 这些初始化函数可能需要修改以适应新的架构
 
     Ok(())
-}
-
-/// 单个平台的扫描汇总（日志里要写平台名，不能笼统写成「外源」）。
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PlatformScanTotals {
-    /// 平台名，与「扫描完成」推送里的标签一致（抖音 / YouTube / TikTok）。
-    label: String,
-    /// 该平台本轮扫描成功的源数量。
-    sources: usize,
-    /// 该平台本轮新增的作品（视频/图文）数量。
-    new_videos: usize,
-}
-
-/// YouTube/抖音/TikTok 本轮扫描结果的汇总，按平台分开记账。
-///
-/// 每轮的扫描日志与「扫描完成」推送共用这份口径：只统计扫描成功的源，
-/// 扫描失败的源另有单独告警，不混进这里的数字。
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-struct ExternalScanTotals {
-    /// 本轮扫描成功的外源数量。
-    sources: usize,
-    /// 本轮外源新增的作品（视频/图文）数量。
-    new_videos: usize,
-    /// 本轮扫到新作品的外源数量。
-    sources_with_new_content: usize,
-    /// 按平台拆分的结果，顺序与扫描顺序一致。
-    platforms: Vec<PlatformScanTotals>,
-}
-
-impl ExternalScanTotals {
-    fn from_results(results: &[SourceScanResult]) -> Self {
-        let mut platforms: Vec<PlatformScanTotals> = Vec::new();
-        for result in results {
-            let new_videos = result.new_videos.len();
-            match platforms
-                .iter_mut()
-                .find(|platform| platform.label == result.source_type)
-            {
-                Some(platform) => {
-                    platform.sources += 1;
-                    platform.new_videos += new_videos;
-                }
-                None => platforms.push(PlatformScanTotals {
-                    label: result.source_type.clone(),
-                    sources: 1,
-                    new_videos,
-                }),
-            }
-        }
-        Self {
-            sources: results.len(),
-            new_videos: results.iter().map(|result| result.new_videos.len()).sum(),
-            sources_with_new_content: results.iter().filter(|result| !result.new_videos.is_empty()).count(),
-            platforms,
-        }
-    }
-
-    /// 来源构成文本，例如 `B站 15 + 抖音 7 + YouTube 2`。
-    fn source_breakdown(&self, bilibili_sources: usize) -> String {
-        let mut parts = vec![format!("B站 {bilibili_sources}")];
-        parts.extend(
-            self.platforms
-                .iter()
-                .map(|platform| format!("{} {}", platform.label, platform.sources)),
-        );
-        parts.join(" + ")
-    }
-
-    /// 平台构成文本（不含 B 站），例如 `抖音 7、YouTube 2`。
-    fn platform_breakdown(&self) -> String {
-        self.platforms
-            .iter()
-            .map(|platform| format!("{} {}", platform.label, platform.sources))
-            .collect::<Vec<_>>()
-            .join("、")
-    }
-
-    /// 新增作品文本（B 站与各平台分开列），例如 `B站 1 个、抖音 2 个`；
-    /// 整轮没有新增时是 `无`。B 站数量直接取本轮推送用的那份统计，保证两边一致。
-    fn new_video_breakdown(&self, bilibili_new_videos: usize) -> String {
-        let mut parts: Vec<String> = Vec::new();
-        if bilibili_new_videos > 0 {
-            parts.push(format!("B站 {bilibili_new_videos} 个"));
-        }
-        parts.extend(
-            self.platforms
-                .iter()
-                .filter(|platform| platform.new_videos > 0)
-                .map(|platform| format!("{} {} 个", platform.label, platform.new_videos)),
-        );
-        if parts.is_empty() {
-            "无".to_string()
-        } else {
-            parts.join("、")
-        }
-    }
 }
 
 /// 启动周期下载视频的任务
@@ -1118,38 +985,10 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
         // 使用直接连接
         let optimized_connection = connection.clone();
 
-        // B 站和 YouTube 共用同一个 UnifiedDownloader 实例。YouTube 仅使用
-        // yt-dlp 解析媒体直链，文件下载、分片、aria2 选择和 ffmpeg 合并均走原链路。
-        let shared_downloader = if let Some(existing) = TASK_CONTROLLER.get_downloader().await {
-            existing
-        } else {
-            let downloader = UnifiedDownloader::new_smart(bili_client.client.clone()).await;
-            let arc = std::sync::Arc::new(downloader);
-            TASK_CONTROLLER.set_downloader(Some(arc.clone())).await;
-            arc
-        };
         TASK_CONTROLLER.set_scanning(true);
         crate::utils::task_notifier::TASK_STATUS_NOTIFIER.set_running();
-        let youtube_result = crate::youtube::process_scheduled_sources(
-            optimized_connection.as_ref(),
-            shared_downloader,
-            config.concurrent_limit.video,
-        )
-        .await;
         TASK_CONTROLLER.set_scanning(false);
         crate::utils::task_notifier::TASK_STATUS_NOTIFIER.set_finished();
-        // 外源（YouTube/抖音/TikTok）本轮扫描结果：稍后与 B 站源合并进「扫描完成」推送。
-        let external_scan_results = match youtube_result {
-            Ok(results) => results,
-            Err(error) => {
-                warn!(error = %error, "执行 YouTube 视频源扫描/下载失败");
-                Vec::new()
-            }
-        };
-
-        // 外源汇总口径：日志与「扫描完成」推送共用同一份计数，
-        // 避免每轮日志只报 B 站源、看不出外源扫到了什么。
-        let external_totals = ExternalScanTotals::from_results(&external_scan_results);
 
         // 重新初始化所有视频源（确保源初始化是幂等的）
         if let Err(e) = init_all_sources(&config, &optimized_connection).await {
@@ -1206,45 +1045,16 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
         let deferred_sources_count = enabled_sources_total.saturating_sub(due_sources_count);
         let disabled_sources_count = total_sources_count.saturating_sub(enabled_sources_total);
 
-        // 外源（YouTube/抖音/TikTok）不在 `video_source` 表里，按平台分别统计。
-        // 否则只挂外源的部署会看到「共 7 个视频源（启用: 0，禁用: 7）」，像是所有源都被禁用了。
-        // 只报平台维度的数量，不列具体源名（源名在各自平台的扫描日志里已经有了）。
-        let external_sources = bili_sync_entity::youtube_source::Entity::find()
-            .all(optimized_connection.as_ref())
-            .await
-            .unwrap_or_default();
-        let mut external_parts: Vec<String> = Vec::new();
-        for label in ["YouTube", "抖音", "TikTok"] {
-            let group: Vec<&bili_sync_entity::youtube_source::Model> = external_sources
-                .iter()
-                .filter(|source| crate::youtube::source_platform_label(source) == label)
-                .collect();
-            if group.is_empty() {
-                external_parts.push(format!("{label} 0 个"));
-                continue;
-            }
-            let enabled = group.iter().filter(|source| source.enabled).count();
-            external_parts.push(format!(
-                "{} {} 个（启用 {}，禁用 {}）",
-                label,
-                group.len(),
-                enabled,
-                group.len().saturating_sub(enabled)
-            ));
-        }
-
-        if deferred_sources_count > 0 || disabled_sources_count > 0 || !external_sources.is_empty() {
-            let external_part = external_parts.join("；");
+        if deferred_sources_count > 0 || disabled_sources_count > 0 {
             info!(
-                "开始执行本轮视频下载任务：B站视频源 {} 个（启用 {}，暂缓 {}，禁用 {}）；{}",
-                total_sources_count, due_sources_count, deferred_sources_count, disabled_sources_count, external_part
+                "开始执行本轮视频下载任务：视频源 {} 个（启用 {}，暂缓 {}，禁用 {}）",
+                total_sources_count, due_sources_count, deferred_sources_count, disabled_sources_count
             );
         } else {
             info!("开始执行本轮视频下载任务，共 {} 个启用的视频源", due_sources_count);
         }
 
-        // 扫描收集器：收集 B 站源扫描结果，稍后与外源结果合并后统一推送，
-        // 保证「只挂外源」或「本轮没有启用 B 站源」的部署也能收到扫描完成通知。
+        // 扫描收集器：收集本轮扫描结果，统一生成扫描完成通知。
         let mut scan_collector = ScanCollector::new();
 
         'inner: {
@@ -1389,7 +1199,6 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
                         crate::adapter::Args::WatchLater => "稍后观看",
                         crate::adapter::Args::Bangumi { .. } => "番剧",
                         crate::adapter::Args::Pugv { .. } => "课程",
-                        crate::adapter::Args::Manga { .. } => "漫画",
                     };
                     debug!("  - {} (ID: {})", source_name, source.id);
                 }
@@ -1489,7 +1298,6 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
                             crate::adapter::Args::WatchLater => "稍后再看",
                             crate::adapter::Args::Bangumi { .. } => "番剧",
                             crate::adapter::Args::Pugv { .. } => "课程",
-                            crate::adapter::Args::Manga { .. } => "漫画",
                         };
 
                         info!("处理下一个{}前延迟 {} 秒，避免触发风控...", source_type, delay_seconds);
@@ -1791,17 +1599,13 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
 
             // mmap自动处理数据持久化，不需要手动同步
 
-            // B 站源与外源共用一份汇总：本轮日志里的源数量、有新内容的源数量
-            // 都与后面的「扫描完成」推送口径一致，不再出现「日志说均无新内容、
-            // 实际外源已经扫到并下载了新作品」的矛盾。
-            let scanned_source_total = processed_sources + external_totals.sources;
-            let sources_with_new_content_total = sources_with_new_content + external_totals.sources_with_new_content;
+            let scanned_source_total = processed_sources;
+            let sources_with_new_content_total = sources_with_new_content;
 
             info!(
-                "本轮扫描完成 - 视频源数量: {}（{}），新增作品: {}",
-                ordered_sources.len() + external_totals.sources,
-                external_totals.source_breakdown(ordered_sources.len()),
-                external_totals.new_video_breakdown(scan_collector.total_new_videos())
+                "本轮扫描完成 - 视频源数量: {}，新增作品: {} 个",
+                ordered_sources.len(),
+                scan_collector.total_new_videos()
             );
 
             // 标记任务状态为结束
@@ -1834,23 +1638,13 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
                         ordered_sources.len() - processed_sources
                     );
                 }
-            } else if external_totals.sources > 0 {
-                warn!(
-                    "本轮任务执行完毕，B站 {} 个视频源均处理失败（{} 本轮扫描成功，详情见扫描推送）",
-                    ordered_sources.len(),
-                    external_totals.platform_breakdown()
-                );
             } else {
                 warn!("本轮任务执行完毕，所有 {} 个视频源均处理失败", ordered_sources.len());
             }
         }
 
-        // 生成扫描摘要并发送推送通知：外源结果与 B 站源合并，
-        // 推送门槛（最少新增视频数）也按合并后的总数判断。
-        let mut scan_summary = scan_collector.generate_summary();
-        scan_summary.total_sources += external_totals.sources;
-        scan_summary.total_new_videos += external_totals.new_videos;
-        scan_summary.source_results.extend(external_scan_results);
+        // 生成扫描摘要并发送推送通知。
+        let scan_summary = scan_collector.generate_summary();
         if let Err(e) = crate::utils::notification::send_scan_notification(scan_summary).await {
             warn!("发送扫描完成推送失败: {}", e);
         }
@@ -1959,7 +1753,6 @@ pub async fn video_downloader(connection: Arc<DatabaseConnection>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::notification::NewVideoInfo;
     use bili_sync_migration::MigratorTrait;
     use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
     use sea_orm::SqlxSqliteConnector;
@@ -2003,7 +1796,7 @@ mod tests {
                 upper_id: id.to_string(),
             },
             SourceType::WatchLater => Args::WatchLater,
-            SourceType::Bangumi | SourceType::Pugv | SourceType::Manga => {
+            SourceType::Bangumi | SourceType::Pugv => {
                 panic!("测试辅助函数仅覆盖合集、收藏夹、投稿和稍后再看")
             }
         };
@@ -2082,59 +1875,6 @@ mod tests {
             .expect("风控后应保留状态");
         assert!(risk_state.last_scan_at.is_some());
         assert!(risk_state.next_scan_at.is_some());
-    }
-
-    /// 每轮扫描日志与「扫描完成」推送共用外源汇总：源数量、有新内容的源数量、
-    /// 新增作品数量都必须覆盖外源，否则日志会出现「均无新内容」的假象。
-    #[test]
-    fn external_scan_totals_cover_all_platforms_for_round_summary() {
-        let video = |title: &str, url: &str| NewVideoInfo {
-            title: title.to_string(),
-            bvid: "7687945613371288975".to_string(),
-            pubtime: Some("20260921".to_string()),
-            episode_number: None,
-            video_id: None,
-            url: Some(url.to_string()),
-        };
-        let results = vec![
-            SourceScanResult {
-                source_type: "抖音".to_string(),
-                source_name: "001".to_string(),
-                new_videos: vec![
-                    video("小肚小肚", "https://www.douyin.com/video/1"),
-                    video("你饿不饿", "https://www.douyin.com/video/2"),
-                ],
-            },
-            SourceScanResult {
-                source_type: "YouTube".to_string(),
-                source_name: "HDR VISION".to_string(),
-                new_videos: Vec::new(),
-            },
-            SourceScanResult {
-                source_type: "抖音".to_string(),
-                source_name: "开心蛙蛙".to_string(),
-                new_videos: vec![video("第三批", "https://www.douyin.com/video/3")],
-            },
-        ];
-
-        let totals = ExternalScanTotals::from_results(&results);
-        assert_eq!(totals.sources, 3, "外源数量应包含没有新作品的源");
-        assert_eq!(totals.new_videos, 3, "新增作品数量应覆盖所有外源");
-        assert_eq!(totals.sources_with_new_content, 2, "两个抖音源都有新作品");
-        // 日志里必须写平台名，不能写成笼统的「外源」。
-        assert_eq!(totals.source_breakdown(15), "B站 15 + 抖音 2 + YouTube 1");
-        assert_eq!(totals.platform_breakdown(), "抖音 2、YouTube 1");
-        // 只有外源有新增时，B 站不占位。
-        assert_eq!(totals.new_video_breakdown(0), "抖音 3 个");
-        // B 站有新增时要一起列出来，否则日志会出现「新增作品: 无」却真的新增了的假象。
-        assert_eq!(totals.new_video_breakdown(1), "B站 1 个、抖音 3 个");
-        assert_eq!(totals.new_video_breakdown(2), "B站 2 个、抖音 3 个");
-
-        let empty = ExternalScanTotals::from_results(&[]);
-        assert_eq!(empty.sources, 0, "没有外源时应为 0");
-        assert_eq!(empty.source_breakdown(15), "B站 15", "没有外源时只写 B 站");
-        assert_eq!(empty.new_video_breakdown(0), "无", "整轮没有新增时写「无」");
-        assert_eq!(empty.new_video_breakdown(1), "B站 1 个", "只有 B 站有新增时写 B 站");
     }
 
     #[test]

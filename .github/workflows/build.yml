@@ -2,16 +2,22 @@ name: Build bili-sync
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
     tags: ['v*']
-    # 文档 / 打包脚本改动不触发完整 Rust 编译（GitHub 的 path filters 对 tag 推送不生效，发版不受影响）
+    # 文档改动不触发完整 Rust 编译（GitHub 的 path filters 对 tag 推送不生效，发版不受影响）
     paths-ignore:
-      - 'synology/**'
       - 'docs/**'
       - '**.md'
   pull_request:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,6 +26,7 @@ jobs:
   build_frontend:
     name: Build frontend
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -47,20 +54,18 @@ jobs:
         with:
           name: web-build
           path: web/build
+          retention-days: 1
 
   build:
     name: Build ${{ matrix.platform.name }}
     needs: build_frontend
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         platform:
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            name: Windows-x86_64
-            bin: bili-sync-rs.exe
-            archive_name: bili-sync-rs-Windows-x86_64.zip
           - target: x86_64-unknown-linux-musl
             os: ubuntu-24.04
             name: Linux-x86_64-musl
@@ -71,11 +76,6 @@ jobs:
             name: Linux-aarch64-musl
             bin: bili-sync-rs
             archive_name: bili-sync-rs-Linux-aarch64-musl.tar.gz
-          - target: armv7-unknown-linux-musleabihf
-            os: ubuntu-24.04
-            name: Linux-armv7l-musl
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-Linux-armv7l-musl.tar.gz
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -93,6 +93,7 @@ jobs:
         with:
           name: web-build
           path: web/build
+          retention-days: 1
 
       - name: Read Rust toolchain version
         id: read_rust_toolchain
@@ -101,86 +102,16 @@ jobs:
           channel=$(grep '^channel' rust-toolchain.toml | sed 's/.*= *"\(.*\)"/\1/')
           echo "value=$channel" >> "$GITHUB_OUTPUT"
 
-      - name: Install unzip on Linux runners
-        if: runner.os == 'Linux'
+      - name: Install unzip
         run: |
           sudo apt-get update
           sudo apt-get install -y unzip
 
-      - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v1
+      - name: 缓存 cargo 编译产物
+        uses: Swatinem/rust-cache@v2
         with:
-          command: build
-          target: ${{ matrix.platform.target }}
-          toolchain: ${{ steps.read_rust_toolchain.outputs.value }}
-          args: "--locked --release -p bili_sync"
-          strip: true
-
-      - name: Package archive
-        shell: bash
-        run: |
-          cd target/${{ matrix.platform.target }}/release
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            7z a "../../../${{ matrix.platform.archive_name }}" "${{ matrix.platform.bin }}"
-          else
-            tar czf "../../../${{ matrix.platform.archive_name }}" "${{ matrix.platform.bin }}"
-          fi
-
-      - name: Upload release package
-        uses: actions/upload-artifact@v6
-        with:
-          name: ${{ matrix.platform.archive_name }}
-          path: ${{ github.workspace }}/${{ matrix.platform.archive_name }}
-
-  # macOS 单独拆开：GitHub 托管 macOS runner 容量长期紧张，排队约 15 分钟拿不到
-  # 机器就会被直接 cancel（runner 名称为空、steps 为空，注解是 not acquired by
-  # Runner of type hosted），和代码无关。PR 阶段不跑 macOS（其余 5 个平台照常全量
-  # 构建）；push 到 main / 发 tag 时仍然构建 macOS 产物，保证 release 资产齐全。
-  build_macos:
-    # 静态名字：PR 阶段整 job 被跳过时不会显示成未展开的 ${{ matrix... }}。
-    # 两个矩阵项在 tag / main 的 run 里通过产物名区分。
-    name: Build macOS
-    needs: build_frontend
-    if: github.event_name != 'pull_request'
-    runs-on: ${{ matrix.platform.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: x86_64-apple-darwin
-            os: macos-15
-            name: macos-x86_64
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-macos-x86_64.tar.gz
-          - target: aarch64-apple-darwin
-            os: macos-latest
-            name: macos-aarch64
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-macos-aarch64.tar.gz
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Reset frontend build output
-        shell: bash
-        run: |
-          rm -rf web/build
-          mkdir -p web/build
-
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: web-build
-          path: web/build
-
-      - name: Read Rust toolchain version
-        id: read_rust_toolchain
-        shell: bash
-        run: |
-          channel=$(grep '^channel' rust-toolchain.toml | sed 's/.*= *"\(.*\)"/\1/')
-          echo "value=$channel" >> "$GITHUB_OUTPUT"
+          key: build-${{ matrix.platform.target }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v1
@@ -202,21 +133,21 @@ jobs:
         with:
           name: ${{ matrix.platform.archive_name }}
           path: ${{ github.workspace }}/${{ matrix.platform.archive_name }}
+          retention-days: 1
 
   release:
     name: Create release
-    needs: [build, build_macos]
-    # 发版时不要把整个 release 卡在 macOS 上：GitHub 的 macOS runner 经常因为排队
-    # 超时被直接 cancel（与代码无关）。只要 Windows / Linux 全绿就发布，macOS 产物
-    # 有就一起带上，没有就缺这两个资产（之后可单独重跑补）。
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success'
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - name: Download release artifacts
         uses: actions/download-artifact@v8
         with:
+          pattern: bili-sync-rs-*
           merge-multiple: true
 
       - name: Publish GitHub release
@@ -226,53 +157,3 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-
-
-  # ── 群晖 SPK：从本次 Release 的 Linux 静态二进制打 DSM 7 套件 ──────────────
-  # 不编译 Rust：直接消费上面 build job 产出的 musl 二进制 + 静态 ffmpeg。
-  # 只在打 v* tag 时跑，产物上传到同一个 Release。
-  spk:
-    name: Build SPK (${{ matrix.arch }})
-    needs: release
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x86_64
-            asset: bili-sync-rs-Linux-x86_64-musl.tar.gz
-          - arch: armv8
-            asset: bili-sync-rs-Linux-aarch64-musl.tar.gz
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Download Linux binary artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ matrix.asset }}
-          path: dist
-
-      - name: Build SPK
-        run: |
-          chmod +x synology/build-spk.sh
-          ./synology/build-spk.sh \
-            --tag "$GITHUB_REF_NAME" \
-            --arch "${{ matrix.arch }}" \
-            --binary "dist/${{ matrix.asset }}" \
-            --outdir dist/spk
-
-      - name: Upload SPK to the release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" dist/spk/*.spk --clobber
-
-      - name: Upload SPK as workflow artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: spk-${{ matrix.arch }}
-          path: dist/spk/*.spk
-          if-no-files-found: error

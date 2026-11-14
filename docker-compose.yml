@@ -1,6 +1,6 @@
 services:
   bili-sync:
-    # image: bili-sync:latest
+    # image: ghcr.io/lurenyang418/hei:latest
     # 如果想本地构建，取消注释下面三行
     build:
       context: .

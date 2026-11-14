@@ -40,16 +40,13 @@ export default {
       {
         text: '进阶',
         items: [
-          { text: '任务队列管理', link: '/queue-management' },
-          { text: 'YouTube 登录', link: '/youtube-login' },
-          { text: 'TikTok 登录', link: '/tiktok-login' }
+          { text: '任务队列管理', link: '/queue-management' }
         ]
       },
       {
         text: '设计文档',
         items: [
           { text: '源级充电视频重试设计', link: '/superpowers/specs/2026-06-18-retry-charge-videos-design' },
-          { text: '哔哩哔哩漫画源设计', link: '/superpowers/specs/2026-10-03-bilibili-manga-source-design' }
         ]
       }
     ],

@@ -133,12 +133,6 @@ pub struct FilterOption {
     pub no_dolby_audio: bool,
     pub no_hdr: bool,
     pub no_hires: bool,
-    #[serde(default = "default_prefer_douyin_original")]
-    pub prefer_douyin_original: bool,
-}
-
-fn default_prefer_douyin_original() -> bool {
-    true
 }
 
 impl Default for FilterOption {
@@ -153,7 +147,6 @@ impl Default for FilterOption {
             no_dolby_audio: false,
             no_hdr: false,
             no_hires: false,
-            prefer_douyin_original: true,
         }
     }
 }

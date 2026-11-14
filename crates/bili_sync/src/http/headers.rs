@@ -93,11 +93,10 @@ mod tests {
 
     #[test]
     fn aria2_headers_override_platform_referer() {
-        let headers = create_aria2_headers_with_referer("https://www.douyin.com/");
+        let headers = create_aria2_headers_with_referer("https://www.bilibili.com/");
 
         assert!(headers
             .iter()
-            .any(|header| header == "Referer: https://www.douyin.com/"));
-        assert!(!headers.iter().any(|header| header.contains("bilibili.com")));
+            .any(|header| header == "Referer: https://www.bilibili.com/"));
     }
 }

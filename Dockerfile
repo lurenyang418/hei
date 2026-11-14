@@ -5,12 +5,11 @@ ARG BILI_SYNC_RELEASE_CHANNEL=stable
 
 WORKDIR /app
 
+# ffmpeg：B 站音视频合并、章节切分等
 RUN apk update && apk add --no-cache \
     ca-certificates \
     tzdata \
-    ffmpeg \
-    quickjs \
-    nodejs
+    ffmpeg
 
 # 复制所有Linux二进制文件
 COPY ./bili-sync-rs-Linux-*.tar.gz ./
@@ -40,7 +39,6 @@ ENV LANG=zh_CN.UTF-8 \
     TZ=Asia/Shanghai \
     HOME=/app \
     BILI_SYNC_CONTAINER=1 \
-    BILI_SYNC_YTDLP_JS_RUNTIME=/usr/bin/qjs \
     RUST_BACKTRACE=1 \
     RUST_LOG=None,bili_sync=info
 
