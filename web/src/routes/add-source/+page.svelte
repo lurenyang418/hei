@@ -6,6 +6,9 @@
 	import api from '$lib/api';
 	import BatchCheckbox from '$lib/components/batch-checkbox.svelte';
 	import BiliImage from '$lib/components/bili-image.svelte';
+	import BatchActionBar from '$lib/components/add-source/batch-action-bar.svelte';
+	import HoverDetailCard from '$lib/components/add-source/hover-detail-card.svelte';
+	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import FilterOptionEditor from '$lib/components/filter-option-editor.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/empty-state.svelte';
@@ -28,6 +31,9 @@
 		UserFollowing,
 		BangumiSeasonInfo,
 		BangumiSourceOption,
+		HoveredItem,
+		BatchSelectedItem,
+		BatchSelectedItemData,
 		PugvCourseItem,
 		ValidateFavoriteResponse,
 		ConfigResponse,
@@ -256,23 +262,6 @@
 
 	// 批量添加相关
 	let batchMode = false; // 是否为批量模式
-	// 批量选择项在「搜索/关注/收藏夹/合集/番剧」分支里分别是不同接口的返回值，这里只声明实际用到的字段
-	type BatchSelectedItemData = {
-		title?: string;
-		name?: string;
-		season_title?: string;
-		full_title?: string;
-		mid?: number | string;
-		up_mid?: number | string;
-		bvid?: string;
-		season_id?: number | string;
-		id?: number | string;
-		fid?: number | string;
-		sid?: number | string;
-		collection_type?: string;
-		cover?: string;
-	};
-	type BatchSelectedItem = { type: string; data: BatchSelectedItemData; name: string };
 	let batchSelectedItems: Map<string, BatchSelectedItem> = new SvelteMap(); // 存储选中项 {key: {type, data, name}}
 	let batchCheckboxStates: Record<string, boolean> = {}; // 存储checkbox状态的响应式对象
 	let batchBasePath = '/Downloads'; // 批量基础路径
@@ -296,9 +285,6 @@
 	}
 
 	// 悬停详情相关
-	type HoveredItem =
-		| { type: 'search'; data: SearchResultItem }
-		| { type: 'season'; data: BangumiSeasonInfo };
 	let hoveredItem: HoveredItem | null = null;
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 	let mousePosition = { x: 0, y: 0 };
@@ -5591,357 +5577,45 @@
 
 <!-- 批量操作工具栏 -->
 {#if batchMode && batchSelectedItems.size > 0}
-	<div
-		class="fixed {isMobile
-			? 'right-4 bottom-4 left-4'
-			: 'bottom-6 left-1/2 -translate-x-1/2'} z-50 rounded-lg border border-blue-500 bg-blue-600 px-4 py-3 text-white shadow-xl transition-all duration-300 dark:border-blue-600 dark:bg-blue-700"
-		transition:fly={{ y: 100, duration: 300 }}
-	>
-		<div class="flex {isMobile ? 'flex-col gap-3' : 'items-center gap-4'}">
-			<div class="text-sm font-medium {isMobile ? 'text-center' : ''}">
-				已选择 {batchSelectedItems.size} 个视频源
-			</div>
-			<div class="flex gap-2 {isMobile ? 'justify-center' : ''}">
-				<Button
-					size="sm"
-					variant="secondary"
-					onclick={clearBatchSelection}
-					class="border-white/30 bg-white/20 text-xs text-white hover:bg-white/30"
-				>
-					清空
-				</Button>
-				<Button
-					size="sm"
-					variant="secondary"
-					onclick={openBatchDialog}
-					disabled={batchAdding}
-					class="bg-white text-xs text-blue-600 hover:bg-gray-100 dark:text-blue-700"
-				>
-					{batchAdding ? '添加中...' : '批量添加'}
-				</Button>
-			</div>
-		</div>
-		{#if batchAdding}
-			<div class="mt-2 text-xs text-blue-100 dark:text-blue-200 {isMobile ? 'text-center' : ''}">
-				正在添加 ({batchProgress.current}/{batchProgress.total})
-			</div>
-		{/if}
-	</div>
+	<BatchActionBar
+		{isMobile}
+		selectedCount={batchSelectedItems.size}
+		adding={batchAdding}
+		progress={batchProgress}
+		onClear={clearBatchSelection}
+		onOpenDialog={openBatchDialog}
+	/>
 {/if}
 
 <!-- 统一的悬停详情框 -->
-{#if hoveredItem}
-	<div
-		class="bg-card pointer-events-none fixed z-50 max-w-md rounded-lg border p-4 shadow-2xl transition-all duration-150 ease-out"
-		style="left: {mousePosition.x}px; top: {mousePosition.y}px;"
-		transition:fade={{ duration: 200 }}
-	>
-		{#if hoveredItem.type === 'search'}
-			<!-- 搜索结果详情内容 -->
-			<div class="flex gap-4">
-				<BiliImage
-					src={hoveredItem.data.cover}
-					alt={hoveredItem.data.title}
-					class="{sourceType === 'bangumi'
-						? 'h-32 w-24'
-						: 'h-20 w-32'} flex-shrink-0 rounded object-cover"
-					placeholder="无图片"
-					placeholderClass="text-sm"
-				/>
-				<div class="min-w-0 flex-1">
-					<div class="mb-1 flex items-center gap-2">
-						<h4 class="flex-1 text-sm font-semibold">
-							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-							{@html hoveredItem.data.title}
-						</h4>
-						{#if hoveredItem.data.result_type}
-							<span
-								class="flex-shrink-0 rounded px-1.5 py-0.5 text-xs {hoveredItem.data.result_type ===
-								'media_bangumi'
-									? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-									: hoveredItem.data.result_type === 'media_ft'
-										? 'bg-red-100 text-red-700'
-										: hoveredItem.data.result_type === 'bili_user'
-											? 'bg-blue-100 text-blue-700'
-											: hoveredItem.data.result_type === 'video'
-												? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-												: 'text-foreground bg-gray-100'}"
-							>
-								{hoveredItem.data.result_type === 'media_bangumi'
-									? '番剧'
-									: hoveredItem.data.result_type === 'media_ft'
-										? '影视'
-										: hoveredItem.data.result_type === 'bili_user'
-											? 'UP主'
-											: hoveredItem.data.result_type === 'video'
-												? '视频'
-												: hoveredItem.data.result_type}
-							</span>
-						{/if}
-					</div>
-					<p class="text-muted-foreground mb-2 text-xs">作者：{hoveredItem.data.author}</p>
-					{#if hoveredItem.data.description}
-						<p class="text-muted-foreground mb-2 line-clamp-4 text-xs">
-							{hoveredItem.data.description}
-						</p>
-					{/if}
-					<div class="flex flex-wrap gap-2 text-xs">
-						{#if hoveredItem.data.play}
-							<span class="text-muted-foreground flex items-center gap-1">
-								<span>▶</span> 播放：{hoveredItem.data.play > 10000
-									? (hoveredItem.data.play / 10000).toFixed(1) + '万'
-									: hoveredItem.data.play}
-							</span>
-						{/if}
-						{#if hoveredItem.data.danmaku}
-							<span class="text-muted-foreground flex items-center gap-1">
-								<span>💬</span> 弹幕：{hoveredItem.data.danmaku > 10000
-									? (hoveredItem.data.danmaku / 10000).toFixed(1) + '万'
-									: hoveredItem.data.danmaku}
-							</span>
-						{/if}
-						{#if sourceType === 'bangumi' && hoveredItem.data.season_id}
-							<span class="text-muted-foreground">Season ID: {hoveredItem.data.season_id}</span>
-						{/if}
-						{#if hoveredItem.data.bvid}
-							<span class="text-muted-foreground">BV号: {hoveredItem.data.bvid}</span>
-						{/if}
-					</div>
-				</div>
-			</div>
-		{:else if hoveredItem.type === 'season'}
-			<!-- 季度选择详情内容 -->
-			<div class="flex gap-4">
-				<BiliImage
-					src={hoveredItem.data.cover}
-					alt={hoveredItem.data.season_title}
-					class="h-32 w-24 flex-shrink-0 rounded object-cover"
-					placeholder="无封面"
-					placeholderClass="text-sm"
-				/>
-				<div class="min-w-0 flex-1">
-					<div class="mb-1 flex items-center gap-2">
-						<h4 class="flex-1 text-sm font-semibold">
-							{hoveredItem.data.full_title || hoveredItem.data.season_title}
-						</h4>
-						<span
-							class="flex-shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700 dark:bg-purple-900 dark:text-purple-300"
-						>
-							番剧
-						</span>
-					</div>
-
-					<div class="space-y-2 text-xs">
-						{#if hoveredItem.data.description}
-							<div class="text-foreground mb-3 line-clamp-3 text-sm leading-relaxed">
-								{hoveredItem.data.description}
-							</div>
-						{/if}
-
-						<div class="flex flex-wrap gap-3">
-							<span class="text-muted-foreground"
-								>Season ID: <span class="font-mono text-gray-800 dark:text-gray-200"
-									>{hoveredItem.data.season_id}</span
-								></span
-							>
-							{#if hoveredItem.data.media_id}
-								<span class="text-muted-foreground"
-									>Media ID: <span class="font-mono text-gray-800 dark:text-gray-200"
-										>{hoveredItem.data.media_id}</span
-									></span
-								>
-							{/if}
-						</div>
-
-						{#if hoveredItem.data.episode_count}
-							<div class="text-muted-foreground flex items-center gap-1">
-								<span>📺</span> 总集数：{hoveredItem.data.episode_count} 集
-							</div>
-						{/if}
-
-						{#if hoveredItem.data.season_id === sourceId}
-							<div class="font-medium text-purple-600">🎯 当前选择的季度</div>
-						{/if}
-
-						{#if selectedSeasons.includes(hoveredItem.data.season_id)}
-							<div class="font-medium text-green-600">✅ 已选择下载</div>
-						{/if}
-					</div>
-				</div>
-			</div>
-		{/if}
-	</div>
-{/if}
+<HoverDetailCard
+	{hoveredItem}
+	mousePosition={mousePosition}
+	sourceType={sourceType}
+	{sourceId}
+	{selectedSeasons}
+/>
 
 <!-- 批量添加配置对话框 -->
-{#if batchDialogOpen}
-	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-		transition:fade
-	>
-		<div
-			class="bg-card mx-4 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border shadow-lg"
-			transition:fly={{ y: -50 }}
-		>
-			<div class="border-b p-4">
-				<h3 class="text-lg font-semibold">批量添加配置</h3>
-				<p class="text-muted-foreground mt-1 text-sm">
-					将添加 {batchSelectedItems.size} 个视频源
-				</p>
-			</div>
-
-			<div class="space-y-4 p-4">
-				<div>
-					<div class="mb-2 flex items-center justify-between gap-3">
-						<Label for="batch-base-path">本次保存路径 / 路径模板</Label>
-						{#if batchSelectedTemplate}
-							<Button
-								type="button"
-								size="sm"
-								variant="outline"
-								onclick={() => {
-									batchBasePath = batchSelectedTemplate;
-								}}
-							>
-								恢复快捷模板
-							</Button>
-						{/if}
-					</div>
-					<Input
-						id="batch-base-path"
-						bind:value={batchBasePath}
-						placeholder={batchSelectedTemplate || '/Downloads'}
-						class="mt-1"
-					/>
-					{#if batchSelectedTemplate}
-						<div
-							class="mt-2 space-y-1 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/30"
-						>
-							<p class="text-xs text-blue-700 dark:text-blue-300">
-								已从当前源类型的快捷订阅路径模板带入默认值，本次批量添加可临时改成任意路径或任意模板。
-							</p>
-							<p class="text-xs text-blue-700 dark:text-blue-300">
-								支持 <code>{'{{name}}'}</code> 变量；如果不包含该变量，则所有选中项会使用同一个路径。
-							</p>
-						</div>
-					{:else}
-						<p class="text-muted-foreground mt-1 text-xs">
-							未配置快捷模板时，所有选中的视频源将保存到此路径。支持手动填写 <code
-								>{'{{name}}'}</code
-							> 变量。
-						</p>
-					{/if}
-				</div>
-
-				<div class="space-y-3">
-					<div
-						class="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-950/30"
-					>
-						<div class="flex items-center gap-2 pr-3">
-							<SlidersHorizontalIcon class="h-4 w-4 text-blue-600 dark:text-blue-400" />
-							<div>
-								<div class="text-sm font-medium text-blue-800 dark:text-blue-200">
-									批量源级码率/流过滤
-								</div>
-								<p class="mt-1 text-xs text-blue-600 dark:text-blue-300">
-									当前设置会应用到本次批量添加的每个视频源。
-								</p>
-							</div>
-						</div>
-						<div class="flex items-center gap-2">
-							<span class="text-xs text-blue-700 dark:text-blue-300">继承全局</span>
-							<label class="relative inline-flex cursor-pointer items-center">
-								<input
-									type="checkbox"
-									bind:checked={filterOptionInheritGlobal}
-									class="peer sr-only"
-								/>
-								<div
-									class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
-								></div>
-							</label>
-						</div>
-					</div>
-
-					{#if !filterOptionInheritGlobal}
-						<div
-							class="rounded-md border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-900"
-						>
-							<FilterOptionEditor
-								value={filterOptionDraft}
-								disabled={batchAdding}
-								on:change={(event) => (filterOptionDraft = event.detail)}
-							/>
-						</div>
-					{/if}
-				</div>
-
-				{#if getBatchSelectedSourceType() === 'collection'}
-					<div class="space-y-2">
-						<Label>合集聚合</Label>
-						<div
-							class="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-950/30"
-						>
-							<div class="pr-3">
-								<div class="text-sm font-medium text-blue-800 dark:text-blue-200">
-									按同UP合集绝对顺序聚合
-								</div>
-								<p class="mt-1 text-xs text-blue-600 dark:text-blue-300">
-									批量添加的合集源将按各自UP远端合集/系列列表顺序映射 Season
-									xx，并归并到对应UP合集根目录。
-								</p>
-							</div>
-							<label class="relative inline-flex cursor-pointer items-center">
-								<input
-									type="checkbox"
-									bind:checked={batchCollectionAggregateEnabled}
-									class="peer sr-only"
-								/>
-								<div
-									class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
-								></div>
-							</label>
-						</div>
-					</div>
-				{/if}
-
-				<div class="max-h-60 overflow-y-auto rounded border">
-					<div class="space-y-2 p-3">
-						{#each Array.from(batchSelectedItems.entries()) as [itemKey, item] (itemKey)}
-							<div class="bg-muted flex items-center justify-between rounded p-2 text-sm">
-								<div class="min-w-0 flex-1">
-									<div class="truncate font-medium">{item.name}</div>
-									<div class="text-muted-foreground truncate text-xs">
-										{getBatchPathForItem(item)}
-									</div>
-								</div>
-								<span class="bg-background ml-2 rounded px-2 py-1 text-xs">
-									{getBatchItemTypeLabel(item)}
-								</span>
-							</div>
-						{/each}
-					</div>
-				</div>
-			</div>
-
-			<div class="flex justify-end gap-2 border-t p-4">
-				<Button
-					variant="outline"
-					onclick={() => {
-						batchDialogOpen = false;
-						batchCollectionAggregateEnabled = false;
-					}}
-					disabled={batchAdding}
-				>
-					取消
-				</Button>
-				<Button onclick={handleBatchAdd} disabled={batchAdding || !canStartBatchAdd()}>
-					{batchAdding ? '添加中...' : '开始添加'}
-				</Button>
-			</div>
-		</div>
-	</div>
-{/if}
+<BatchConfigDialog
+	open={batchDialogOpen}
+	selectedItems={batchSelectedItems}
+	bind:batchBasePath
+	selectedTemplate={batchSelectedTemplate}
+	bind:filterOptionInheritGlobal
+	bind:filterOptionDraft
+	bind:collectionAggregateEnabled={batchCollectionAggregateEnabled}
+	adding={batchAdding}
+	selectedSourceType={getBatchSelectedSourceType()}
+	canStart={canStartBatchAdd()}
+	getPathForItem={getBatchPathForItem}
+	getItemTypeLabel={getBatchItemTypeLabel}
+	onStart={handleBatchAdd}
+	onCancel={() => {
+		batchDialogOpen = false;
+		batchCollectionAggregateEnabled = false;
+	}}
+/>
 
 <style>
 	/* 限制描述文字的行数 */

@@ -773,6 +773,30 @@ export interface BangumiSeasonsResponse {
 	data: BangumiSeasonInfo[];
 }
 
+// add-source 页面的悬停详情项（搜索结果 / 番剧季度）
+export type HoveredItem =
+	| { type: 'search'; data: SearchResultItem }
+	| { type: 'season'; data: BangumiSeasonInfo };
+
+// add-source 批量选择项在「搜索/关注/收藏夹/合集/番剧」分支里分别是不同接口的返回值，这里只声明实际用到的字段
+export type BatchSelectedItemData = {
+	title?: string;
+	name?: string;
+	season_title?: string;
+	full_title?: string;
+	mid?: number | string;
+	up_mid?: number | string;
+	bvid?: string;
+	season_id?: number | string;
+	id?: number | string;
+	fid?: number | string;
+	sid?: number | string;
+	collection_type?: string;
+	cover?: string;
+};
+
+export type BatchSelectedItem = { type: string; data: BatchSelectedItemData; name: string };
+
 // 讲师（UP 主）名下的一门课程
 export interface PugvCourseItem {
 	season_id: string;
