@@ -89,7 +89,7 @@ targets/
 # Log files
 日志
 *.log
-log*
+/log*
 # Dockerfile copies
 Dockerfile*副本
 Dockerfile - 副本

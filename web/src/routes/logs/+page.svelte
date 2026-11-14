@@ -11,7 +11,8 @@
 	import api from '$lib/api';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
-	import { RefreshCw, Download, AlertTriangle, XCircle, Info, Bug } from '@lucide/svelte';
+	import { RefreshCw, Download } from '@lucide/svelte';
+	import LogEntryList from '$lib/components/log-entry-list.svelte';
 
 	// 日志级别类型
 	type LogLevel = 'info' | 'warn' | 'error' | 'debug';
@@ -72,23 +73,6 @@
 	let currentPage = 1;
 	let totalPages = 0;
 	let perPage = 100;
-
-	// 日志级别颜色映射
-	const levelColors: Record<LogLevel, string> = {
-		info: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-		warn: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-		error: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-		debug: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-	};
-
-	// 日志级别图标映射
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const levelIcons: Record<LogLevel, any> = {
-		info: Info,
-		warn: AlertTriangle,
-		error: XCircle,
-		debug: Bug
-	};
 
 	// 检查认证状态
 	async function checkAuth(): Promise<boolean> {
@@ -1027,64 +1011,15 @@
 					</Card.Description>
 				</Card.Header>
 				<Card.Content class="p-0">
-					<div
-						bind:this={logsContainer}
-						class="h-[600px] overflow-auto"
-						role="log"
-						aria-label="系统日志列表"
-						aria-live="off"
-						on:mouseenter={handleLogsMouseEnter}
-						on:mouseleave={handleLogsMouseLeave}
-					>
-						{#if filteredLogs.length === 0}
-							<div class="text-muted-foreground flex h-32 items-center justify-center">
-								{isLoading ? '加载中...' : '暂无日志'}
-							</div>
-						{:else}
-							<div class="space-y-1 p-4">
-								{#each filteredLogs as log, index (index)}
-									<div class="mb-3 border-b border-gray-100 pb-3 last:border-b-0">
-										<div class="flex {isMobile ? 'flex-col gap-2' : 'items-start justify-between'}">
-											<div class="flex flex-1 items-start gap-3">
-												<svelte:component
-													this={levelIcons[log.level]}
-													class="mt-1 h-4 w-4 flex-shrink-0 text-{log.level === 'error'
-														? 'red'
-														: log.level === 'warn'
-															? 'yellow'
-															: log.level === 'info'
-																? 'blue'
-																: 'gray'}-500"
-												/>
-												<div class="min-w-0 flex-1">
-													<div
-														class="flex {isMobile ? 'flex-col gap-1' : 'items-center gap-2'} mb-1"
-													>
-														<Badge variant="outline" class={levelColors[log.level]}>
-															{log.level.toUpperCase()}
-														</Badge>
-														{#if log.target}
-															<span class="text-muted-foreground font-mono text-xs"
-																>{log.target}</span
-															>
-														{/if}
-													</div>
-													<p class="text-sm break-words">{log.message}</p>
-												</div>
-											</div>
-											<div
-												class="text-muted-foreground font-mono text-xs {isMobile
-													? 'text-left'
-													: 'text-right'} flex-shrink-0"
-											>
-												{formatTimestamp(log.timestamp)}
-											</div>
-										</div>
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</div>
+					<LogEntryList
+						bind:container={logsContainer}
+						logs={filteredLogs}
+						{isLoading}
+						{isMobile}
+						{formatTimestamp}
+						onMouseEnter={handleLogsMouseEnter}
+						onMouseLeave={handleLogsMouseLeave}
+					/>
 
 					<!-- 分页控件 -->
 					{#if totalPages > 1}
