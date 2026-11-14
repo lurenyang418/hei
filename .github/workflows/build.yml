@@ -155,5 +155,5 @@ jobs:
         with:
           files: bili-sync-rs*
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'dev') }}
           generate_release_notes: true
