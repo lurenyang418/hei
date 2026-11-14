@@ -11,6 +11,8 @@
 	import { HoverTooltipStore } from '$lib/stores/add-source/hover.svelte';
 	import { SubmissionSelectionStore } from '$lib/stores/add-source/submission.svelte';
 	import { BatchSelectionStore } from '$lib/stores/add-source/batch.svelte';
+	import { BangumiSeasonStore } from '$lib/stores/add-source/bangumi.svelte';
+	import { PugvCourseStore } from '$lib/stores/add-source/pugv.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -111,6 +113,14 @@
 		cleanTitle: (title) => cleanTitle(title),
 		getFavoriteDisplayName: (item) => getFavoriteDisplayName(item)
 	});
+
+	const bangumi = new BangumiSeasonStore({
+		getSourceId: () => sourceId,
+		getSourceType: () => sourceType,
+		isSeasonExists: (seasonId) => isBangumiSeasonExists(seasonId)
+	});
+
+	const pugv = new PugvCourseStore();
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -261,25 +271,8 @@
 	let userFollowings: UserFollowing[] = [];
 	let loadingFollowings = false;
 
-	// 番剧季度相关
-	let bangumiSeasons: BangumiSeasonInfo[] = [];
-	let loadingSeasons = false;
-	let selectedSeasons: string[] = [];
-	let bangumiSeasonsFetchAttempted = false;
-	let seasonIdTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	// 课程（pugv）相关：先选讲师（UP 主），再挑要下载的课程
-	let pugvUpMid = '';
-	let pugvUpName = '';
-	let pugvCourses: PugvCourseItem[] = [];
-	let loadingPugvCourses = false;
-	let pugvCoursesFetchAttempted = false;
-	let selectedPugvSeasonIds: string[] = [];
-	let existingPugvSeasonIds: Set<string> = new Set();
 
-	// 番剧合并相关
-	let existingBangumiSources: BangumiSourceOption[] = [];
-	let mergeToSourceId: number | null = null;
 	let cachedNameBeforeMerge = '';
 	let cachedPathBeforeMerge = '';
 	let isUsingMergedSourceMeta = false;
@@ -289,7 +282,6 @@
 	let existingFavoriteIds: Set<number> = new SvelteSet();
 	let existingSubmissionIds: Set<number> = new SvelteSet();
 	let existingBangumiSeasonIds: Set<string> = new SvelteSet();
-	let isMergingBangumi = false;
 
 	// 关键词过滤器相关（双列表模式）
 	let blacklistKeywords: string[] = [];
@@ -434,7 +426,7 @@
 		sourceName: string,
 		force = false
 	): boolean {
-		if (isMergingBangumi) return false;
+		if (bangumi.isMerging) return false;
 
 		const template = getQuickSubscriptionTemplate(type).trim();
 		if (!template || !sourceName.trim()) return false;
@@ -537,16 +529,15 @@
 		// 清理定时器
 		hover.destroy();
 		submission.destroy();
+		bangumi.destroy();
 		if (upIdTimeout) clearTimeout(upIdTimeout);
-		if (seasonIdTimeout) clearTimeout(seasonIdTimeout);
 		if (favoriteValidationTimeout) clearTimeout(favoriteValidationTimeout);
 	});
 
-	$: isMergingBangumi = sourceType === 'bangumi' && mergeToSourceId !== null;
 
 	$: {
-		if (isMergingBangumi) {
-			const targetSource = existingBangumiSources.find((source) => source.id === mergeToSourceId);
+		if (bangumi.isMerging) {
+			const targetSource = bangumi.existingSources.find((source) => source.id === bangumi.mergeToSourceId);
 			if (targetSource) {
 				if (!isUsingMergedSourceMeta) {
 					cachedNameBeforeMerge = name;
@@ -722,14 +713,14 @@
 			case 'pugv':
 				// 课程：先选讲师（UP 主），随后列出该讲师名下所有课程供勾选
 				if (result.mid) {
-					pugvUpMid = result.mid.toString();
-					pugvUpName = cleanTitle(result.title);
-					pugvCourses = [];
-					selectedPugvSeasonIds = [];
-					pugvCoursesFetchAttempted = false;
-					name = pugvUpName;
+					pugv.upMid = result.mid.toString();
+					pugv.upName = cleanTitle(result.title);
+					pugv.courses = [];
+					pugv.selectedSeasonIds = [];
+					pugv.fetchAttempted = false;
+					name = pugv.upName;
 					applyQuickSubscriptionPath('pugv', name, true);
-					void fetchPugvUpCourses();
+					void pugv.fetchCourses();
 					toast.success('已选择UP主', { description: '正在获取该UP主的课程列表…' });
 				}
 				break;
@@ -963,7 +954,7 @@
 
 
 		// 验证表单
-		const isPugvUpFlow = sourceType === 'pugv' && !!(pugvUpMid && pugvCourses.length > 0);
+		const isPugvUpFlow = sourceType === 'pugv' && !!(pugv.upMid && pugv.courses.length > 0);
 		if (sourceType !== 'watch_later' && !sourceId && !isPugvUpFlow) {
 			toast.error('请输入ID', { description: '视频源ID不能为空' });
 			return;
@@ -992,7 +983,7 @@
 		// 番剧特殊验证
 		if (sourceType === 'bangumi') {
 			// 如果不是下载全部季度，且没有选择任何季度，且不是单季度情况，则提示错误
-			if (!downloadAllSeasons && selectedSeasons.length === 0 && bangumiSeasons.length > 1) {
+			if (!downloadAllSeasons && bangumi.selected.length === 0 && bangumi.seasons.length > 1) {
 				toast.error('请选择要下载的季度', {
 					description: '未选择"下载全部季度"时，至少需要选择一个季度'
 				});
@@ -1039,12 +1030,12 @@
 		if (sourceType === 'bangumi') {
 			params.download_all_seasons = downloadAllSeasons;
 			// 如果选择了特定季度，添加selected_seasons参数
-			if (selectedSeasons.length > 0 && !downloadAllSeasons) {
-				params.selected_seasons = selectedSeasons;
+			if (bangumi.selected.length > 0 && !downloadAllSeasons) {
+				params.selected_seasons = bangumi.selected;
 			}
 			// 如果选择了合并到现有番剧源，添加merge_to_source_id参数
-			if (mergeToSourceId) {
-				params.merge_to_source_id = mergeToSourceId;
+			if (bangumi.mergeToSourceId) {
+				params.merge_to_source_id = bangumi.mergeToSourceId;
 			}
 		}
 
@@ -1072,16 +1063,16 @@
 		// 课程：勾选的每门课各自作为一个视频源；未勾选则添加该讲师名下的全部课程
 		if (isPugvUpFlow) {
 			const targets =
-				selectedPugvSeasonIds.length > 0
-					? pugvCourses.filter((course) => selectedPugvSeasonIds.includes(course.season_id))
-					: pugvCourses;
+				pugv.selectedSeasonIds.length > 0
+					? pugv.courses.filter((course) => pugv.selectedSeasonIds.includes(course.season_id))
+					: pugv.courses;
 
 			const summary = await runRequest(
 				async () => {
 					let added = 0;
 					const failed: string[] = [];
 					for (const course of targets) {
-						if (existingPugvSeasonIds.has(course.season_id)) continue;
+						if (pugv.existingSeasonIds.has(course.season_id)) continue;
 						try {
 							const addedResult = await api.addVideoSource({
 								...params,
@@ -1222,12 +1213,12 @@
 			collectionType = 'season';
 			collectionAggregateEnabled = false;
 			isManualInput = false;
-			bangumiSeasons = [];
-			selectedSeasons = [];
+			bangumi.seasons = [];
+			bangumi.selected = [];
 			submission.selectedVideos = [];
 			submission.selectedUpName = '';
-			mergeToSourceId = null;
-			existingBangumiSources = [];
+			bangumi.mergeToSourceId = null;
+			bangumi.existingSources = [];
 			blacklistKeywords = [];
 			whitelistKeywords = [];
 			newBlacklistKeyword = '';
@@ -1548,131 +1539,14 @@
 	// 处理Season ID变化
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function handleSeasonIdChange() {
-		if (seasonIdTimeout) clearTimeout(seasonIdTimeout);
-		if (sourceId.trim() && sourceType === 'bangumi') {
-			bangumiSeasonsFetchAttempted = false;
-			seasonIdTimeout = setTimeout(() => {
-				fetchBangumiSeasons();
-			}, 500);
-		} else {
-			bangumiSeasonsFetchAttempted = false;
-			bangumiSeasons = [];
-			selectedSeasons = [];
-		}
+		bangumi.handleSeasonIdChange();
 	}
 
-	// 获取讲师（UP 主）名下的全部课程
-	async function fetchPugvUpCourses() {
-		if (!pugvUpMid.trim()) return;
 
-		pugvCoursesFetchAttempted = true;
-		const result = await runRequest(() => api.getPugvUpCourses(pugvUpMid.trim()), {
-			setLoading: (value) => (loadingPugvCourses = value),
-			context: '获取UP主课程列表失败',
-			onError: () => {
-				pugvCourses = [];
-				selectedPugvSeasonIds = [];
-			}
-		});
-		if (!result) return;
 
-		if (result.data && result.data.success) {
-			pugvCourses = result.data.data || [];
-			// 默认不勾选：不勾选即代表添加该 UP 主的全部课程
-			selectedPugvSeasonIds = [];
-			if (pugvCourses.length === 0) {
-				toast.warning('该UP主暂无课程', { description: '请确认搜索到的是正确的讲师账号' });
-			} else {
-				toast.success(`已获取到 ${pugvCourses.length} 门课程`, {
-					description: '勾选要下载的课程，不勾选则全部下载'
-				});
-			}
-		} else {
-			pugvCourses = [];
-			selectedPugvSeasonIds = [];
-		}
-	}
 
-	// 切换某门课程的勾选状态
-	function togglePugvSeasonSelection(seasonId: string) {
-		if (existingPugvSeasonIds.has(seasonId)) return;
-		if (selectedPugvSeasonIds.includes(seasonId)) {
-			selectedPugvSeasonIds = selectedPugvSeasonIds.filter((id) => id !== seasonId);
-		} else {
-			selectedPugvSeasonIds = [...selectedPugvSeasonIds, seasonId];
-		}
-	}
 
-	// 全选 / 取消全选（已添加过的课程不参与）
-	function toggleAllPugvCourses() {
-		const selectable = pugvCourses
-			.map((course) => course.season_id)
-			.filter((seasonId) => !existingPugvSeasonIds.has(seasonId));
-		if (selectedPugvSeasonIds.length > 0) {
-			selectedPugvSeasonIds = [];
-		} else {
-			selectedPugvSeasonIds = selectable;
-		}
-	}
 
-	// 关闭讲师课程面板
-	function clearPugvUpSelection() {
-		pugvUpMid = '';
-		pugvUpName = '';
-		pugvCourses = [];
-		selectedPugvSeasonIds = [];
-		pugvCoursesFetchAttempted = false;
-	}
-
-	// 获取番剧季度信息
-	async function fetchBangumiSeasons() {
-		if (!sourceId.trim() || sourceType !== 'bangumi') return;
-
-		bangumiSeasonsFetchAttempted = true;
-		const result = await runRequest(() => api.getBangumiSeasons(sourceId), {
-			setLoading: (value) => (loadingSeasons = value),
-			context: '获取季度信息失败',
-			onError: () => {
-				bangumiSeasons = [];
-				selectedSeasons = [];
-			}
-		});
-		if (!result) return;
-
-		if (result.data && result.data.success) {
-			bangumiSeasons = result.data.data || [];
-			// 默认选中当前季度
-			if (bangumiSeasons.length > 0) {
-				const currentSeason = bangumiSeasons.find((s) => s.season_id === sourceId);
-				if (currentSeason) {
-					selectedSeasons = [currentSeason.season_id];
-				}
-			}
-			// 如果只有一个季度，自动选中它
-			if (bangumiSeasons.length === 1) {
-				selectedSeasons = [bangumiSeasons[0].season_id];
-			}
-		} else {
-			bangumiSeasons = [];
-		}
-	}
-
-	// 获取现有番剧源列表（用于合并选择）
-	async function fetchExistingBangumiSources() {
-		const result = await runRequest(() => api.getBangumiSourcesForMerge(), {
-			context: '获取现有番剧源失败',
-			onError: () => {
-				existingBangumiSources = [];
-			}
-		});
-		if (!result) return;
-
-		if (result.data && result.data.success) {
-			existingBangumiSources = result.data.bangumi_sources;
-		} else {
-			existingBangumiSources = [];
-		}
-	}
 
 	// 加载已有视频源（用于过滤）
 	async function loadExistingVideoSources() {
@@ -1716,15 +1590,15 @@
 			if (b.selected_seasons) {
 				try {
 					// 检查 selected_seasons 是字符串还是已经解析的数组
-					let selectedSeasons;
+					let parsedSeasons;
 					if (typeof b.selected_seasons === 'string') {
-						selectedSeasons = JSON.parse(b.selected_seasons);
+						parsedSeasons = JSON.parse(b.selected_seasons);
 					} else {
-						selectedSeasons = b.selected_seasons;
+						parsedSeasons = b.selected_seasons;
 					}
 
-					if (Array.isArray(selectedSeasons)) {
-						selectedSeasons.forEach((seasonId) => {
+					if (Array.isArray(parsedSeasons)) {
+						parsedSeasons.forEach((seasonId) => {
 							// 确保统一转换为字符串进行比较
 							const seasonIdStr = seasonId.toString();
 							existingBangumiSeasonIds.add(seasonIdStr);
@@ -1737,7 +1611,7 @@
 		});
 
 		// 处理课程（每门课程一个源，按 season_id 去重）
-		existingPugvSeasonIds = new Set(
+		pugv.existingSeasonIds = new Set(
 			(result.data.pugv ?? [])
 				.map((p) => (p.season_id ? p.season_id.toString() : ''))
 				.filter((seasonId) => seasonId.length > 0)
@@ -1779,25 +1653,6 @@
 		return existingBangumiSeasonIds.has(seasonId.toString());
 	}
 
-	// 切换季度选择
-	function toggleSeasonSelection(seasonId: string) {
-		// 检查季度是否已存在
-		if (isBangumiSeasonExists(seasonId)) {
-			const seasonName =
-				filteredBangumiSeasons.find((s) => s.season_id === seasonId)?.season_title || '该季度';
-			toast.error('季度已存在', {
-				description: `${seasonName}已经添加过了`
-			});
-			return;
-		}
-
-		const index = selectedSeasons.indexOf(seasonId);
-		if (index === -1) {
-			selectedSeasons = [...selectedSeasons, seasonId];
-		} else {
-			selectedSeasons = selectedSeasons.filter((id) => id !== seasonId);
-		}
-	}
 
 	// 过滤后的收藏夹列表（不完全过滤，而是标记已存在状态）
 	$: filteredUserFavorites = userFavorites;
@@ -1820,7 +1675,7 @@
 	});
 
 	// 过滤后的番剧季度列表（标记已存在的季度）
-	$: filteredBangumiSeasons = bangumiSeasons.map((season) => ({
+	$: filteredBangumiSeasons = bangumi.seasons.map((season) => ({
 		...season,
 		isExisting: isBangumiSeasonExists(season.season_id)
 	}));
@@ -1834,15 +1689,15 @@
 
 	// 监听sourceType变化，清理季度相关状态
 	$: if (sourceType !== 'bangumi') {
-		bangumiSeasonsFetchAttempted = false;
-		bangumiSeasons = [];
-		selectedSeasons = [];
-		mergeToSourceId = null;
+		bangumi.fetchAttempted = false;
+		bangumi.seasons = [];
+		bangumi.selected = [];
+		bangumi.mergeToSourceId = null;
 	}
 
 	// 当源类型改为番剧时，获取现有番剧源列表
 	$: if (sourceType === 'bangumi') {
-		fetchExistingBangumiSources();
+		bangumi.fetchExistingSources();
 	}
 
 	// 监听sourceType变化，重置手动输入标志和清空所有缓存
@@ -1865,12 +1720,12 @@
 		selectedUserId = '';
 		selectedUserName = '';
 		loadingSearchedUserFavorites = false;
-		// 注意：bangumiSeasons 和 selectedSeasons 在另一个响应式语句中处理
+		// 注意：bangumi.seasons 和 bangumi.selected 在另一个响应式语句中处理
 	}
 
 	// 监听 source_id 变化，自动获取季度信息
 	$: if (sourceType === 'bangumi' && sourceId) {
-		fetchBangumiSeasons();
+		bangumi.fetchSeasons();
 	}
 
 	// 切换源类型时，如处于批量模式且已有选择，则清空选择防止跨源类型
@@ -2477,11 +2332,11 @@
 												sourceId = normalizePugvSeasonId(sourceId);
 											}
 										}}
-										required={!(sourceType === 'pugv' && !!pugvUpMid)}
+										required={!(sourceType === 'pugv' && !!pugv.upMid)}
 									/>
 									{#if sourceType === 'pugv'}
 										<p class="text-muted-foreground text-xs">
-											{#if pugvUpMid}
+											{#if pugv.upMid}
 												已在右侧选择讲师，此处可留空；添加时会使用勾选课程的课程 ID
 											{:else}
 												可直接粘贴课程链接，例如 https://www.bilibili.com/cheese/play/ss713799843
@@ -2510,14 +2365,14 @@
 									{/if}
 
 									<!-- 下载所有季度（仅番剧时显示，紧跟在Season ID后面） -->
-									{#if sourceType === 'bangumi' && sourceId && bangumiSeasons.length > 0 && !loadingSeasons}
+									{#if sourceType === 'bangumi' && sourceId && bangumi.seasons.length > 0 && !bangumi.loading}
 										<div class="mt-3 flex items-center space-x-2">
 											<input
 												type="checkbox"
 												id="download-all-seasons"
 												bind:checked={downloadAllSeasons}
 												onchange={() => {
-													if (downloadAllSeasons) selectedSeasons = [];
+													if (downloadAllSeasons) bangumi.selected = [];
 												}}
 												class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 											/>
@@ -2532,33 +2387,33 @@
 											<p class="mt-1 ml-6 text-xs text-purple-600">
 												勾选后将下载该番剧的所有季度，无需单独选择
 											</p>
-										{:else if bangumiSeasons.length > 1}
+										{:else if bangumi.seasons.length > 1}
 											<p class="mt-1 ml-6 text-xs text-purple-600">
-												检测到 {bangumiSeasons.length} 个相关季度，请在{isCompactLayout
+												检测到 {bangumi.seasons.length} 个相关季度，请在{isCompactLayout
 													? '下方'
 													: '右侧'}选择要下载的季度
 											</p>
-										{:else if bangumiSeasons.length === 1}
+										{:else if bangumi.seasons.length === 1}
 											<p class="mt-1 ml-6 text-xs text-purple-600">该番剧只有当前一个季度</p>
 										{/if}
 
 										<!-- 合并到现有番剧源选项 -->
-										{#if existingBangumiSources.length > 0}
+										{#if bangumi.existingSources.length > 0}
 											<div class="mt-3 space-y-2">
 												<Label class="text-sm font-medium">合并选项（可选）</Label>
 												<CustomSelect
-													value={mergeToSourceId}
+													value={bangumi.mergeToSourceId}
 													options={[
 														{ value: null, label: '作为新的独立番剧源添加' },
-														...existingBangumiSources.map((source) => ({
+														...bangumi.existingSources.map((source) => ({
 															value: source.id,
 															label: `合并到：${source.name}${source.season_id ? ` (Season ID: ${source.season_id})` : ''}${source.media_id ? ` (Media ID: ${source.media_id})` : ''}`
 														}))
 													]}
-													onChange={(nextValue) => (mergeToSourceId = nextValue as number | null)}
+													onChange={(nextValue) => (bangumi.mergeToSourceId = nextValue as number | null)}
 													class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
 												/>
-												{#if mergeToSourceId}
+												{#if bangumi.mergeToSourceId}
 													<p class="text-xs text-orange-600">
 														⚠️ 合并后，新番剧的内容将添加到选中的现有番剧源中，不会创建新的番剧源
 													</p>
@@ -2569,7 +2424,7 @@
 												{/if}
 											</div>
 										{/if}
-									{:else if sourceType === 'bangumi' && sourceId && loadingSeasons}
+									{:else if sourceType === 'bangumi' && sourceId && bangumi.loading}
 										<p class="mt-3 text-xs text-purple-600">正在获取季度信息...</p>
 									{/if}
 
@@ -2621,9 +2476,9 @@
 								placeholder="请输入视频源名称"
 								oninput={handleNameInput}
 								required
-								disabled={isMergingBangumi || batch.mode}
+								disabled={bangumi.isMerging || batch.mode}
 							/>
-							{#if isMergingBangumi}
+							{#if bangumi.isMerging}
 								<p class="text-xs text-purple-600">合并时自动沿用目标番剧源的名称</p>
 							{:else if batch.mode}
 								<p class="text-xs text-blue-600">批量模式下名称自动使用所选视频源信息</p>
@@ -2660,7 +2515,7 @@
 										type="button"
 										size="sm"
 										variant="outline"
-										disabled={!name.trim() || isMergingBangumi}
+										disabled={!name.trim() || bangumi.isMerging}
 										onclick={() =>
 											applyQuickSubscriptionPath(currentQuickSubscriptionType, name, true)}
 									>
@@ -2678,9 +2533,9 @@
 									}
 								}}
 								required
-								disabled={isMergingBangumi}
+								disabled={bangumi.isMerging}
 							/>
-							{#if isMergingBangumi}
+							{#if bangumi.isMerging}
 								<p class="text-xs text-purple-600">合并时自动沿用目标番剧源的保存路径</p>
 							{:else}
 								<div class="space-y-1">
@@ -4105,40 +3960,40 @@
 				{/if}
 
 				<!-- 番剧季度选择区域（移动到右侧） -->
-				{#if sourceType === 'bangumi' && sourceId && !downloadAllSeasons && (loadingSeasons || bangumiSeasons.length > 1 || (bangumiSeasonsFetchAttempted && bangumiSeasons.length === 0))}
+				{#if sourceType === 'bangumi' && sourceId && !downloadAllSeasons && (bangumi.loading || bangumi.seasons.length > 1 || (bangumi.fetchAttempted && bangumi.seasons.length === 0))}
 					<div class={isCompactLayout ? 'w-full' : 'flex-1'}>
 						<SidePanel
 							isMobile={isCompactLayout}
 							title="选择要下载的季度"
-							subtitle={loadingSeasons
+							subtitle={bangumi.loading
 								? '正在加载...'
-								: bangumiSeasons.length > 0
-									? `共 ${bangumiSeasons.length} 个相关季度`
+								: bangumi.seasons.length > 0
+									? `共 ${bangumi.seasons.length} 个相关季度`
 									: '暂无季度信息'}
 							headerClass="bg-purple-50 dark:bg-purple-950"
 							titleClass="text-base font-medium text-purple-800 dark:text-purple-200"
 							subtitleClass="text-sm text-purple-600 dark:text-purple-400"
 							bodyClass="flex-1 overflow-hidden p-3"
-							showActions={selectedSeasons.length > 0}
+							showActions={bangumi.selected.length > 0}
 						>
 							{#snippet actions()}
 								<span
 									class="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700 dark:bg-purple-900 dark:text-purple-300"
 								>
-									已选择 {selectedSeasons.length} 个
-									{#if selectedSeasons.length === bangumiSeasons.length}
+									已选择 {bangumi.selected.length} 个
+									{#if bangumi.selected.length === bangumi.seasons.length}
 										（全部）
 									{/if}
 								</span>
 							{/snippet}
 
-							{#if loadingSeasons}
+							{#if bangumi.loading}
 								<div class="p-4 text-center">
 									<div class="text-sm text-purple-700 dark:text-purple-300">
 										正在加载季度信息...
 									</div>
 								</div>
-							{:else if bangumiSeasons.length > 0}
+							{:else if bangumi.seasons.length > 0}
 								<div class="seasons-grid-container">
 									<div
 										class="grid gap-4 {isMobile ? 'grid-cols-1' : ''}"
@@ -4160,11 +4015,11 @@
 												onmouseleave={!season.isExisting ? () => hover.hide() : undefined}
 												onmousemove={!season.isExisting ? (e) => hover.move(e) : undefined}
 												onclick={() =>
-													!season.isExisting && toggleSeasonSelection(season.season_id)}
+													!season.isExisting && bangumi.toggleSeason(season.season_id)}
 												onkeydown={(e) =>
 													!season.isExisting &&
 													(e.key === 'Enter' || e.key === ' ') &&
-													toggleSeasonSelection(season.season_id)}
+													bangumi.toggleSeason(season.season_id)}
 												transition:fly={{
 													y: 50,
 													duration: enableSeasonAnimations ? 300 : 0,
@@ -4184,9 +4039,9 @@
 															<input
 																type="checkbox"
 																id="season-{season.season_id}"
-																checked={selectedSeasons.includes(season.season_id)}
+																checked={bangumi.selected.includes(season.season_id)}
 																disabled={season.isExisting}
-																onchange={() => toggleSeasonSelection(season.season_id)}
+																onchange={() => bangumi.toggleSeason(season.season_id)}
 																class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 {season.isExisting
 																	? 'cursor-not-allowed opacity-50'
 																	: ''}"
@@ -4232,7 +4087,7 @@
 										{/each}
 									</div>
 								</div>
-								{#if !loadingSeasons && bangumiSeasons.length > 0}
+								{#if !bangumi.loading && bangumi.seasons.length > 0}
 									<p class="mt-3 text-center text-xs text-purple-600">
 										不选择则仅下载{isCompactLayout ? '上方' : '左侧'}输入的当前季度
 									</p>
@@ -4245,7 +4100,7 @@
 									class="m-2"
 								>
 									{#snippet actions()}
-										<Button type="button" size="sm" variant="outline" onclick={fetchBangumiSeasons}>
+										<Button type="button" size="sm" variant="outline" onclick={bangumi.fetchSeasons}>
 											重新获取
 										</Button>
 									{/snippet}
@@ -4256,15 +4111,15 @@
 				{/if}
 
 				<!-- 课程（pugv）选择区域：选中讲师后列出其名下全部课程 -->
-				{#if sourceType === 'pugv' && pugvUpMid && (loadingPugvCourses || pugvCourses.length > 0 || pugvCoursesFetchAttempted)}
+				{#if sourceType === 'pugv' && pugv.upMid && (pugv.loading || pugv.courses.length > 0 || pugv.fetchAttempted)}
 					<div class={isCompactLayout ? 'w-full' : 'flex-1'}>
 						<SidePanel
 							isMobile={isCompactLayout}
-							title={`${pugvUpName || pugvUpMid} 的课程`}
-							subtitle={loadingPugvCourses
+							title={`${pugv.upName || pugv.upMid} 的课程`}
+							subtitle={pugv.loading
 								? '正在加载...'
-								: pugvCourses.length > 0
-									? `共 ${pugvCourses.length} 门课程`
+								: pugv.courses.length > 0
+									? `共 ${pugv.courses.length} 门课程`
 									: '未找到课程'}
 							headerClass="bg-indigo-50 dark:bg-indigo-950"
 							titleClass="text-base font-medium text-indigo-800 dark:text-indigo-200"
@@ -4272,60 +4127,60 @@
 							bodyClass="flex-1 overflow-hidden p-3"
 						>
 							{#snippet actions()}
-								{#if pugvCourses.length > 0}
+								{#if pugv.courses.length > 0}
 									<Button
 										type="button"
 										size="sm"
 										variant="outline"
 										class="h-7 px-2 text-xs"
-										onclick={toggleAllPugvCourses}
+										onclick={pugv.toggleAll}
 									>
-										{selectedPugvSeasonIds.length > 0 ? '取消全选' : '全选'}
+										{pugv.selectedSeasonIds.length > 0 ? '取消全选' : '全选'}
 									</Button>
 									<span
 										class="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300"
 									>
-										已选 {selectedPugvSeasonIds.length} 门
+										已选 {pugv.selectedSeasonIds.length} 门
 									</span>
 								{/if}
 								<button
-									onclick={clearPugvUpSelection}
+									onclick={pugv.clear}
 									class="p-1 text-xl text-indigo-500 hover:text-indigo-700 dark:text-indigo-300"
 								>
 									<X class="h-5 w-5" />
 								</button>
 							{/snippet}
 
-							{#if loadingPugvCourses}
+							{#if pugv.loading}
 								<div class="p-4 text-center">
 									<div class="text-sm text-indigo-700 dark:text-indigo-300">
 										正在加载课程列表...
 									</div>
 								</div>
-							{:else if pugvCourses.length > 0}
+							{:else if pugv.courses.length > 0}
 								<div
 									class="grid gap-4 {isMobile ? 'grid-cols-1' : ''}"
 									style={isMobile
 										? ''
 										: 'grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));'}
 								>
-									{#each pugvCourses as course (course.season_id)}
-										{@const isExisting = existingPugvSeasonIds.has(course.season_id)}
+									{#each pugv.courses as course (course.season_id)}
+										{@const isExisting = pugv.existingSeasonIds.has(course.season_id)}
 										<div
 											role="button"
 											tabindex="0"
 											class="relative rounded-lg border p-4 transition-all duration-300 {isExisting
 												? 'cursor-not-allowed bg-gray-50 opacity-60 dark:bg-gray-800'
-												: selectedPugvSeasonIds.includes(course.season_id)
+												: pugv.selectedSeasonIds.includes(course.season_id)
 													? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950'
 													: 'cursor-pointer hover:scale-102 hover:bg-indigo-50 hover:shadow-md dark:hover:bg-indigo-900'} {isMobile
 												? 'h-auto'
 												: 'h-[120px]'}"
-											onclick={() => !isExisting && togglePugvSeasonSelection(course.season_id)}
+											onclick={() => !isExisting && pugv.toggleSeason(course.season_id)}
 											onkeydown={(e) =>
 												!isExisting &&
 												(e.key === 'Enter' || e.key === ' ') &&
-												togglePugvSeasonSelection(course.season_id)}
+												pugv.toggleSeason(course.season_id)}
 										>
 											<div class="flex gap-3 {isMobile ? '' : 'h-full'}">
 												<BiliImage
@@ -4339,9 +4194,9 @@
 														<input
 															type="checkbox"
 															id="pugv-course-{course.season_id}"
-															checked={selectedPugvSeasonIds.includes(course.season_id)}
+															checked={pugv.selectedSeasonIds.includes(course.season_id)}
 															disabled={isExisting}
-															onchange={() => togglePugvSeasonSelection(course.season_id)}
+															onchange={() => pugv.toggleSeason(course.season_id)}
 															class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 {isExisting
 																? 'cursor-not-allowed opacity-50'
 																: ''}"
@@ -4388,7 +4243,7 @@
 									class="m-2"
 								>
 									{#snippet actions()}
-										<Button type="button" size="sm" variant="outline" onclick={fetchPugvUpCourses}>
+										<Button type="button" size="sm" variant="outline" onclick={pugv.fetchCourses}>
 											重新获取
 										</Button>
 									{/snippet}
@@ -4535,7 +4390,7 @@
 	mousePosition={hover.position}
 	sourceType={sourceType}
 	{sourceId}
-	{selectedSeasons}
+	selectedSeasons={bangumi.selected}
 />
 
 <!-- 批量添加配置对话框 -->
