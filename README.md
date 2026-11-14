@@ -1,15 +1,15 @@
 # bili-sync
 
-![bili-sync](https://socialify.git.ci/NeeYoonc/bili-sync-up/image?custom_description=%E7%94%B1%20Rust%20%26%20Tokio%20%E9%A9%B1%E5%8A%A8%E7%9A%84%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E5%90%8C%E6%AD%A5%E5%B7%A5%E5%85%B7%EF%BC%88%E5%8D%87%E7%BA%A7%E4%BC%98%E5%8C%96%E7%89%88%EF%BC%89&description=1&font=KoHo&issues=1&language=1&logo=https%3A%2F%2Fs2.loli.net%2F2023%2F12%2F02%2F9EwT2yInOu1d3zm.png&name=1&owner=1&pattern=Signal&pulls=1&stargazers=1&theme=Light)
+![bili-sync](https://socialify.git.ci/lurenyang418/hei/image?custom_description=%E7%94%B1%20Rust%20%26%20Tokio%20%E9%A9%B1%E5%8A%A8%E7%9A%84%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9%E5%90%8C%E6%AD%A5%E5%B7%A5%E5%85%B7%EF%BC%88%E5%8D%87%E7%BA%A7%E4%BC%98%E5%8C%96%E7%89%88%EF%BC%89&description=1&font=KoHo&issues=1&language=1&logo=https%3A%2F%2Fs2.loli.net%2F2023%2F12%2F02%2F9EwT2yInOu1d3zm.png&name=1&owner=1&pattern=Signal&pulls=1&stargazers=1&theme=Light)
 
-[![GitHub Release](https://img.shields.io/github/v/release/NeeYoonc/bili-sync-up)](https://github.com/NeeYoonc/bili-sync-up/releases/latest)
-[![Build](https://github.com/NeeYoonc/bili-sync-up/actions/workflows/build.yml/badge.svg)](https://github.com/NeeYoonc/bili-sync-up/actions/workflows/build.yml)
-[![Docker Build](https://github.com/NeeYoonc/bili-sync-up/actions/workflows/docker-build.yml/badge.svg)](https://github.com/NeeYoonc/bili-sync-up/actions/workflows/docker-build.yml)
-[![Downloads](https://img.shields.io/github/downloads/NeeYoonc/bili-sync-up/total)](https://github.com/NeeYoonc/bili-sync-up/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/lurenyang418/hei)](https://github.com/lurenyang418/hei/releases/latest)
+[![Build](https://github.com/lurenyang418/hei/actions/workflows/build.yml/badge.svg)](https://github.com/lurenyang418/hei/actions/workflows/build.yml)
+[![Docker Build](https://github.com/lurenyang418/hei/actions/workflows/docker-build.yml/badge.svg)](https://github.com/lurenyang418/hei/actions/workflows/docker-build.yml)
+[![Downloads](https://img.shields.io/github/downloads/lurenyang418/hei/total)](https://github.com/lurenyang418/hei/releases)
 
 专为 NAS 用户打造的哔哩哔哩同步工具，基于 Rust & Tokio 构建。
 
-📚 [在线文档](https://NeeYoonc.github.io/bili-sync-up/) | 🚀 [快速开始](#快速开始) | 📝 [更新日志](./docs/changelog.md) | 💬 [QQ群交流](https://qm.qq.com/q/144RN3oaLM) | 📦 [群晖套件源](https://ssp.dnof.net/)
+📚 [在线文档](https://lurenyang418.github.io/hei/) | 🚀 [快速开始](#快速开始) | 📝 [更新日志](./docs/changelog.md) | 💬 [QQ群交流](https://qm.qq.com/q/144RN3oaLM)
 
 ## ✨ 核心特性
 
@@ -24,9 +24,11 @@
 
 ### 🎬 视频源支持
 - **收藏夹** - 直接显示用户所有收藏夹，支持快速选择
+- **合集 / 列表** - 订阅单个合集或系列，支持合集聚合与季度结构
 - **UP主投稿** - 输入UP主ID查看所有合集/系列
 - **稍后再看** - 自动同步稍后再看列表
 - **番剧下载** - 支持单季和全季下载模式
+- **B站课程** - 支持课程（pugv / cheese）订阅
 
 ### 🚀 技术优势
 - **高性能** - Rust + Tokio 异步架构，支持高并发
@@ -35,20 +37,6 @@
 - **自动重试** - 智能错误处理和重试机制
 
 ## 🚀 快速开始
-
-### 群晖 NAS 套件安装（推荐）
-
-**添加套件源（可在套件中心直接安装 / 升级）**
-
-1. DSM → **套件中心** → **设置** → **套件来源** → **新增**
-2. 名称随意（如 `dnof`），位置填：`https://ssp.dnof.net/`
-3. 保存后回到「套件中心 → **社群**」，找到 **Bili Sync Up** → 安装
-
-安装向导可设置 **Web 访问端口**（默认 12345）、**访问 Token**、是否放行防火墙。
-装完点套件中心「打开」，或访问 `http://<NAS-IP>:<端口>`（填了 Token 会先要求输入）。
-
-> 套件以专用用户 `bili-sync-up` 运行（DSM 7 套件规范）。下载目录建议用安装时自动创建的共享文件夹 `bili-sync-up`；
-> 若要指向其它共享文件夹，需在「控制面板 → 共享文件夹 → 权限」中给 `bili-sync-up` 用户读写权限。
 
 ### 使用 Docker（推荐）
 
@@ -107,14 +95,14 @@ services:
 
 ### 二进制文件
 
-从 [Releases](https://github.com/NeeYoonc/bili-sync-up/releases) 下载 Linux amd64 / arm64 可执行文件；Windows / macOS 需自行从源码编译。
+从 [Releases](https://github.com/lurenyang418/hei/releases) 下载 Linux amd64 / arm64 可执行文件；Windows / macOS 需自行从源码编译。
 
 ### 开发环境
 
 ```bash
 # 克隆项目
-git clone https://github.com/NeeYoonc/bili-sync-up
-cd bili-sync-up
+git clone https://github.com/lurenyang418/hei
+cd hei
 
 # 构建前端
 cd web
