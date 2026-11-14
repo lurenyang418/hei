@@ -39,25 +39,15 @@ use crate::utils::signal::terminate;
 use crate::utils::{file_logger, init_logger};
 use anyhow::Result;
 
-#[cfg(windows)]
-const TOKIO_WORKER_STACK_SIZE: usize = 8 * 1024 * 1024;
+// 下载链路在 debug 构建下的 async 状态机较深，所有平台统一增大 worker 栈。
+const TOKIO_WORKER_STACK_SIZE: usize = 16 * 1024 * 1024;
 
 fn main() -> Result<()> {
-    #[cfg(windows)]
-    {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            // Windows 下 Tokio worker 默认栈偏小，大批量下载阶段会触发 tokio-runtime-worker 栈溢出。
-            .thread_stack_size(TOKIO_WORKER_STACK_SIZE)
-            .build()?;
-        return runtime.block_on(async_main());
-    }
-
-    #[cfg(not(windows))]
-    {
-        let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-        runtime.block_on(async_main())
-    }
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(TOKIO_WORKER_STACK_SIZE)
+        .build()?;
+    runtime.block_on(async_main())
 }
 
 async fn async_main() -> Result<()> {
