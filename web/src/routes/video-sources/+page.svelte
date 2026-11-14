@@ -9,6 +9,7 @@
 	import api from '$lib/api';
 	import { VIDEO_SOURCES, type VideoSourceType } from '$lib/consts';
 	import { VideoSourceBulkStore } from '$lib/stores/video-sources/bulk.svelte';
+	import { VideoSourceScanConfigStore } from '$lib/stores/video-sources/scan-config.svelte';
 	import { videoSourceStore, setVideoSources } from '$lib/stores/video-source';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
@@ -113,6 +114,8 @@
 	const bulk = new VideoSourceBulkStore({
 		updateSources: updateSourcesInStore
 	});
+
+	const scanConfig = new VideoSourceScanConfigStore();
 
 	let loading = false;
 	let platformTab = 'bilibili';
@@ -323,65 +326,9 @@
 	}
 
 	// B站合集/收藏夹/投稿源扫描策略配置（分批/自适应）
-	let submissionScanBatchSize = '0';
-	let submissionAdaptiveScan = false;
-	let submissionAdaptiveMaxHours = '24';
-	let submissionScanConfigLoading = false;
-	let submissionScanConfigSaving = false;
-	let showSubmissionScanConfigDialog = false;
 
-	async function loadSubmissionScanConfig() {
-		const response = await runRequest(() => api.getConfig(), {
-			setLoading: (value) => (submissionScanConfigLoading = value),
-			context: '加载B站源扫描策略失败'
-		});
-		if (!response) return;
 
-		const cfg = response.data;
-		submissionScanBatchSize = String(cfg.submission_scan_batch_size ?? 0);
-		submissionAdaptiveScan = Boolean(cfg.submission_adaptive_scan ?? false);
-		submissionAdaptiveMaxHours = String(cfg.submission_adaptive_max_hours ?? 24);
-	}
 
-	async function saveSubmissionScanConfig() {
-		const batchSize = Number(submissionScanBatchSize);
-		const maxHours = Number(submissionAdaptiveMaxHours);
-
-		if (!Number.isFinite(batchSize) || batchSize < 0) {
-			toast.error('每轮扫描数量必须是非负数字');
-			return;
-		}
-		if (!Number.isFinite(maxHours) || maxHours < 1) {
-			toast.error('最大间隔必须大于等于 1 小时');
-			return;
-		}
-
-		submissionScanConfigSaving = true;
-		const result = await runRequest(
-			() =>
-				api.updateConfig({
-					submission_scan_batch_size: batchSize,
-					submission_adaptive_scan: submissionAdaptiveScan,
-					submission_adaptive_max_hours: maxHours
-				}),
-			{ context: '保存B站源扫描策略失败' }
-		);
-		submissionScanConfigSaving = false;
-		if (!result) return;
-
-		if (result.data.success) {
-			toast.success(result.data.message || '保存成功');
-		} else {
-			toast.error('保存失败', { description: result.data.message });
-		}
-
-		await loadSubmissionScanConfig();
-	}
-
-	async function openSubmissionScanConfigDialog() {
-		showSubmissionScanConfigDialog = true;
-		await loadSubmissionScanConfig();
-	}
 
 	type UpdateResult = { success: boolean; message: string };
 	type SuccessToast = {
@@ -1344,7 +1291,7 @@
 		setBreadcrumb([{ label: '视频源管理' }]);
 		loadVideoSources();
 		startVideoSourcesStream();
-		loadSubmissionScanConfig();
+		scanConfig.load();
 
 	});
 
@@ -1392,12 +1339,12 @@
 										分批扫描覆盖合集、收藏夹和UP主投稿源；新源优先，其余按最久未扫描顺序轮转。自适应会对长期无更新的源逐步降频。
 									</div>
 									<div class="text-muted-foreground text-xs">
-										当前：每轮 {Number(submissionScanBatchSize) === 0
+										当前：每轮 {Number(scanConfig.batchSize) === 0
 											? '不限'
-											: submissionScanBatchSize} 个 · 自适应 {submissionAdaptiveScan
+											: scanConfig.batchSize} 个 · 自适应 {scanConfig.adaptiveScan
 											? '已开启'
 											: '已关闭'}
-										· 最大间隔 {submissionAdaptiveMaxHours || '24'} 小时
+										· 最大间隔 {scanConfig.adaptiveMaxHours || '24'} 小时
 									</div>
 								</div>
 
@@ -1405,15 +1352,15 @@
 									<Button
 										size="sm"
 										variant="outline"
-										disabled={submissionScanConfigSaving}
-										onclick={loadSubmissionScanConfig}
+										disabled={scanConfig.saving}
+										onclick={() => scanConfig.load()}
 									>
 										刷新
 									</Button>
 									<Button
 										size="sm"
-										disabled={submissionScanConfigSaving}
-										onclick={openSubmissionScanConfigDialog}
+										disabled={scanConfig.saving}
+										onclick={() => scanConfig.open()}
 									>
 										弹窗配置
 									</Button>
@@ -2076,14 +2023,14 @@
 
 <!-- B站源扫描优化弹窗 -->
 <SubmissionScanConfigDialog
-	bind:open={showSubmissionScanConfigDialog}
-	bind:batchSize={submissionScanBatchSize}
-	bind:adaptiveScan={submissionAdaptiveScan}
-	bind:adaptiveMaxHours={submissionAdaptiveMaxHours}
-	loading={submissionScanConfigLoading}
-	saving={submissionScanConfigSaving}
-	onReload={loadSubmissionScanConfig}
-	onSave={saveSubmissionScanConfig}
+	bind:open={scanConfig.dialogOpen}
+	bind:batchSize={scanConfig.batchSize}
+	bind:adaptiveScan={scanConfig.adaptiveScan}
+	bind:adaptiveMaxHours={scanConfig.adaptiveMaxHours}
+	loading={scanConfig.loading}
+	saving={scanConfig.saving}
+	onReload={() => scanConfig.load()}
+	onSave={() => scanConfig.save()}
 />
 
 <!-- 源级流过滤/码率设置对话框 -->
