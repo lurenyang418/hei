@@ -11,6 +11,7 @@
 	import { VideoSourceBulkStore } from '$lib/stores/video-sources/bulk.svelte';
 	import { VideoSourceScanConfigStore } from '$lib/stores/video-sources/scan-config.svelte';
 	import { VideoSourceFilterOptionStore } from '$lib/stores/video-sources/filter-option.svelte';
+	import { VideoSourceDialogsStore } from '$lib/stores/video-sources/dialogs.svelte';
 	import { videoSourceStore, setVideoSources } from '$lib/stores/video-source';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
@@ -124,9 +125,12 @@
 			const response = await runRequest(() => api.getConfig(), {
 				context: '加载全局流过滤设置失败'
 			});
+
 			return response ? filterOptionFromConfig(response.data) : null;
 		}
 	});
+
+	const dialogs = new VideoSourceDialogsStore();
 
 	let loading = false;
 	let platformTab = 'bilibili';
@@ -148,69 +152,18 @@
 	const retryingChargeVideoSources = new SvelteSet<string>();
 
 	// 删除对话框状态
-	let showDeleteDialog = false;
-	let deleteSourceInfo = {
-		type: '',
-		id: 0,
-		name: ''
-	};
 
 	// 路径重设对话框状态
-	let showResetPathDialog = false;
-	let resetPathSourceInfo = {
-		type: '',
-		id: 0,
-		name: '',
-		currentPath: ''
-	};
 
 	// 投稿选择对话框状态
-	let showSubmissionSelectionDialog = false;
-	let submissionSelectionInfo = {
-		id: 0,
-		upperId: 0,
-		upperName: '',
-		selectedVideos: [] as string[]
-	};
 
 	// 关键词过滤对话框状态
-	let showKeywordFilterDialog = false;
-	let keywordFilterInfo = {
-		type: '',
-		id: 0,
-		name: ''
-	};
 
 	// 源级流过滤/码率设置对话框状态
 
 	// AI提示词对话框状态
-	let showAiPromptDialog = false;
-	let aiPromptInfo = {
-		type: '',
-		id: 0,
-		name: '',
-		videoPrompt: '',
-		audioPrompt: '',
-		aiRename: false,
-		enableMultiPage: false,
-		enableCollection: false,
-		enableBangumi: false,
-		renameParentDir: false
-	};
 
 	// AI批量重命名历史对话框状态
-	let showAiRenameHistoryDialog = false;
-	let aiRenameHistoryInfo = {
-		type: '',
-		id: 0,
-		name: '',
-		videoPrompt: '',
-		audioPrompt: '',
-		enableMultiPage: false,
-		enableCollection: false,
-		enableBangumi: false,
-		renameParentDir: false
-	};
 
 	function normalizeBeijingDateTime(value: string | null | undefined): string | null {
 		if (!value || value === '1970-01-01 00:00:00') return null;
@@ -522,12 +475,12 @@
 
 	// 打开删除确认对话框
 	function handleDeleteSource(sourceType: string, sourceId: number, sourceName: string) {
-		deleteSourceInfo = {
+		dialogs.deleteInfo = {
 			type: sourceType,
 			id: sourceId,
 			name: sourceName
 		};
-		showDeleteDialog = true;
+		dialogs.deleteOpen = true;
 	}
 
 	// 打开路径重设对话框
@@ -537,13 +490,13 @@
 		sourceName: string,
 		currentPath: string
 	) {
-		resetPathSourceInfo = {
+		dialogs.resetPathInfo = {
 			type: sourceType,
 			id: sourceId,
 			name: sourceName,
 			currentPath: currentPath
 		};
-		showResetPathDialog = true;
+		dialogs.resetPathOpen = true;
 	}
 
 	async function handleRetryChargeVideos(sourceType: string, sourceId: number) {
@@ -936,7 +889,7 @@
 		enableBangumi: boolean,
 		renameParentDir: boolean
 	) {
-		aiPromptInfo = {
+		dialogs.aiPromptInfo = {
 			type: sourceType,
 			id: sourceId,
 			name: sourceName,
@@ -948,7 +901,7 @@
 			enableBangumi: enableBangumi || false,
 			renameParentDir: renameParentDir || false
 		};
-		showAiPromptDialog = true;
+		dialogs.aiPromptOpen = true;
 	}
 
 	// AI提示词保存后的回调
@@ -964,7 +917,7 @@
 		}>
 	) {
 		const detail = event.detail;
-		updateSourceInStore(aiPromptInfo.type, aiPromptInfo.id, (source) => ({
+		updateSourceInStore(dialogs.aiPromptInfo.type, dialogs.aiPromptInfo.id, (source) => ({
 			...source,
 			ai_rename: detail.aiRename,
 			ai_rename_video_prompt: detail.videoPrompt,
@@ -988,7 +941,7 @@
 		enableBangumi: boolean,
 		renameParentDir: boolean
 	) {
-		aiRenameHistoryInfo = {
+		dialogs.aiRenameHistoryInfo = {
 			type: sourceType,
 			id: sourceId,
 			name: sourceName,
@@ -999,21 +952,21 @@
 			enableBangumi: enableBangumi || false,
 			renameParentDir: renameParentDir || false
 		};
-		showAiRenameHistoryDialog = true;
+		dialogs.aiRenameHistoryOpen = true;
 	}
 
 	// AI批量重命名完成后的回调
 	function handleAiRenameHistoryComplete() {
 		// 刷新视频源列表以显示最新状态（AI重命名已开启）
-		updateSourceInStore(aiRenameHistoryInfo.type, aiRenameHistoryInfo.id, (source) => ({
+		updateSourceInStore(dialogs.aiRenameHistoryInfo.type, dialogs.aiRenameHistoryInfo.id, (source) => ({
 			...source,
 			ai_rename: true,
-			ai_rename_video_prompt: aiRenameHistoryInfo.videoPrompt,
-			ai_rename_audio_prompt: aiRenameHistoryInfo.audioPrompt,
-			ai_rename_enable_multi_page: aiRenameHistoryInfo.enableMultiPage,
-			ai_rename_enable_collection: aiRenameHistoryInfo.enableCollection,
-			ai_rename_enable_bangumi: aiRenameHistoryInfo.enableBangumi,
-			ai_rename_rename_parent_dir: aiRenameHistoryInfo.renameParentDir
+			ai_rename_video_prompt: dialogs.aiRenameHistoryInfo.videoPrompt,
+			ai_rename_audio_prompt: dialogs.aiRenameHistoryInfo.audioPrompt,
+			ai_rename_enable_multi_page: dialogs.aiRenameHistoryInfo.enableMultiPage,
+			ai_rename_enable_collection: dialogs.aiRenameHistoryInfo.enableCollection,
+			ai_rename_enable_bangumi: dialogs.aiRenameHistoryInfo.enableBangumi,
+			ai_rename_rename_parent_dir: dialogs.aiRenameHistoryInfo.renameParentDir
 		}));
 	}
 
@@ -1022,7 +975,7 @@
 		const { deleteLocalFiles } = event.detail;
 
 		await updateAndApply(
-			() => api.deleteVideoSource(deleteSourceInfo.type, deleteSourceInfo.id, deleteLocalFiles),
+			() => api.deleteVideoSource(dialogs.deleteInfo.type, dialogs.deleteInfo.id, deleteLocalFiles),
 			{
 				errorTitle: '删除失败',
 				successToast: (data) => {
@@ -1044,13 +997,13 @@
 				applyLocalUpdate: (data) => {
 					if (isQueuedMessage(data.message)) {
 						markQueuedDeletePending(
-							deleteSourceInfo.type as VideoSourceType,
-							deleteSourceInfo.id,
-							deleteSourceInfo.name
+							dialogs.deleteInfo.type as VideoSourceType,
+							dialogs.deleteInfo.id,
+							dialogs.deleteInfo.name
 						);
 						return;
 					}
-					removeSourceFromStore(deleteSourceInfo.type, deleteSourceInfo.id);
+					removeSourceFromStore(dialogs.deleteInfo.type, dialogs.deleteInfo.id);
 				}
 			}
 		);
@@ -1058,7 +1011,7 @@
 
 	// 取消删除
 	function handleCancelDelete() {
-		showDeleteDialog = false;
+		dialogs.deleteOpen = false;
 	}
 
 	// 确认路径重设
@@ -1072,7 +1025,7 @@
 		const request = event.detail;
 
 		await updateAndApply(
-			() => api.resetVideoSourcePath(resetPathSourceInfo.type, resetPathSourceInfo.id, request),
+			() => api.resetVideoSourcePath(dialogs.resetPathInfo.type, dialogs.resetPathInfo.id, request),
 			{
 				errorTitle: '路径重设失败',
 				successToast: (data) => ({
@@ -1082,7 +1035,7 @@
 						(request.apply_rename_rules ? `，已移动 ${data.moved_files_count} 个文件` : '')
 				}),
 				applyLocalUpdate: (data) => {
-					updateSourceInStore(resetPathSourceInfo.type, resetPathSourceInfo.id, (source) => ({
+					updateSourceInStore(dialogs.resetPathInfo.type, dialogs.resetPathInfo.id, (source) => ({
 						...source,
 						path: data.new_path
 					}));
@@ -1093,7 +1046,7 @@
 
 	// 取消路径重设
 	function handleCancelResetPath() {
-		showResetPathDialog = false;
+		dialogs.resetPathOpen = false;
 	}
 
 	// 打开投稿选择对话框
@@ -1116,13 +1069,13 @@
 				console.error('解析选中视频列表失败:', e);
 			}
 		}
-		submissionSelectionInfo = {
+		dialogs.submissionSelectionInfo = {
 			id: sourceId,
 			upperId,
 			upperName,
 			selectedVideos
 		};
-		showSubmissionSelectionDialog = true;
+		dialogs.submissionSelectionOpen = true;
 	}
 
 	// 确认投稿选择
@@ -1130,14 +1083,14 @@
 		const selectedVideos = event.detail;
 		try {
 			const result = await api.updateSubmissionSelectedVideos(
-				submissionSelectionInfo.id,
+				dialogs.submissionSelectionInfo.id,
 				selectedVideos
 			);
 			if (result.data.success) {
 				toast.success('历史投稿选择已更新', {
 					description: result.data.message
 				});
-				updateSourceInStore('submission', submissionSelectionInfo.id, (source) => ({
+				updateSourceInStore('submission', dialogs.submissionSelectionInfo.id, (source) => ({
 					...source,
 					selected_videos: JSON.stringify(selectedVideos)
 				}));
@@ -1152,17 +1105,17 @@
 
 	// 取消投稿选择
 	function handleCancelSubmissionSelection() {
-		showSubmissionSelectionDialog = false;
+		dialogs.submissionSelectionOpen = false;
 	}
 
 	// 打开关键词过滤对话框
 	function handleOpenKeywordFilter(sourceType: string, sourceId: number, sourceName: string) {
-		keywordFilterInfo = {
+		dialogs.keywordFilterInfo = {
 			type: sourceType,
 			id: sourceId,
 			name: sourceName
 		};
-		showKeywordFilterDialog = true;
+		dialogs.keywordFilterOpen = true;
 	}
 
 	function hasSourceKeywordFilters(source: VideoSource) {
@@ -1191,7 +1144,7 @@
 	) {
 		toast.success('关键词过滤器已更新');
 		const detail = event.detail;
-		updateSourceInStore(keywordFilterInfo.type, keywordFilterInfo.id, (source) => ({
+		updateSourceInStore(dialogs.keywordFilterInfo.type, dialogs.keywordFilterInfo.id, (source) => ({
 			...source,
 			blacklist_keywords: detail.blacklistKeywords,
 			whitelist_keywords: detail.whitelistKeywords,
@@ -1205,7 +1158,7 @@
 
 	// 取消关键词过滤
 	function handleKeywordFilterCancel() {
-		showKeywordFilterDialog = false;
+		dialogs.keywordFilterOpen = false;
 	}
 
 	// 切换折叠状态
@@ -1996,71 +1949,71 @@
 
 <!-- 删除确认对话框 -->
 <DeleteVideoSourceDialog
-	bind:isOpen={showDeleteDialog}
-	sourceName={deleteSourceInfo.name}
-	sourceType={deleteSourceInfo.type}
+	bind:isOpen={dialogs.deleteOpen}
+	sourceName={dialogs.deleteInfo.name}
+	sourceType={dialogs.deleteInfo.type}
 	on:confirm={handleConfirmDelete}
 	on:cancel={handleCancelDelete}
 />
 
 <!-- 路径重设对话框 -->
 <ResetPathDialog
-	bind:isOpen={showResetPathDialog}
-	sourceName={resetPathSourceInfo.name}
-	sourceType={resetPathSourceInfo.type}
-	currentPath={resetPathSourceInfo.currentPath}
+	bind:isOpen={dialogs.resetPathOpen}
+	sourceName={dialogs.resetPathInfo.name}
+	sourceType={dialogs.resetPathInfo.type}
+	currentPath={dialogs.resetPathInfo.currentPath}
 	on:confirm={handleConfirmResetPath}
 	on:cancel={handleCancelResetPath}
 />
 
 <!-- 投稿选择对话框 -->
 <SubmissionSelectionDialog
-	bind:isOpen={showSubmissionSelectionDialog}
-	sourceId={submissionSelectionInfo.id}
-	upperId={submissionSelectionInfo.upperId}
-	upperName={submissionSelectionInfo.upperName}
-	initialSelectedVideos={submissionSelectionInfo.selectedVideos}
+	bind:isOpen={dialogs.submissionSelectionOpen}
+	sourceId={dialogs.submissionSelectionInfo.id}
+	upperId={dialogs.submissionSelectionInfo.upperId}
+	upperName={dialogs.submissionSelectionInfo.upperName}
+	initialSelectedVideos={dialogs.submissionSelectionInfo.selectedVideos}
 	on:confirm={handleConfirmSubmissionSelection}
 	on:cancel={handleCancelSubmissionSelection}
 />
 
 <!-- 关键词过滤对话框 -->
 <KeywordFilterDialog
-	bind:isOpen={showKeywordFilterDialog}
-	sourceName={keywordFilterInfo.name}
-	sourceType={keywordFilterInfo.type}
-	sourceId={keywordFilterInfo.id}
+	bind:isOpen={dialogs.keywordFilterOpen}
+	sourceName={dialogs.keywordFilterInfo.name}
+	sourceType={dialogs.keywordFilterInfo.type}
+	sourceId={dialogs.keywordFilterInfo.id}
 	on:save={handleKeywordFilterSave}
 	on:cancel={handleKeywordFilterCancel}
 />
 
 <!-- AI提示词设置对话框 -->
 <AiPromptDialog
-	bind:isOpen={showAiPromptDialog}
-	sourceName={aiPromptInfo.name}
-	sourceType={aiPromptInfo.type}
-	sourceId={aiPromptInfo.id}
-	initialVideoPrompt={aiPromptInfo.videoPrompt}
-	initialAudioPrompt={aiPromptInfo.audioPrompt}
-	initialAiRename={aiPromptInfo.aiRename}
-	initialEnableMultiPage={aiPromptInfo.enableMultiPage}
-	initialEnableCollection={aiPromptInfo.enableCollection}
-	initialEnableBangumi={aiPromptInfo.enableBangumi}
-	initialRenameParentDir={aiPromptInfo.renameParentDir}
+	bind:isOpen={dialogs.aiPromptOpen}
+	sourceName={dialogs.aiPromptInfo.name}
+	sourceType={dialogs.aiPromptInfo.type}
+	sourceId={dialogs.aiPromptInfo.id}
+	initialVideoPrompt={dialogs.aiPromptInfo.videoPrompt}
+	initialAudioPrompt={dialogs.aiPromptInfo.audioPrompt}
+	initialAiRename={dialogs.aiPromptInfo.aiRename}
+	initialEnableMultiPage={dialogs.aiPromptInfo.enableMultiPage}
+	initialEnableCollection={dialogs.aiPromptInfo.enableCollection}
+	initialEnableBangumi={dialogs.aiPromptInfo.enableBangumi}
+	initialRenameParentDir={dialogs.aiPromptInfo.renameParentDir}
 	on:save={handleAiPromptSave}
 />
 
 <!-- AI批量重命名历史对话框 -->
 <AiRenameHistoryDialog
-	bind:isOpen={showAiRenameHistoryDialog}
-	sourceName={aiRenameHistoryInfo.name}
-	sourceType={aiRenameHistoryInfo.type}
-	sourceId={aiRenameHistoryInfo.id}
-	initialVideoPrompt={aiRenameHistoryInfo.videoPrompt}
-	initialAudioPrompt={aiRenameHistoryInfo.audioPrompt}
-	initialEnableMultiPage={aiRenameHistoryInfo.enableMultiPage}
-	initialEnableCollection={aiRenameHistoryInfo.enableCollection}
-	initialEnableBangumi={aiRenameHistoryInfo.enableBangumi}
-	initialRenameParentDir={aiRenameHistoryInfo.renameParentDir}
+	bind:isOpen={dialogs.aiRenameHistoryOpen}
+	sourceName={dialogs.aiRenameHistoryInfo.name}
+	sourceType={dialogs.aiRenameHistoryInfo.type}
+	sourceId={dialogs.aiRenameHistoryInfo.id}
+	initialVideoPrompt={dialogs.aiRenameHistoryInfo.videoPrompt}
+	initialAudioPrompt={dialogs.aiRenameHistoryInfo.audioPrompt}
+	initialEnableMultiPage={dialogs.aiRenameHistoryInfo.enableMultiPage}
+	initialEnableCollection={dialogs.aiRenameHistoryInfo.enableCollection}
+	initialEnableBangumi={dialogs.aiRenameHistoryInfo.enableBangumi}
+	initialRenameParentDir={dialogs.aiRenameHistoryInfo.renameParentDir}
 	on:complete={handleAiRenameHistoryComplete}
 />
