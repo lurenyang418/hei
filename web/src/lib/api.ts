@@ -983,13 +983,9 @@ class ApiClient {
 		ApiResponse<{
 			active_channel: string;
 			enable_scan_notifications: boolean;
-			serverchan_key?: string;
-			serverchan3_uid?: string;
-			serverchan3_sendkey?: string;
-			wecom_webhook_url?: string;
-			wecom_msgtype: string;
-			wecom_mention_all: boolean;
-			wecom_mentioned_list?: string[];
+			telegram_bot_token?: string;
+			telegram_chat_id?: string;
+			telegram_api_base?: string;
 			webhook_url?: string;
 			webhook_bearer_token?: string;
 			webhook_custom_headers?: string;
@@ -1004,13 +1000,9 @@ class ApiClient {
 		return this.get<{
 			active_channel: string;
 			enable_scan_notifications: boolean;
-			serverchan_key?: string;
-			serverchan3_uid?: string;
-			serverchan3_sendkey?: string;
-			wecom_webhook_url?: string;
-			wecom_msgtype: string;
-			wecom_mention_all: boolean;
-			wecom_mentioned_list?: string[];
+			telegram_bot_token?: string;
+			telegram_chat_id?: string;
+			telegram_api_base?: string;
 			webhook_url?: string;
 			webhook_bearer_token?: string;
 			webhook_custom_headers?: string;
@@ -1029,13 +1021,9 @@ class ApiClient {
 	async updateNotificationConfig(config: {
 		active_channel?: string;
 		enable_scan_notifications?: boolean;
-		serverchan_key?: string;
-		serverchan3_uid?: string;
-		serverchan3_sendkey?: string;
-		wecom_webhook_url?: string;
-		wecom_msgtype?: string;
-		wecom_mention_all?: boolean;
-		wecom_mentioned_list?: string[];
+		telegram_bot_token?: string;
+		telegram_chat_id?: string;
+		telegram_api_base?: string;
 		webhook_url?: string;
 		webhook_bearer_token?: string;
 		webhook_custom_headers?: string;
@@ -1053,13 +1041,9 @@ class ApiClient {
 	async testNotification(params?: {
 		custom_message?: string;
 		active_channel?: string;
-		serverchan_key?: string;
-		serverchan3_uid?: string;
-		serverchan3_sendkey?: string;
-		wecom_webhook_url?: string;
-		wecom_msgtype?: string;
-		wecom_mention_all?: boolean;
-		wecom_mentioned_list?: string[];
+		telegram_bot_token?: string;
+		telegram_chat_id?: string;
+		telegram_api_base?: string;
 		webhook_url?: string;
 		webhook_bearer_token?: string;
 		webhook_custom_headers?: string;
@@ -1525,13 +1509,9 @@ export const api = {
 	updateNotificationConfig: (config: {
 		active_channel?: string;
 		enable_scan_notifications?: boolean;
-		serverchan_key?: string;
-		serverchan3_uid?: string;
-		serverchan3_sendkey?: string;
-		wecom_webhook_url?: string;
-		wecom_msgtype?: string;
-		wecom_mention_all?: boolean;
-		wecom_mentioned_list?: string[];
+		telegram_bot_token?: string;
+		telegram_chat_id?: string;
+		telegram_api_base?: string;
 		webhook_url?: string;
 		webhook_bearer_token?: string;
 		webhook_custom_headers?: string;
@@ -1547,13 +1527,9 @@ export const api = {
 	testNotification: (params?: {
 		custom_message?: string;
 		active_channel?: string;
-		serverchan_key?: string;
-		serverchan3_uid?: string;
-		serverchan3_sendkey?: string;
-		wecom_webhook_url?: string;
-		wecom_msgtype?: string;
-		wecom_mention_all?: boolean;
-		wecom_mentioned_list?: string[];
+		telegram_bot_token?: string;
+		telegram_chat_id?: string;
+		telegram_api_base?: string;
 		webhook_url?: string;
 		webhook_bearer_token?: string;
 		webhook_custom_headers?: string;

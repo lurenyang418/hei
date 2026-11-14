@@ -7,77 +7,22 @@ use tracing::{debug, error, info, warn};
 
 use crate::config::NotificationConfig;
 
-// Server酱API请求结构
-#[derive(Serialize)]
-struct ServerChanRequest {
-    title: String,
-    desp: String,
-}
-
-// Server酱API响应结构
-#[derive(Deserialize)]
-struct ServerChanResponse {
-    #[serde(deserialize_with = "deserialize_code")]
-    code: i32,
-    message: String,
-}
-
-// 自定义反序列化器，支持字符串和整数的code
-fn deserialize_code<'de, D>(deserializer: D) -> Result<i32, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::Error;
-    let value = serde_json::Value::deserialize(deserializer)?;
-
-    match value {
-        serde_json::Value::Number(n) => n
-            .as_i64()
-            .and_then(|v| i32::try_from(v).ok())
-            .ok_or_else(|| D::Error::custom("code is not a valid i32")),
-        serde_json::Value::String(s) => s
-            .parse::<i32>()
-            .map_err(|_| D::Error::custom(format!("code string '{}' is not a valid i32", s))),
-        _ => Err(D::Error::custom("code must be a number or string")),
-    }
-}
-
-// ========== 企业微信API请求/响应结构 ==========
+// ========== Telegram API 请求/响应结构 ==========
 
 #[derive(Serialize)]
-struct WecomTextRequest {
-    msgtype: String,
-    text: WecomTextContent,
-}
-
-#[derive(Serialize)]
-struct WecomTextContent {
-    content: String,
+struct TelegramSendMessageRequest {
+    chat_id: String,
+    text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    mentioned_list: Option<Vec<String>>,
+    parse_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    disable_web_page_preview: Option<bool>,
 }
 
-#[derive(Serialize)]
-struct WecomMarkdownRequest {
-    msgtype: String,
-    markdown: WecomMarkdownContent,
-}
-
-#[derive(Serialize)]
-struct WecomMarkdownContent {
-    content: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct WecomResponse {
-    errcode: i32,
-    errmsg: String,
-}
-
-impl WecomResponse {
-    fn is_success(&self) -> bool {
-        self.errcode == 0
-    }
+#[derive(Deserialize)]
+struct TelegramResponse {
+    ok: bool,
+    description: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -144,23 +89,6 @@ impl NotificationClient {
         Self { client, config }
     }
 
-    // 清理可能导致Server酱数据库问题的特殊字符
-    fn sanitize_for_serverchan(text: &str) -> String {
-        text
-            .replace('「', "[")
-            .replace('」', "]")
-            .replace('【', "[")
-            .replace('】', "]")
-            .replace('〖', "[")
-            .replace('〗', "]")
-            .replace('〔', "[")
-            .replace('〕', "]")
-            // 移除其他可能有问题的Unicode字符
-            .chars()
-            .filter(|c| c.is_ascii() || (*c as u32) < 0x10000)
-            .collect()
-    }
-
     pub async fn send_scan_completion(&self, summary: &ScanSummary) -> Result<()> {
         if !self.config.enable_scan_notifications {
             debug!("推送通知已禁用，跳过发送");
@@ -191,21 +119,16 @@ impl NotificationClient {
 
         // 只向选中的渠道发送
         match active_channel {
-            "serverchan" => {
-                let Some(ref key) = self.config.serverchan_key else {
-                    warn!("Server酱渠道已激活但未配置密钥");
-                    return Ok(());
-                };
-
+            "telegram" => {
                 for attempt in 1..=self.config.notification_retry_count {
-                    match self.send_to_serverchan(key, &title, &content).await {
+                    match self.send_to_telegram(&title, &content).await {
                         Ok(_) => {
-                            info!("Server酱推送发送成功");
+                            info!("Telegram 推送发送成功");
                             return Ok(());
                         }
                         Err(e) => {
                             warn!(
-                                "Server酱推送发送失败 (尝试 {}/{}): {}",
+                                "Telegram 推送发送失败 (尝试 {}/{}): {}",
                                 attempt, self.config.notification_retry_count, e
                             );
                             if attempt < self.config.notification_retry_count {
@@ -214,56 +137,7 @@ impl NotificationClient {
                         }
                     }
                 }
-                error!("Server酱推送发送失败，已达最大重试次数");
-            }
-            "serverchan3" => {
-                let (Some(ref uid), Some(ref sendkey)) =
-                    (&self.config.serverchan3_uid, &self.config.serverchan3_sendkey)
-                else {
-                    warn!("Server酱3渠道已激活但未配置UID或SendKey");
-                    return Ok(());
-                };
-
-                for attempt in 1..=self.config.notification_retry_count {
-                    match self.send_to_serverchan3(uid, sendkey, &title, &content).await {
-                        Ok(_) => {
-                            info!("Server酱3推送发送成功");
-                            return Ok(());
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Server酱3推送发送失败 (尝试 {}/{}): {}",
-                                attempt, self.config.notification_retry_count, e
-                            );
-                            if attempt < self.config.notification_retry_count {
-                                tokio::time::sleep(Duration::from_secs(2)).await;
-                            }
-                        }
-                    }
-                }
-                error!("Server酱3推送发送失败，已达最大重试次数");
-            }
-            "wecom" => {
-                for attempt in 1..=self.config.notification_retry_count {
-                    let wecom_content = self.format_wecom_content(&content);
-
-                    match self.send_to_wecom(&title, &wecom_content).await {
-                        Ok(_) => {
-                            info!("企业微信推送发送成功");
-                            return Ok(());
-                        }
-                        Err(e) => {
-                            warn!(
-                                "企业微信推送发送失败 (尝试 {}/{}): {}",
-                                attempt, self.config.notification_retry_count, e
-                            );
-                            if attempt < self.config.notification_retry_count {
-                                tokio::time::sleep(Duration::from_secs(2)).await;
-                            }
-                        }
-                    }
-                }
-                error!("企业微信推送发送失败，已达最大重试次数");
+                error!("Telegram 推送发送失败，已达最大重试次数");
             }
             "webhook" => {
                 let Some(webhook_url) = self.get_runtime_webhook_url("扫描完成通知") else {
@@ -300,104 +174,49 @@ impl NotificationClient {
         Ok(())
     }
 
-    async fn send_to_serverchan(&self, key: &str, title: &str, content: &str) -> Result<()> {
-        let url = format!("https://sctapi.ftqq.com/{}.send", key);
-        let request = ServerChanRequest {
-            title: title.to_string(),
-            desp: content.to_string(),
+    /// 发送 Telegram 通知
+    async fn send_to_telegram(&self, title: &str, content: &str) -> Result<()> {
+        let bot_token = self
+            .config
+            .telegram_bot_token
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("未配置 Telegram Bot Token"))?;
+        let chat_id = self
+            .config
+            .telegram_chat_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("未配置 Telegram Chat ID"))?;
+
+        let api_base = self.config.telegram_api_base.trim().trim_end_matches('/');
+        let api_base = if api_base.is_empty() {
+            "https://api.telegram.org"
+        } else {
+            api_base
+        };
+        let url = format!("{}/bot{}/sendMessage", api_base, bot_token);
+        let request = TelegramSendMessageRequest {
+            chat_id: chat_id.to_string(),
+            text: format!("{}\n\n{}", title, content),
+            parse_mode: None,
+            disable_web_page_preview: Some(true),
         };
 
         let response = self.client.post(&url).json(&request).send().await?;
-
+        let status = response.status();
         let response_text = response.text().await?;
-        let server_response: ServerChanResponse = serde_json::from_str(&response_text)
-            .map_err(|e| anyhow!("解析响应失败: {}, 响应内容: {}", e, response_text))?;
-
-        if server_response.code == 0 {
-            Ok(())
-        } else {
-            Err(anyhow!("Server酱返回错误: {}", server_response.message))
-        }
-    }
-
-    /// 发送Server酱3通知
-    async fn send_to_serverchan3(&self, uid: &str, sendkey: &str, title: &str, content: &str) -> Result<()> {
-        let url = format!("https://{}.push.ft07.com/send/{}.send", uid, sendkey);
-        let request = ServerChanRequest {
-            title: title.to_string(),
-            desp: content.to_string(),
-        };
-
-        let response = self.client.post(&url).json(&request).send().await?;
-
-        let response_text = response.text().await?;
-        let server_response: ServerChanResponse = serde_json::from_str(&response_text)
-            .map_err(|e| anyhow!("解析Server酱3响应失败: {}, 响应内容: {}", e, response_text))?;
-
-        if server_response.code == 0 {
-            Ok(())
-        } else {
-            Err(anyhow!("Server酱3返回错误: {}", server_response.message))
-        }
-    }
-
-    /// 发送企业微信通知
-    async fn send_to_wecom(&self, title: &str, content: &str) -> Result<()> {
-        let Some(ref webhook_url) = self.config.wecom_webhook_url else {
-            return Err(anyhow!("未配置企业微信Webhook URL"));
-        };
-
-        let response = match self.config.wecom_msgtype.as_str() {
-            "text" => {
-                let full_content = format!("{}\n\n{}", title, content);
-                let full_content = self.truncate_wecom_text(&full_content);
-
-                let mentioned_list = if self.config.wecom_mention_all {
-                    Some(vec!["@all".to_string()])
-                } else {
-                    self.config.wecom_mentioned_list.clone()
-                };
-
-                let request = WecomTextRequest {
-                    msgtype: "text".to_string(),
-                    text: WecomTextContent {
-                        content: full_content,
-                        mentioned_list,
-                    },
-                };
-
-                self.client.post(webhook_url).json(&request).send().await?
-            }
-            "markdown" => {
-                // 先拼接完整内容，再进行长度限制（企业微信限制按 UTF-8 字节计算）
-                let full_content = format!("# {}\n\n{}", title, content);
-                let markdown_content = self.truncate_wecom_markdown(&full_content);
-
-                let request = WecomMarkdownRequest {
-                    msgtype: "markdown".to_string(),
-                    markdown: WecomMarkdownContent {
-                        content: markdown_content,
-                    },
-                };
-
-                self.client.post(webhook_url).json(&request).send().await?
-            }
-            _ => {
-                return Err(anyhow!("不支持的企业微信消息类型: {}", self.config.wecom_msgtype));
-            }
-        };
-
-        let response_text = response.text().await?;
-        let wecom_response: WecomResponse = serde_json::from_str(&response_text)
-            .map_err(|e| anyhow!("解析企业微信响应失败: {}, 响应内容: {}", e, response_text))?;
-
-        if wecom_response.is_success() {
+        let telegram_response: TelegramResponse = serde_json::from_str(&response_text)
+            .map_err(|e| anyhow!("解析 Telegram 响应失败: {}, 响应内容: {}", e, response_text))?;
+        if telegram_response.ok {
             Ok(())
         } else {
             Err(anyhow!(
-                "企业微信返回错误 (errcode: {}): {}",
-                wecom_response.errcode,
-                wecom_response.errmsg
+                "Telegram 返回错误 (status: {}): {}",
+                status,
+                telegram_response.description.unwrap_or_default()
             ))
         }
     }
@@ -825,51 +644,6 @@ impl NotificationClient {
         Self::render_custom_webhook_body(template, &sample_payload).map(|_| ())
     }
 
-    /// 截断 UTF-8 字符串到指定字节长度，并追加提示（保证结果仍是合法 UTF-8）。
-    fn truncate_utf8_bytes_with_suffix(content: &str, max_bytes: usize, suffix: &str) -> String {
-        if content.len() <= max_bytes {
-            return content.to_string();
-        }
-
-        let suffix_bytes = suffix.len();
-        if suffix_bytes >= max_bytes {
-            let mut end = max_bytes;
-            while end > 0 && !content.is_char_boundary(end) {
-                end -= 1;
-            }
-            return content[..end].to_string();
-        }
-
-        let mut end = max_bytes - suffix_bytes;
-        while end > 0 && !content.is_char_boundary(end) {
-            end -= 1;
-        }
-
-        let mut truncated = String::with_capacity(end + suffix_bytes);
-        truncated.push_str(&content[..end]);
-        truncated.push_str(suffix);
-        truncated
-    }
-
-    /// 格式化企业微信消息内容（预截断）
-    /// 企业微信 markdown 消息限制 4096 **字节**，这里预留部分字节给标题和格式。
-    fn format_wecom_content(&self, content: &str) -> String {
-        const MAX_WECOM_BYTES: usize = 3900;
-        Self::truncate_utf8_bytes_with_suffix(content, MAX_WECOM_BYTES, "\n\n...内容过长，已截断")
-    }
-
-    /// 截断企业微信 text 消息（严格限制 2048 字节）
-    fn truncate_wecom_text(&self, content: &str) -> String {
-        const MAX_TEXT_BYTES: usize = 2048;
-        Self::truncate_utf8_bytes_with_suffix(content, MAX_TEXT_BYTES, "\n\n...内容过长，已截断")
-    }
-
-    /// 截断企业微信 markdown 消息（严格限制 4096 字节）
-    fn truncate_wecom_markdown(&self, content: &str) -> String {
-        const MAX_MARKDOWN_BYTES: usize = 4096;
-        Self::truncate_utf8_bytes_with_suffix(content, MAX_MARKDOWN_BYTES, "\n\n...内容过长，已截断")
-    }
-
     fn format_scan_message(&self, summary: &ScanSummary) -> (String, String) {
         let title = "扫描完成".to_string();
 
@@ -919,7 +693,7 @@ impl NotificationClient {
                     };
 
                     // 清理源名称中的特殊字符
-                    let clean_source_name = Self::sanitize_for_serverchan(&source_result.source_name);
+                    let clean_source_name = source_result.source_name.clone();
 
                     content.push_str(&format!(
                         "{} **{}** - {} ({}个新视频):\n",
@@ -961,7 +735,7 @@ impl NotificationClient {
                         videos_shown += 1;
 
                         // 清理视频标题中的特殊字符
-                        let clean_title = Self::sanitize_for_serverchan(&video.title);
+                        let clean_title = video.title.clone();
                         let video_url = format!("https://www.bilibili.com/video/{}", video.bvid);
                         let mut video_line = format!("- [{}]({})", clean_title, video_url);
 
@@ -993,7 +767,7 @@ impl NotificationClient {
         }
 
         // 最终清理整个内容，确保没有问题字符
-        let clean_content = Self::sanitize_for_serverchan(&content);
+        let clean_content = content.clone();
 
         // 确保内容不超过限制
         let final_content = if clean_content.len() > MAX_CONTENT_LENGTH {
@@ -1015,40 +789,12 @@ impl NotificationClient {
         }
 
         match active_channel {
-            "serverchan" => {
-                let Some(ref key) = self.config.serverchan_key else {
-                    return Err(anyhow!("Server酱渠道已选择但未配置密钥"));
-                };
-
+            "telegram" => {
                 let title = "测试推送";
-                let content =
-                    "这是一条测试推送消息。\n\n如果您收到此消息，说明Server酱推送配置正确。\n\n🎉 推送功能工作正常！";
+                let content = "这是一条 Telegram 测试推送消息。\n\n如果您收到此消息，说明 Telegram 推送配置正确。\n\n🎉 推送功能工作正常！";
 
-                self.send_to_serverchan(key, title, content).await?;
-                info!("Server酱测试推送发送成功");
-                Ok(())
-            }
-            "serverchan3" => {
-                let (Some(ref uid), Some(ref sendkey)) =
-                    (&self.config.serverchan3_uid, &self.config.serverchan3_sendkey)
-                else {
-                    return Err(anyhow!("Server酱3渠道已选择但未配置UID或SendKey"));
-                };
-
-                let title = "测试推送";
-                let content =
-                    "这是一条测试推送消息。\n\n如果您收到此消息，说明Server酱3推送配置正确。\n\n🎉 推送功能工作正常！";
-
-                self.send_to_serverchan3(uid, sendkey, title, content).await?;
-                info!("Server酱3测试推送发送成功");
-                Ok(())
-            }
-            "wecom" => {
-                let title = "测试推送";
-                let content = "这是一条企业微信测试推送消息。\n\n如果您收到此消息，说明企业微信推送配置正确。\n\n🎉 推送功能工作正常！";
-
-                self.send_to_wecom(title, content).await?;
-                info!("企业微信测试推送发送成功");
+                self.send_to_telegram(title, content).await?;
+                info!("Telegram 测试推送发送成功");
                 Ok(())
             }
             "webhook" => {
@@ -1087,30 +833,9 @@ impl NotificationClient {
         let content = format!("🧪 **自定义测试消息**\n\n{}", message);
 
         match active_channel {
-            "serverchan" => {
-                let Some(ref key) = self.config.serverchan_key else {
-                    return Err(anyhow!("Server酱渠道已选择但未配置密钥"));
-                };
-
-                self.send_to_serverchan(key, title, &content).await?;
-                info!("Server酱自定义测试推送发送成功");
-                Ok(())
-            }
-            "serverchan3" => {
-                let (Some(ref uid), Some(ref sendkey)) =
-                    (&self.config.serverchan3_uid, &self.config.serverchan3_sendkey)
-                else {
-                    return Err(anyhow!("Server酱3渠道已选择但未配置UID或SendKey"));
-                };
-
-                self.send_to_serverchan3(uid, sendkey, title, &content).await?;
-                info!("Server酱3自定义测试推送发送成功");
-                Ok(())
-            }
-            "wecom" => {
-                let wecom_content = self.format_wecom_content(&content);
-                self.send_to_wecom(title, &wecom_content).await?;
-                info!("企业微信自定义测试推送发送成功");
+            "telegram" => {
+                self.send_to_telegram(title, &content).await?;
+                info!("Telegram 自定义测试推送发送成功");
                 Ok(())
             }
             "webhook" => {
@@ -1152,49 +877,14 @@ impl NotificationClient {
         };
 
         match active_channel {
-            "serverchan" => {
-                let Some(ref key) = self.config.serverchan_key else {
-                    warn!("Server酱渠道已激活但未配置密钥，跳过风控通知");
-                    return Ok(());
-                };
-
-                match self.send_to_serverchan(key, title, &content).await {
-                    Ok(_) => {
-                        info!("风控通知推送成功 (Server酱)");
-                    }
-                    Err(e) => {
-                        warn!("风控通知推送失败 (Server酱): {}", e);
-                    }
+            "telegram" => match self.send_to_telegram(title, &content).await {
+                Ok(_) => {
+                    info!("风控通知推送成功 (Telegram)");
                 }
-            }
-            "serverchan3" => {
-                let (Some(ref uid), Some(ref sendkey)) =
-                    (&self.config.serverchan3_uid, &self.config.serverchan3_sendkey)
-                else {
-                    warn!("Server酱3渠道已激活但未配置UID或SendKey，跳过风控通知");
-                    return Ok(());
-                };
-
-                match self.send_to_serverchan3(uid, sendkey, title, &content).await {
-                    Ok(_) => {
-                        info!("风控通知推送成功 (Server酱3)");
-                    }
-                    Err(e) => {
-                        warn!("风控通知推送失败 (Server酱3): {}", e);
-                    }
+                Err(e) => {
+                    warn!("风控通知推送失败 (Telegram): {}", e);
                 }
-            }
-            "wecom" => {
-                let wecom_content = self.format_wecom_content(&content);
-                match self.send_to_wecom(title, &wecom_content).await {
-                    Ok(_) => {
-                        info!("风控通知推送成功 (企业微信)");
-                    }
-                    Err(e) => {
-                        warn!("风控通知推送失败 (企业微信): {}", e);
-                    }
-                }
-            }
+            },
             "webhook" => {
                 let Some(webhook_url) = self.get_runtime_webhook_url("风控通知") else {
                     return Ok(());
@@ -1241,57 +931,18 @@ impl NotificationClient {
             **视频**: {}\n\
             **BVID**: [{}](https://www.bilibili.com/video/{})\n\
             **新分P数**: {}{}",
-            Self::sanitize_for_serverchan(video_name),
-            bvid,
-            bvid,
-            total_pages,
-            path_info
+            video_name, bvid, bvid, total_pages, path_info
         );
 
         match active_channel {
-            "serverchan" => {
-                let Some(ref key) = self.config.serverchan_key else {
-                    warn!("Server酱渠道已激活但未配置密钥，跳过单P变多P通知");
-                    return Ok(());
-                };
-
-                match self.send_to_serverchan(key, title, &content).await {
-                    Ok(_) => {
-                        info!("单P变多P通知推送成功 (Server酱)");
-                    }
-                    Err(e) => {
-                        warn!("单P变多P通知推送失败 (Server酱): {}", e);
-                    }
+            "telegram" => match self.send_to_telegram(title, &content).await {
+                Ok(_) => {
+                    info!("单P变多P通知推送成功 (Telegram)");
                 }
-            }
-            "serverchan3" => {
-                let (Some(ref uid), Some(ref sendkey)) =
-                    (&self.config.serverchan3_uid, &self.config.serverchan3_sendkey)
-                else {
-                    warn!("Server酱3渠道已激活但未配置UID或SendKey，跳过单P变多P通知");
-                    return Ok(());
-                };
-
-                match self.send_to_serverchan3(uid, sendkey, title, &content).await {
-                    Ok(_) => {
-                        info!("单P变多P通知推送成功 (Server酱3)");
-                    }
-                    Err(e) => {
-                        warn!("单P变多P通知推送失败 (Server酱3): {}", e);
-                    }
+                Err(e) => {
+                    warn!("单P变多P通知推送失败 (Telegram): {}", e);
                 }
-            }
-            "wecom" => {
-                let wecom_content = self.format_wecom_content(&content);
-                match self.send_to_wecom(title, &wecom_content).await {
-                    Ok(_) => {
-                        info!("单P变多P通知推送成功 (企业微信)");
-                    }
-                    Err(e) => {
-                        warn!("单P变多P通知推送失败 (企业微信): {}", e);
-                    }
-                }
-            }
+            },
             "webhook" => {
                 let Some(webhook_url) = self.get_runtime_webhook_url("单P变多P通知") else {
                     return Ok(());
@@ -1335,56 +986,18 @@ impl NotificationClient {
             **错误类型**: {}\n\
             **错误信息**: {}\n\
             **发生时间**: {}{}",
-            error_type,
-            Self::sanitize_for_serverchan(error_message),
-            timestamp,
-            context_info
+            error_type, error_message, timestamp, context_info
         );
 
         match active_channel {
-            "serverchan" => {
-                let Some(ref key) = self.config.serverchan_key else {
-                    warn!("Server酱渠道已激活但未配置密钥，跳过错误通知");
-                    return Ok(());
-                };
-
-                match self.send_to_serverchan(key, &title, &content).await {
-                    Ok(_) => {
-                        info!("错误通知推送成功 (Server酱)");
-                    }
-                    Err(e) => {
-                        warn!("错误通知推送失败 (Server酱): {}", e);
-                    }
+            "telegram" => match self.send_to_telegram(&title, &content).await {
+                Ok(_) => {
+                    info!("错误通知推送成功 (Telegram)");
                 }
-            }
-            "serverchan3" => {
-                let (Some(ref uid), Some(ref sendkey)) =
-                    (&self.config.serverchan3_uid, &self.config.serverchan3_sendkey)
-                else {
-                    warn!("Server酱3渠道已激活但未配置UID或SendKey，跳过错误通知");
-                    return Ok(());
-                };
-
-                match self.send_to_serverchan3(uid, sendkey, &title, &content).await {
-                    Ok(_) => {
-                        info!("错误通知推送成功 (Server酱3)");
-                    }
-                    Err(e) => {
-                        warn!("错误通知推送失败 (Server酱3): {}", e);
-                    }
+                Err(e) => {
+                    warn!("错误通知推送失败 (Telegram): {}", e);
                 }
-            }
-            "wecom" => {
-                let wecom_content = self.format_wecom_content(&content);
-                match self.send_to_wecom(&title, &wecom_content).await {
-                    Ok(_) => {
-                        info!("错误通知推送成功 (企业微信)");
-                    }
-                    Err(e) => {
-                        warn!("错误通知推送失败 (企业微信): {}", e);
-                    }
-                }
-            }
+            },
             "webhook" => {
                 let Some(webhook_url) = self.get_runtime_webhook_url("错误通知") else {
                     return Ok(());
@@ -1469,21 +1082,6 @@ mod tests {
     use tokio::sync::Mutex;
 
     #[test]
-    fn test_wecom_response_success() {
-        let resp = WecomResponse {
-            errcode: 0,
-            errmsg: "ok".to_string(),
-        };
-        assert!(resp.is_success());
-
-        let resp = WecomResponse {
-            errcode: 40001,
-            errmsg: "invalid webhook url".to_string(),
-        };
-        assert!(!resp.is_success());
-    }
-
-    #[test]
     fn test_notification_config_validation() {
         let mut config = NotificationConfig {
             enable_scan_notifications: true,
@@ -1493,53 +1091,69 @@ mod tests {
         // 未配置任何渠道应该失败
         assert!(config.validate().is_err());
 
-        // 配置企业微信后应该通过
-        config.wecom_webhook_url = Some("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test".to_string());
+        // 配置 Telegram 后应该通过
+        config.telegram_bot_token = Some("token".to_string());
+        config.telegram_chat_id = Some("chat".to_string());
+        config.active_channel = "telegram".to_string();
         assert!(config.validate().is_ok());
 
-        // 错误的URL格式应该失败
-        config.wecom_webhook_url = Some("https://example.com/webhook".to_string());
+        // API 地址格式错误应该失败
+        config.telegram_api_base = "api.telegram.org".to_string();
         assert!(config.validate().is_err());
 
-        // 错误的消息类型应该失败
-        config.wecom_webhook_url = Some("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test".to_string());
-        config.wecom_msgtype = "invalid".to_string();
+        config.telegram_api_base = "https://api.telegram.org".to_string();
+        assert!(config.validate().is_ok());
+
+        // Webhook 缺少 URL 应该失败
+        config.active_channel = "webhook".to_string();
         assert!(config.validate().is_err());
     }
 
-    #[test]
-    fn test_format_wecom_content() {
-        let config = NotificationConfig::default();
-        let client = NotificationClient::new(config);
-
-        // 短内容应该保持不变
-        let short_content = "测试内容";
-        assert_eq!(client.format_wecom_content(short_content), short_content);
-
-        // 长内容应该被截断
-        let long_content = "a".repeat(5000);
-        let formatted = client.format_wecom_content(&long_content);
-        assert!(formatted.len() < 4100);
-        assert!(formatted.contains("内容过长，已截断"));
-
-        // 多字节内容也必须按字节严格截断（避免超过企业微信限制）
-        const MAX_WECOM_BYTES: usize = 3900;
-        let long_multibyte = "测".repeat(5000);
-        let formatted_multibyte = client.format_wecom_content(&long_multibyte);
-        assert!(formatted_multibyte.len() <= MAX_WECOM_BYTES);
-        assert!(formatted_multibyte.contains("内容过长，已截断"));
+    #[derive(Debug, Clone)]
+    struct CapturedTelegramRequest {
+        path: String,
+        body: serde_json::Value,
     }
 
-    #[test]
-    fn test_truncate_wecom_markdown_multibyte() {
-        let config = NotificationConfig::default();
+    async fn capture_telegram_request(
+        State(captured): State<Arc<Mutex<Option<CapturedTelegramRequest>>>>,
+        uri: axum::http::Uri,
+        Json(body): Json<serde_json::Value>,
+    ) -> impl IntoResponse {
+        *captured.lock().await = Some(CapturedTelegramRequest {
+            path: uri.path().to_string(),
+            body,
+        });
+        Json(json!({ "ok": true }))
+    }
+
+    #[tokio::test]
+    async fn test_send_to_telegram_posts_expected_payload() -> Result<()> {
+        let captured = Arc::new(Mutex::new(None));
+        let app = Router::new()
+            .route("/bottest-token/sendMessage", post(capture_telegram_request))
+            .with_state(captured.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let addr = listener.local_addr()?;
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let config = NotificationConfig {
+            active_channel: "telegram".to_string(),
+            telegram_bot_token: Some("test-token".to_string()),
+            telegram_chat_id: Some("123456".to_string()),
+            telegram_api_base: format!("http://{addr}"),
+            ..Default::default()
+        };
         let client = NotificationClient::new(config);
+        client.send_to_telegram("标题", "正文").await?;
 
-        let long_content = format!("# 标题\n\n{}", "测".repeat(5000));
-        let truncated = client.truncate_wecom_markdown(&long_content);
-
-        assert!(truncated.len() <= 4096);
-        assert!(truncated.contains("内容过长，已截断"));
+        let captured = captured.lock().await.clone().expect("应捕获 Telegram 请求");
+        assert_eq!(captured.path, "/bottest-token/sendMessage");
+        assert_eq!(captured.body["chat_id"], "123456");
+        assert_eq!(captured.body["text"], "标题\n\n正文");
+        Ok(())
     }
 
     #[test]

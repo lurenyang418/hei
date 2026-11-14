@@ -297,27 +297,18 @@ fn default_cdn_sorting() -> bool {
 pub struct NotificationConfig {
     // === 当前激活的通知渠道 ===
     #[serde(default = "default_active_channel")]
-    pub active_channel: String, // "none", "serverchan", "serverchan3", "wecom", "webhook"
+    pub active_channel: String, // "none", "telegram", "webhook"
 
-    // === Server酱配置 ===
+    // === Telegram 配置 ===
+    /// Telegram Bot Token（通过 @BotFather 获取）
     #[serde(default)]
-    pub serverchan_key: Option<String>,
-
-    // === Server酱3配置 ===
+    pub telegram_bot_token: Option<String>,
+    /// Telegram 目标 Chat ID（用户、群组或频道）
     #[serde(default)]
-    pub serverchan3_uid: Option<String>,
-    #[serde(default)]
-    pub serverchan3_sendkey: Option<String>,
-
-    // === 企业微信群机器人配置 ===
-    #[serde(default)]
-    pub wecom_webhook_url: Option<String>,
-    #[serde(default = "default_wecom_msgtype")]
-    pub wecom_msgtype: String,
-    #[serde(default)]
-    pub wecom_mention_all: bool,
-    #[serde(default)]
-    pub wecom_mentioned_list: Option<Vec<String>>,
+    pub telegram_chat_id: Option<String>,
+    /// Telegram Bot API 地址，默认 https://api.telegram.org，可指向自建或反向代理
+    #[serde(default = "default_telegram_api_base")]
+    pub telegram_api_base: String,
 
     // === 通用Webhook配置 ===
     #[serde(default)]
@@ -357,8 +348,8 @@ fn default_notification_retry_count() -> u8 {
     3
 }
 
-fn default_wecom_msgtype() -> String {
-    "markdown".to_string()
+fn default_telegram_api_base() -> String {
+    "https://api.telegram.org".to_string()
 }
 
 fn default_active_channel() -> String {
@@ -373,13 +364,9 @@ impl Default for NotificationConfig {
     fn default() -> Self {
         Self {
             active_channel: default_active_channel(),
-            serverchan_key: None,
-            serverchan3_uid: None,
-            serverchan3_sendkey: None,
-            wecom_webhook_url: None,
-            wecom_msgtype: default_wecom_msgtype(),
-            wecom_mention_all: false,
-            wecom_mentioned_list: None,
+            telegram_bot_token: None,
+            telegram_chat_id: None,
+            telegram_api_base: default_telegram_api_base(),
             webhook_url: None,
             webhook_bearer_token: None,
             webhook_custom_headers: None,
@@ -405,54 +392,21 @@ impl NotificationConfig {
             return;
         }
 
-        // 优先选择 Server酱
-        if self.serverchan_key.is_some() && !self.serverchan_key.as_ref().unwrap().is_empty() {
-            self.active_channel = "serverchan".to_string();
-        }
-        // 其次选择 Server酱3
-        else if self.serverchan3_uid.is_some()
-            && self.serverchan3_sendkey.is_some()
-            && !self.serverchan3_uid.as_ref().unwrap().is_empty()
-            && !self.serverchan3_sendkey.as_ref().unwrap().is_empty()
-        {
-            self.active_channel = "serverchan3".to_string();
-        }
-        // 最后选择企业微信
-        else if self.wecom_webhook_url.is_some() && !self.wecom_webhook_url.as_ref().unwrap().is_empty() {
-            self.active_channel = "wecom".to_string();
-        }
-        // 再次选择通用Webhook
-        else if self.webhook_url.is_some() && !self.webhook_url.as_ref().unwrap().is_empty() {
+        // 仅保留 Webhook：旧配置里存在 Webhook URL 时自动启用
+        if self.webhook_url.as_ref().is_some_and(|url| !url.trim().is_empty()) {
             self.active_channel = "webhook".to_string();
         }
     }
 
     pub fn validate(&self) -> Result<(), String> {
         // 验证 active_channel 的有效性
-        if !["none", "serverchan", "serverchan3", "wecom", "webhook"].contains(&self.active_channel.as_str()) {
+        if !["none", "telegram", "webhook"].contains(&self.active_channel.as_str()) {
             return Err(format!("无效的通知渠道: {}", self.active_channel));
         }
 
-        // 启用推送时，如果未显式选择渠道，则尝试按旧配置规则推断渠道
+        // 启用推送时，如果未显式选择渠道，则按旧配置推断：存在 Webhook URL 即使用 Webhook
         let active_channel = if self.enable_scan_notifications && self.active_channel == "none" {
-            // 优先选择 Server酱
-            if self.serverchan_key.is_some() && !self.serverchan_key.as_ref().unwrap().is_empty() {
-                "serverchan"
-            }
-            // 其次选择 Server酱3
-            else if self.serverchan3_uid.is_some()
-                && self.serverchan3_sendkey.is_some()
-                && !self.serverchan3_uid.as_ref().unwrap().is_empty()
-                && !self.serverchan3_sendkey.as_ref().unwrap().is_empty()
-            {
-                "serverchan3"
-            }
-            // 最后选择企业微信
-            else if self.wecom_webhook_url.is_some() && !self.wecom_webhook_url.as_ref().unwrap().is_empty() {
-                "wecom"
-            }
-            // 再次选择通用Webhook
-            else if self.webhook_url.is_some() && !self.webhook_url.as_ref().unwrap().is_empty() {
+            if self.webhook_url.as_ref().is_some_and(|url| !url.trim().is_empty()) {
                 "webhook"
             } else {
                 "none"
@@ -469,31 +423,16 @@ impl NotificationConfig {
 
             // 验证选中渠道的配置
             match active_channel {
-                "serverchan" => {
-                    if self.serverchan_key.is_none() || self.serverchan_key.as_ref().unwrap().is_empty() {
-                        return Err("已选择Server酱但未配置密钥".to_string());
+                "telegram" => {
+                    if self.telegram_bot_token.as_deref().is_none_or(|v| v.trim().is_empty()) {
+                        return Err("已选择 Telegram 但未配置 Bot Token".to_string());
                     }
-                }
-                "serverchan3" => {
-                    if self.serverchan3_uid.is_none() || self.serverchan3_uid.as_ref().unwrap().is_empty() {
-                        return Err("已选择Server酱3但未配置UID".to_string());
+                    if self.telegram_chat_id.as_deref().is_none_or(|v| v.trim().is_empty()) {
+                        return Err("已选择 Telegram 但未配置 Chat ID".to_string());
                     }
-                    if self.serverchan3_sendkey.is_none() || self.serverchan3_sendkey.as_ref().unwrap().is_empty() {
-                        return Err("已选择Server酱3但未配置SendKey".to_string());
-                    }
-                }
-                "wecom" => {
-                    if self.wecom_webhook_url.is_none() || self.wecom_webhook_url.as_ref().unwrap().is_empty() {
-                        return Err("已选择企业微信但未配置Webhook URL".to_string());
-                    }
-
-                    let url = self.wecom_webhook_url.as_ref().unwrap();
-                    if !url.starts_with("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=") {
-                        return Err("企业微信Webhook URL格式不正确".to_string());
-                    }
-
-                    if !matches!(self.wecom_msgtype.as_str(), "text" | "markdown") {
-                        return Err("企业微信消息类型必须是 'text' 或 'markdown'".to_string());
+                    let api_base = self.telegram_api_base.trim();
+                    if !(api_base.starts_with("http://") || api_base.starts_with("https://")) {
+                        return Err("Telegram API 地址格式不正确".to_string());
                     }
                 }
                 "webhook" => {

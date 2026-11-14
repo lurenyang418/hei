@@ -1078,13 +1078,9 @@ pub struct SysInfo {
 #[derive(Serialize, ToSchema)]
 pub struct NotificationConfigResponse {
     pub active_channel: String,
-    pub serverchan_key: Option<String>,
-    pub serverchan3_uid: Option<String>,
-    pub serverchan3_sendkey: Option<String>,
-    pub wecom_webhook_url: Option<String>,
-    pub wecom_msgtype: String,
-    pub wecom_mention_all: bool,
-    pub wecom_mentioned_list: Option<Vec<String>>,
+    pub telegram_bot_token: Option<String>,
+    pub telegram_chat_id: Option<String>,
+    pub telegram_api_base: String,
     pub webhook_url: Option<String>,
     pub webhook_bearer_token: Option<String>,
     pub webhook_custom_headers: Option<String>,

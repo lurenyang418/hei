@@ -30,7 +30,6 @@
 		SettingsIcon,
 		ShieldIcon,
 		VideoIcon,
-		PaletteIcon,
 		BellIcon,
 		SparklesIcon,
 		RefreshCwIcon,
@@ -39,11 +38,8 @@
 	} from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { theme, setTheme } from '$lib/stores/theme';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
-	// import type { Theme } from '$lib/stores/theme'; // 未使用，已注释
-	import ThemeToggle from '$lib/components/theme-toggle.svelte';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
 	let config: ConfigResponse | null = null;
@@ -115,15 +111,9 @@
 			icon: MonitorIcon
 		},
 		{
-			id: 'interface',
-			title: '界面设置',
-			description: '主题模式、显示选项等界面配置',
-			icon: PaletteIcon
-		},
-		{
 			id: 'notification',
 			title: '推送通知',
-			description: '扫描完成推送、Server酱/企业微信配置',
+			description: '扫描完成推送、Telegram/Webhook 配置',
 			icon: BellIcon
 		},
 		{
@@ -155,7 +145,6 @@
 		risk: '调整投稿源扫描时的风控规避策略、批量设置和延迟参数。',
 		captcha: '设置遇到验证码风控时的处理模式、超时和自动识别参数。',
 		aria2: '配置外部 Aria2 的健康检查、自动重启和监控策略。',
-		interface: '调整主题模式和前端界面显示偏好。',
 		notification: '配置扫描完成后的推送渠道、测试发送和通知内容。',
 		ai_rename: '配置 AI 自动重命名的启用范围、提示词和相关行为。',
 		system: '调整扫描间隔、监听端口、路径模板和基础系统行为。',
@@ -394,15 +383,10 @@
 
 	// 推送通知配置
 	let notificationEnabled = false;
-	let activeNotificationChannel: 'none' | 'serverchan' | 'serverchan3' | 'wecom' | 'webhook' =
-		'none';
-	let serverchanKey = '';
-	let serverchan3Uid = '';
-	let serverchan3Sendkey = '';
-	let wecomWebhookUrl = '';
-	let wecomMsgtype = 'markdown';
-	let wecomMentionAll = false;
-	let wecomMentionedList = '';
+	let activeNotificationChannel: 'none' | 'telegram' | 'webhook' = 'none';
+	let telegramBotToken = '';
+	let telegramChatId = '';
+	let telegramApiBase = 'https://api.telegram.org';
 	let webhookUrl = '';
 	let webhookBearerToken = '';
 	let webhookCustomHeaders = '';
@@ -1606,19 +1590,10 @@
 		};
 
 		// 根据选择的渠道提交相应配置
-		if (activeNotificationChannel === 'serverchan') {
-			config.serverchan_key = serverchanKey.trim();
-		} else if (activeNotificationChannel === 'serverchan3') {
-			config.serverchan3_uid = serverchan3Uid.trim();
-			config.serverchan3_sendkey = serverchan3Sendkey.trim();
-		} else if (activeNotificationChannel === 'wecom') {
-			config.wecom_webhook_url = wecomWebhookUrl.trim();
-			config.wecom_msgtype = wecomMsgtype;
-			config.wecom_mention_all = wecomMentionAll;
-			config.wecom_mentioned_list = wecomMentionedList
-				.split(',')
-				.map((s) => s.trim())
-				.filter((s) => s);
+		if (activeNotificationChannel === 'telegram') {
+			config.telegram_bot_token = telegramBotToken.trim();
+			config.telegram_chat_id = telegramChatId.trim();
+			config.telegram_api_base = telegramApiBase.trim();
 		} else if (activeNotificationChannel === 'webhook') {
 			config.webhook_url = webhookUrl.trim();
 			config.webhook_bearer_token = webhookBearerToken.trim();
@@ -1742,28 +1717,16 @@
 		// 加载激活渠道
 		activeNotificationChannel = (response.data.active_channel || 'none') as
 			| 'none'
-			| 'serverchan'
-			| 'serverchan3'
-			| 'wecom'
+			| 'telegram'
 			| 'webhook';
 
 		notificationEnabled = response.data.enable_scan_notifications;
 		notificationMinVideos = response.data.notification_min_videos;
 
-		// 加载Server酱配置（如果有）
-		serverchanKey = response.data.serverchan_key || '';
-
-		// 加载Server酱3配置（如果有）
-		serverchan3Uid = response.data.serverchan3_uid || '';
-		serverchan3Sendkey = response.data.serverchan3_sendkey || '';
-
-		// 加载企业微信配置（如果有）
-		wecomWebhookUrl = response.data.wecom_webhook_url || '';
-		wecomMsgtype = response.data.wecom_msgtype || 'markdown';
-		wecomMentionAll = response.data.wecom_mention_all || false;
-		if (response.data.wecom_mentioned_list) {
-			wecomMentionedList = response.data.wecom_mentioned_list.join(', ');
-		}
+		// 加载 Telegram 配置（如果有）
+		telegramBotToken = response.data.telegram_bot_token || '';
+		telegramChatId = response.data.telegram_chat_id || '';
+		telegramApiBase = response.data.telegram_api_base || 'https://api.telegram.org';
 
 		// 加载通用Webhook配置（如果有）
 		webhookUrl = response.data.webhook_url || '';
@@ -1790,19 +1753,10 @@
 			active_channel: activeNotificationChannel
 		};
 
-		if (activeNotificationChannel === 'serverchan') {
-			request.serverchan_key = serverchanKey.trim();
-		} else if (activeNotificationChannel === 'serverchan3') {
-			request.serverchan3_uid = serverchan3Uid.trim();
-			request.serverchan3_sendkey = serverchan3Sendkey.trim();
-		} else if (activeNotificationChannel === 'wecom') {
-			request.wecom_webhook_url = wecomWebhookUrl.trim();
-			request.wecom_msgtype = wecomMsgtype;
-			request.wecom_mention_all = wecomMentionAll;
-			request.wecom_mentioned_list = wecomMentionedList
-				.split(',')
-				.map((s) => s.trim())
-				.filter((s) => s.length > 0);
+		if (activeNotificationChannel === 'telegram') {
+			request.telegram_bot_token = telegramBotToken.trim();
+			request.telegram_chat_id = telegramChatId.trim();
+			request.telegram_api_base = telegramApiBase.trim();
 		} else if (activeNotificationChannel === 'webhook') {
 			request.webhook_url = webhookUrl.trim();
 			request.webhook_bearer_token = webhookBearerToken.trim();
@@ -3943,98 +3897,6 @@
 	</form>
 </ResponsiveSheet>
 
-<!-- 界面设置抽屉 -->
-<ResponsiveSheet
-	open={openSheet === 'interface'}
-	onOpenChange={(open) => {
-		if (!open) openSheet = null;
-	}}
-	title="界面设置"
-	description="主题模式、显示选项等界面配置"
-	titleTooltip={getSettingTooltip('interface')}
-	{isMobile}
->
-	<div class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}">
-		<div class="bg-background/50 min-h-0 flex-1 overflow-y-auto {isMobile ? 'px-4 pb-4' : 'p-6'}">
-			<div class="mx-auto max-w-4xl space-y-6">
-				<!-- 主题设置 -->
-				<div class="space-y-4">
-					<SectionHeader
-						as="div"
-						title="主题模式"
-						description="选择您偏好的界面主题"
-						titleTooltip="切换浅色、深色或跟随系统的界面主题。"
-						titleClass="text-lg font-medium"
-						descriptionClass="text-muted-foreground text-sm"
-					>
-						{#snippet actions()}
-							<div class="flex items-center gap-2">
-								<span class="text-muted-foreground text-sm">快速切换:</span>
-								<ThemeToggle />
-							</div>
-						{/snippet}
-					</SectionHeader>
-
-					<div class="space-y-3">
-						<h4 class="text-sm font-medium">快速切换</h4>
-						<div class="grid grid-cols-3 gap-3">
-							<button
-								class="hover:bg-accent rounded-lg border p-3 text-center transition-colors {$theme ===
-								'light'
-									? 'border-primary bg-primary/10'
-									: 'border-border'}"
-								onclick={() => setTheme('light')}
-							>
-								<div class="bg-background mb-2 rounded-md border p-2">
-									<div class="h-8 rounded bg-gradient-to-r from-gray-100 to-gray-200"></div>
-								</div>
-								<span class="text-xs font-medium">浅色模式</span>
-							</button>
-
-							<button
-								class="hover:bg-accent rounded-lg border p-3 text-center transition-colors {$theme ===
-								'dark'
-									? 'border-primary bg-primary/10'
-									: 'border-border'}"
-								onclick={() => setTheme('dark')}
-							>
-								<div class="mb-2 rounded-md border bg-slate-900 p-2">
-									<div class="h-8 rounded bg-gradient-to-r from-slate-700 to-slate-800"></div>
-								</div>
-								<span class="text-xs font-medium">深色模式</span>
-							</button>
-
-							<button
-								class="hover:bg-accent rounded-lg border p-3 text-center transition-colors {$theme ===
-								'system'
-									? 'border-primary bg-primary/10'
-									: 'border-border'}"
-								onclick={() => setTheme('system')}
-							>
-								<div class="mb-2 rounded-md border bg-gradient-to-r from-gray-100 to-slate-900 p-2">
-									<div class="h-8 rounded bg-gradient-to-r from-gray-200 to-slate-700"></div>
-								</div>
-								<span class="text-xs font-medium">跟随系统</span>
-							</button>
-						</div>
-					</div>
-
-					<div
-						class="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950/20"
-					>
-						<h5 class="mb-2 font-medium text-blue-800 dark:text-blue-200">主题说明</h5>
-						<div class="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-							<p><strong>浅色模式：</strong>适合在明亮环境下使用，提供清晰的视觉体验</p>
-							<p><strong>深色模式：</strong>适合在昏暗环境下使用，减少眼部疲劳</p>
-							<p><strong>跟随系统：</strong>根据操作系统的主题设置自动切换</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-</ResponsiveSheet>
-
 <!-- 系统设置抽屉 -->
 <ResponsiveSheet
 	open={openSheet === 'system'}
@@ -4253,13 +4115,7 @@
 						{#if activeNotificationChannel !== 'none'}
 							<Badge variant="default" class="bg-green-500">已配置</Badge>
 							<span class="text-sm text-green-700 dark:text-green-400">
-								{activeNotificationChannel === 'serverchan'
-									? 'Server酱'
-									: activeNotificationChannel === 'serverchan3'
-										? 'Server酱3'
-										: activeNotificationChannel === 'wecom'
-											? '企业微信'
-											: 'Webhook'}已配置
+								{activeNotificationChannel === 'telegram' ? 'Telegram' : 'Webhook'}已配置
 							</span>
 						{:else}
 							<Badge variant="secondary">未配置</Badge>
@@ -4299,9 +4155,7 @@
 						value={activeNotificationChannel}
 						options={[
 							{ value: 'none', label: '无' },
-							{ value: 'serverchan', label: 'Server酱' },
-							{ value: 'serverchan3', label: 'Server酱3' },
-							{ value: 'wecom', label: '企业微信群机器人' },
+							{ value: 'telegram', label: 'Telegram' },
 							{ value: 'webhook', label: 'Webhook' }
 						]}
 						onChange={(nextValue) =>
@@ -4314,29 +4168,55 @@
 				</div>
 			</div>
 
-			<!-- Server酱配置 -->
-			{#if activeNotificationChannel === 'serverchan'}
+			<!-- Telegram配置 -->
+			{#if activeNotificationChannel === 'telegram'}
 				<div
-					class="space-y-4 rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/10"
+					class="space-y-4 rounded-lg border border-sky-200 bg-sky-50/50 p-4 dark:border-sky-800 dark:bg-sky-950/10"
 				>
-					<h3 class="text-base font-semibold">Server酱配置</h3>
+					<h3 class="text-base font-semibold">Telegram 配置</h3>
 
 					<div class="space-y-2">
-						<Label for="serverchan-key">Server酱 SendKey</Label>
+						<Label for="telegram-bot-token">Bot Token</Label>
 						<Input
-							id="serverchan-key"
+							id="telegram-bot-token"
 							type="password"
-							bind:value={serverchanKey}
+							bind:value={telegramBotToken}
 							placeholder={notificationStatus?.configured
 								? '已配置（留空保持不变）'
-								: '请输入Server酱密钥'}
+								: '请输入 Bot Token'}
 						/>
 						<p class="text-muted-foreground text-sm">
-							从 <a
-								href="https://sct.ftqq.com/"
+							通过 <a
+								href="https://t.me/BotFather"
 								target="_blank"
-								class="text-primary hover:underline">sct.ftqq.com</a
-							> 获取您的SendKey
+								class="text-primary hover:underline">@BotFather</a
+							> 创建机器人后获取
+						</p>
+					</div>
+
+					<div class="space-y-2">
+						<Label for="telegram-chat-id">Chat ID</Label>
+						<Input
+							id="telegram-chat-id"
+							type="text"
+							bind:value={telegramChatId}
+							placeholder="例如 123456789 或 -1001234567890"
+						/>
+						<p class="text-muted-foreground text-sm">
+							私聊、群组或频道的 Chat ID；群组/频道通常以 -100 开头
+						</p>
+					</div>
+
+					<div class="space-y-2">
+						<Label for="telegram-api-base">API 地址（可选）</Label>
+						<Input
+							id="telegram-api-base"
+							type="text"
+							bind:value={telegramApiBase}
+							placeholder="https://api.telegram.org"
+						/>
+						<p class="text-muted-foreground text-sm">
+							默认 https://api.telegram.org；如使用反向代理或自建 Bot API，可填写对应地址
 						</p>
 					</div>
 				</div>
@@ -4522,111 +4402,6 @@
 				</div>
 			{/if}
 
-			<!-- Server酱3配置 -->
-			{#if activeNotificationChannel === 'serverchan3'}
-				<div
-					class="space-y-4 rounded-lg border border-cyan-200 bg-cyan-50/50 p-4 dark:border-cyan-800 dark:bg-cyan-950/10"
-				>
-					<h3 class="text-base font-semibold">Server酱3配置</h3>
-
-					<div class="space-y-2">
-						<Label for="serverchan3-uid">UID</Label>
-						<Input
-							id="serverchan3-uid"
-							type="text"
-							bind:value={serverchan3Uid}
-							placeholder="请输入您的UID"
-						/>
-						<p class="text-muted-foreground text-sm">您的Server酱3用户UID</p>
-					</div>
-
-					<div class="space-y-2">
-						<Label for="serverchan3-sendkey">SendKey</Label>
-						<Input
-							id="serverchan3-sendkey"
-							type="password"
-							bind:value={serverchan3Sendkey}
-							placeholder={notificationStatus?.configured
-								? '已配置（留空保持不变）'
-								: '请输入Server酱3密钥'}
-						/>
-						<p class="text-muted-foreground text-sm">
-							从 <a
-								href="https://sc3.ft07.com/sendkey"
-								target="_blank"
-								class="text-primary hover:underline">sc3.ft07.com/sendkey</a
-							> 获取您的SendKey
-						</p>
-					</div>
-				</div>
-			{/if}
-
-			<!-- 企业微信配置 -->
-			{#if activeNotificationChannel === 'wecom'}
-				<div
-					class="space-y-4 rounded-lg border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-800 dark:bg-purple-950/10"
-				>
-					<h3 class="text-base font-semibold">企业微信群机器人配置</h3>
-
-					<div class="space-y-2">
-						<Label for="wecom-webhook-url">Webhook URL</Label>
-						<Input
-							id="wecom-webhook-url"
-							type="password"
-							bind:value={wecomWebhookUrl}
-							placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
-						/>
-						<p class="text-muted-foreground text-sm">
-							从企业微信群机器人获取的 Webhook URL（包含key参数）
-						</p>
-					</div>
-
-					<div class="space-y-2">
-						<Label for="wecom-msgtype">消息格式</Label>
-						<CustomSelect
-							id="wecom-msgtype"
-							value={wecomMsgtype}
-							options={[
-								{ value: 'markdown', label: 'Markdown格式（推荐）' },
-								{ value: 'text', label: '纯文本格式' }
-							]}
-							onChange={(nextValue) => (wecomMsgtype = String(nextValue ?? 'markdown'))}
-							class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-						/>
-						<p class="text-muted-foreground text-sm">Markdown格式支持富文本显示，纯文本更简洁</p>
-					</div>
-
-					<div class="flex items-center space-x-2">
-						<input
-							type="checkbox"
-							id="wecom-mention-all"
-							bind:checked={wecomMentionAll}
-							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
-						/>
-						<Label
-							for="wecom-mention-all"
-							class="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-						>
-							@所有人
-						</Label>
-					</div>
-
-					<div class="space-y-2">
-						<Label for="wecom-mentioned-list">@特定成员（可选）</Label>
-						<Input
-							id="wecom-mentioned-list"
-							type="text"
-							bind:value={wecomMentionedList}
-							placeholder="user1, user2, user3"
-							disabled={wecomMentionAll}
-						/>
-						<p class="text-muted-foreground text-sm">
-							多个成员用逗号分隔，如：zhangsan, lisi（@所有人时忽略此项）
-						</p>
-					</div>
-				</div>
-			{/if}
-
 			<!-- 通用配置 -->
 			{#if activeNotificationChannel !== 'none'}
 				<div class="space-y-4">
@@ -4671,58 +4446,20 @@
 				<h4 class="mb-3 font-medium text-gray-800 dark:text-gray-200">使用说明</h4>
 
 				<div class="space-y-4">
-					<!-- Server酱说明 -->
+					<!-- Telegram说明 -->
 					<div>
-						<p class="mb-2 font-medium text-gray-700 dark:text-gray-300">📱 Server酱配置</p>
+						<p class="mb-2 font-medium text-gray-700 dark:text-gray-300">✈️ Telegram 配置</p>
 						<ol class="list-inside list-decimal space-y-2 text-sm text-gray-600 dark:text-gray-400">
 							<li>
-								访问 <a
-									href="https://sct.ftqq.com/"
+								在 Telegram 中找 <a
+									href="https://t.me/BotFather"
 									target="_blank"
-									class="text-primary hover:underline">Server酱官网</a
-								> 注册账号
+									class="text-primary hover:underline">@BotFather</a
+								> 创建机器人，获取 Bot Token
 							</li>
-							<li>登录后在"SendKey"页面获取您的密钥</li>
-							<li>将密钥填入上方输入框并保存</li>
-							<li>使用测试按钮验证推送是否正常</li>
-						</ol>
-					</div>
-
-					<!-- Server酱3说明 -->
-					<div>
-						<p class="mb-2 font-medium text-gray-700 dark:text-gray-300">📲 Server酱3配置</p>
-						<ol class="list-inside list-decimal space-y-2 text-sm text-gray-600 dark:text-gray-400">
-							<li>
-								访问 <a
-									href="https://sc3.ft07.com/"
-									target="_blank"
-									class="text-primary hover:underline">Server酱3官网</a
-								> 注册账号
-							</li>
-							<li>
-								登录后在 <a
-									href="https://sc3.ft07.com/sendkey"
-									target="_blank"
-									class="text-primary hover:underline">SendKey页面</a
-								> 获取您的UID和SendKey
-							</li>
-							<li>将UID和SendKey填入上方输入框并保存</li>
-							<li>使用测试按钮验证推送是否正常</li>
-						</ol>
-						<p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-							⚠️ Server酱3与Server酱使用不同的用户系统，两者不通用
-						</p>
-					</div>
-
-					<!-- 企业微信说明 -->
-					<div>
-						<p class="mb-2 font-medium text-gray-700 dark:text-gray-300">💼 企业微信配置</p>
-						<ol class="list-inside list-decimal space-y-2 text-sm text-gray-600 dark:text-gray-400">
-							<li>在企业微信群中添加群机器人</li>
-							<li>复制机器人的Webhook URL（包含key参数）</li>
-							<li>将URL粘贴到上方输入框</li>
-							<li>选择消息格式（推荐使用Markdown）</li>
-							<li>根据需要配置@功能</li>
+							<li>把机器人拉进目标群组/频道，或先与机器人私聊</li>
+							<li>填写 Chat ID（群组/频道通常以 -100 开头）</li>
+							<li>如访问 api.telegram.org 需要代理，可填写自定义 API 地址</li>
 							<li>保存后使用测试按钮验证</li>
 						</ol>
 					</div>

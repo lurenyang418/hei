@@ -41,7 +41,8 @@ jobs:
               beta) tags="$image:beta,$image:beta-latest" ;;
               dev) tags="$image:dev,$image:dev-latest" ;;
             esac
-            tags="$tags,$image:${GITHUB_REF_NAME}"
+            # 镜像 tag 不带 v 前缀（3.1.6 而非 v3.1.6），与常见镜像命名保持一致
+            tags="$tags,$image:${GITHUB_REF_NAME#v}"
           else
             case "${GITHUB_REF_NAME}" in
               dev) channel="dev" ;;

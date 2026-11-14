@@ -10656,13 +10656,9 @@ pub async fn get_config() -> Result<ApiResponse<crate::api::response::ConfigResp
         // 推送通知配置
         notification: crate::api::response::NotificationConfigResponse {
             active_channel: config.notification.active_channel.clone(),
-            serverchan_key: config.notification.serverchan_key.clone(),
-            serverchan3_uid: config.notification.serverchan3_uid.clone(),
-            serverchan3_sendkey: config.notification.serverchan3_sendkey.clone(),
-            wecom_webhook_url: config.notification.wecom_webhook_url.clone(),
-            wecom_msgtype: config.notification.wecom_msgtype.clone(),
-            wecom_mention_all: config.notification.wecom_mention_all,
-            wecom_mentioned_list: config.notification.wecom_mentioned_list.clone(),
+            telegram_bot_token: config.notification.telegram_bot_token.clone(),
+            telegram_chat_id: config.notification.telegram_chat_id.clone(),
+            telegram_api_base: config.notification.telegram_api_base.clone(),
             webhook_url: config.notification.webhook_url.clone(),
             webhook_bearer_token: config.notification.webhook_bearer_token.clone(),
             webhook_custom_headers: config.notification.webhook_custom_headers.clone(),
@@ -13059,7 +13055,7 @@ pub async fn update_config_internal(
                         .await
                 }
                 // 通知配置字段
-                "serverchan_key"
+                "telegram_bot_token"
                 | "enable_scan_notifications"
                 | "notification_min_videos"
                 | "notification_timeout"
@@ -19984,41 +19980,21 @@ pub async fn test_notification_handler(
     {
         config.active_channel = active_channel.to_string();
     }
-    if let Some(serverchan_key) = request.serverchan_key.as_ref() {
-        let v = serverchan_key.trim();
-        config.serverchan_key = if v.is_empty() { None } else { Some(v.to_string()) };
+    if let Some(telegram_bot_token) = request.telegram_bot_token.as_ref() {
+        let v = telegram_bot_token.trim();
+        config.telegram_bot_token = if v.is_empty() { None } else { Some(v.to_string()) };
     }
-    if let Some(serverchan3_uid) = request.serverchan3_uid.as_ref() {
-        let v = serverchan3_uid.trim();
-        config.serverchan3_uid = if v.is_empty() { None } else { Some(v.to_string()) };
+    if let Some(telegram_chat_id) = request.telegram_chat_id.as_ref() {
+        let v = telegram_chat_id.trim();
+        config.telegram_chat_id = if v.is_empty() { None } else { Some(v.to_string()) };
     }
-    if let Some(serverchan3_sendkey) = request.serverchan3_sendkey.as_ref() {
-        let v = serverchan3_sendkey.trim();
-        config.serverchan3_sendkey = if v.is_empty() { None } else { Some(v.to_string()) };
-    }
-    if let Some(wecom_webhook_url) = request.wecom_webhook_url.as_ref() {
-        let v = wecom_webhook_url.trim();
-        config.wecom_webhook_url = if v.is_empty() { None } else { Some(v.to_string()) };
-    }
-    if let Some(wecom_msgtype) = request
-        .wecom_msgtype
+    if let Some(telegram_api_base) = request
+        .telegram_api_base
         .as_ref()
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
     {
-        config.wecom_msgtype = wecom_msgtype.to_string();
-    }
-    if let Some(wecom_mention_all) = request.wecom_mention_all {
-        config.wecom_mention_all = wecom_mention_all;
-    }
-    if let Some(wecom_mentioned_list) = request.wecom_mentioned_list.as_ref() {
-        let list: Vec<String> = wecom_mentioned_list
-            .iter()
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(ToString::to_string)
-            .collect();
-        config.wecom_mentioned_list = if list.is_empty() { None } else { Some(list) };
+        config.telegram_api_base = telegram_api_base.to_string();
     }
     if let Some(webhook_url) = request.webhook_url.as_ref() {
         let v = webhook_url.trim();
@@ -20084,36 +20060,20 @@ pub async fn test_notification_handler(
 
     // 验证选中渠道的配置
     match config.active_channel.as_str() {
-        "serverchan" => {
-            if config.serverchan_key.is_none() || config.serverchan_key.as_ref().unwrap().is_empty() {
+        "telegram" => {
+            if config.telegram_bot_token.as_deref().is_none_or(|v| v.trim().is_empty()) {
                 return Ok(ApiResponse::bad_request(
                     crate::api::response::TestNotificationResponse {
                         success: false,
-                        message: "未配置Server酱密钥".to_string(),
+                        message: "未配置 Telegram Bot Token".to_string(),
                     },
                 ));
             }
-        }
-        "serverchan3" => {
-            if config.serverchan3_uid.is_none()
-                || config.serverchan3_uid.as_ref().unwrap().is_empty()
-                || config.serverchan3_sendkey.is_none()
-                || config.serverchan3_sendkey.as_ref().unwrap().is_empty()
-            {
+            if config.telegram_chat_id.as_deref().is_none_or(|v| v.trim().is_empty()) {
                 return Ok(ApiResponse::bad_request(
                     crate::api::response::TestNotificationResponse {
                         success: false,
-                        message: "未配置Server酱3 UID或SendKey".to_string(),
-                    },
-                ));
-            }
-        }
-        "wecom" => {
-            if config.wecom_webhook_url.is_none() || config.wecom_webhook_url.as_ref().unwrap().is_empty() {
-                return Ok(ApiResponse::bad_request(
-                    crate::api::response::TestNotificationResponse {
-                        success: false,
-                        message: "未配置企业微信Webhook URL".to_string(),
+                        message: "未配置 Telegram Chat ID".to_string(),
                     },
                 ));
             }
@@ -20176,13 +20136,9 @@ pub async fn get_notification_config() -> Result<ApiResponse<crate::api::respons
 
     Ok(ApiResponse::ok(crate::api::response::NotificationConfigResponse {
         active_channel: config.active_channel,
-        serverchan_key: config.serverchan_key,
-        serverchan3_uid: config.serverchan3_uid,
-        serverchan3_sendkey: config.serverchan3_sendkey,
-        wecom_webhook_url: config.wecom_webhook_url,
-        wecom_msgtype: config.wecom_msgtype,
-        wecom_mention_all: config.wecom_mention_all,
-        wecom_mentioned_list: config.wecom_mentioned_list,
+        telegram_bot_token: config.telegram_bot_token,
+        telegram_chat_id: config.telegram_chat_id,
+        telegram_api_base: config.telegram_api_base,
         webhook_url: config.webhook_url,
         webhook_bearer_token: config.webhook_bearer_token,
         webhook_custom_headers: config.webhook_custom_headers,
@@ -20227,59 +20183,31 @@ pub async fn update_notification_config(
     }
 
     // 更新配置字段
-    if let Some(ref key) = request.serverchan_key {
-        if key.trim().is_empty() {
-            notification_config.serverchan_key = None;
+    if let Some(ref token) = request.telegram_bot_token {
+        if token.trim().is_empty() {
+            notification_config.telegram_bot_token = None;
         } else {
-            notification_config.serverchan_key = Some(key.trim().to_string());
+            notification_config.telegram_bot_token = Some(token.trim().to_string());
         }
         updated = true;
     }
 
-    // Server酱3配置
-    if let Some(ref uid) = request.serverchan3_uid {
-        if uid.trim().is_empty() {
-            notification_config.serverchan3_uid = None;
+    if let Some(ref chat_id) = request.telegram_chat_id {
+        if chat_id.trim().is_empty() {
+            notification_config.telegram_chat_id = None;
         } else {
-            notification_config.serverchan3_uid = Some(uid.trim().to_string());
+            notification_config.telegram_chat_id = Some(chat_id.trim().to_string());
         }
         updated = true;
     }
 
-    if let Some(ref sendkey) = request.serverchan3_sendkey {
-        if sendkey.trim().is_empty() {
-            notification_config.serverchan3_sendkey = None;
+    if let Some(ref api_base) = request.telegram_api_base {
+        let trimmed = api_base.trim();
+        notification_config.telegram_api_base = if trimmed.is_empty() {
+            "https://api.telegram.org".to_string()
         } else {
-            notification_config.serverchan3_sendkey = Some(sendkey.trim().to_string());
-        }
-        updated = true;
-    }
-
-    if let Some(ref url) = request.wecom_webhook_url {
-        if url.trim().is_empty() {
-            notification_config.wecom_webhook_url = None;
-        } else {
-            notification_config.wecom_webhook_url = Some(url.trim().to_string());
-        }
-        updated = true;
-    }
-
-    if let Some(ref msgtype) = request.wecom_msgtype {
-        notification_config.wecom_msgtype = msgtype.clone();
-        updated = true;
-    }
-
-    if let Some(mention_all) = request.wecom_mention_all {
-        notification_config.wecom_mention_all = mention_all;
-        updated = true;
-    }
-
-    if let Some(ref list) = request.wecom_mentioned_list {
-        if list.is_empty() {
-            notification_config.wecom_mentioned_list = None;
-        } else {
-            notification_config.wecom_mentioned_list = Some(list.clone());
-        }
+            trimmed.to_string()
+        };
         updated = true;
     }
 
@@ -20421,12 +20349,10 @@ pub async fn get_notification_status() -> Result<ApiResponse<crate::api::respons
 
     // 这里可以从数据库或缓存中获取推送统计信息
     let configured = match config.active_channel.as_str() {
-        "serverchan" => config.serverchan_key.as_ref().is_some_and(|v| !v.is_empty()),
-        "serverchan3" => {
-            config.serverchan3_uid.as_ref().is_some_and(|v| !v.is_empty())
-                && config.serverchan3_sendkey.as_ref().is_some_and(|v| !v.is_empty())
+        "telegram" => {
+            config.telegram_bot_token.as_ref().is_some_and(|v| !v.is_empty())
+                && config.telegram_chat_id.as_ref().is_some_and(|v| !v.is_empty())
         }
-        "wecom" => config.wecom_webhook_url.as_ref().is_some_and(|v| !v.is_empty()),
         "webhook" => config.webhook_url.as_ref().is_some_and(|v| !v.is_empty()),
         _ => false,
     };

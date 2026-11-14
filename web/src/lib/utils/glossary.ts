@@ -365,20 +365,16 @@ const GLOSSARY_ENTRIES: GlossaryEntry[] = [
 		description: '配置任务结果通知，在扫描完成或异常时推送消息到指定渠道。'
 	},
 	{
-		terms: ['Server酱', 'Server酱3', '企业微信群机器人', 'Webhook'],
-		description: '可选通知渠道类型，分别使用对应平台的密钥或 webhook。'
+		terms: ['Telegram', 'Webhook'],
+		description: '可选通知渠道类型：Telegram Bot 或通用 Webhook。'
+	},
+	{
+		terms: ['Bot Token', 'Chat ID', 'API 地址（可选）'],
+		description: 'Telegram 通知配置：Bot Token 来自 @BotFather，Chat ID 为目标会话；可自定义 API 地址以走代理或自建 Bot API。'
 	},
 	{
 		terms: ['Webhook URL', 'Bearer Token（可选）'],
 		description: '通用Webhook通知配置：向指定URL发送JSON POST；可选附带Bearer鉴权。'
-	},
-	{
-		terms: ['消息格式', 'Markdown格式（推荐）', '纯文本格式'],
-		description: '控制通知消息渲染格式，Markdown 信息量更高，纯文本兼容性更强。'
-	},
-	{
-		terms: ['@所有人', '@特定成员（可选）'],
-		description: '企业微信通知提及配置，可全体提醒或定向提醒成员。'
 	},
 	{
 		terms: ['最小视频数阈值'],
