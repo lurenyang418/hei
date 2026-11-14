@@ -17,6 +17,7 @@
 	import { SourceOptionsStore } from '$lib/stores/add-source/source-options.svelte';
 	import { QuickSubscriptionStore } from '$lib/stores/add-source/quick-subscription.svelte';
 	import { KeywordFilterStore } from '$lib/stores/add-source/keyword-filter.svelte';
+	import { SourceFormStore } from '$lib/stores/add-source/source-form.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -76,7 +77,7 @@
 	const hover = new HoverTooltipStore();
 
 	const submission = new SubmissionSelectionStore({
-		getUpId: () => sourceId,
+		getUpId: () => form.sourceId,
 		getPlatform: () => sourcePlatform
 	});
 
@@ -102,7 +103,7 @@
 	});
 
 	const bangumi = new BangumiSeasonStore({
-		getSourceId: () => sourceId,
+		getSourceId: () => form.sourceId,
 		getSourceType: () => sourceType,
 		isSeasonExists: (seasonId) => isBangumiSeasonExists(seasonId)
 	});
@@ -126,6 +127,7 @@
 	const options = new SourceOptionsStore();
 	const quick = new QuickSubscriptionStore();
 	const filter = new KeywordFilterStore();
+	const form = new SourceFormStore();
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -171,14 +173,8 @@
 	let sourceType: VideoCategory = 'collection';
 	const sourcePlatform = 'bilibili';
 	let lastSourceType: VideoCategory = sourceType; // 记录上一次的源类型，用于检测切换
-	let sourceId = '';
-	let upId = '';
 	let name = '';
 	let path = '';
-	let cover = '';
-	let collectionType = 'season';
-	let collectionAggregateEnabled = false;
-	let downloadAllSeasons = false;
 	let loading = false;
 
 	// 下载选项
@@ -190,7 +186,6 @@
 	// AI重命名高级选项
 
 	// 添加手动输入标志
-	let isManualInput = false;
 
 
 	function clearSearchPanel(options: { clearKeyword?: boolean } = {}) {
@@ -487,7 +482,7 @@
 			case 'collection':
 				if (result.mid) {
 					clearCollectionPanels();
-					upId = result.mid.toString();
+					form.upId = result.mid.toString();
 					// 触发获取UP主合集列表
 					handleUpIdChange();
 					toast.success('已填充UP主信息', { description: '正在获取合集列表...' });
@@ -495,7 +490,7 @@
 				break;
 			case 'submission':
 				if (result.mid) {
-					sourceId = result.mid.toString();
+					form.sourceId = result.mid.toString();
 					name = cleanTitle(result.title);
 					submission.selectedUpName = cleanTitle(result.title);
 					applyQuickSubscriptionPath('submission', name, true);
@@ -505,7 +500,7 @@
 				break;
 			case 'bangumi':
 				if (result.season_id) {
-					sourceId = result.season_id;
+					form.sourceId = result.season_id;
 					name = cleanTitle(result.title);
 					applyQuickSubscriptionPath('bangumi', name, true);
 				}
@@ -533,7 +528,7 @@
 				break;
 			default:
 				if (result.bvid) {
-					sourceId = result.bvid;
+					form.sourceId = result.bvid;
 					name = cleanTitle(result.title);
 				}
 				break;
@@ -597,12 +592,12 @@
 
 		// 验证表单
 		const isPugvUpFlow = sourceType === 'pugv' && !!(pugv.upMid && pugv.courses.length > 0);
-		if (sourceType !== 'watch_later' && !sourceId && !isPugvUpFlow) {
+		if (sourceType !== 'watch_later' && !form.sourceId && !isPugvUpFlow) {
 			toast.error('请输入ID', { description: '视频源ID不能为空' });
 			return;
 		}
 
-		if (sourceType === 'collection' && !upId) {
+		if (sourceType === 'collection' && !form.upId) {
 			toast.error('请输入UP主ID', { description: '合集需要提供UP主ID' });
 			return;
 		}
@@ -625,7 +620,7 @@
 		// 番剧特殊验证
 		if (sourceType === 'bangumi') {
 			// 如果不是下载全部季度，且没有选择任何季度，且不是单季度情况，则提示错误
-			if (!downloadAllSeasons && bangumi.selected.length === 0 && bangumi.seasons.length > 1) {
+			if (!form.downloadAllSeasons && bangumi.selected.length === 0 && bangumi.seasons.length > 1) {
 				toast.error('请选择要下载的季度', {
 					description: '未选择"下载全部季度"时，至少需要选择一个季度'
 				});
@@ -635,7 +630,7 @@
 
 		const params: AddVideoSourceRequest = {
 			source_type: sourceType,
-			source_id: sourceId,
+			source_id: form.sourceId,
 			name,
 			path,
 			// 下载选项
@@ -643,18 +638,18 @@
 		};
 
 		if (sourceType === 'collection') {
-			params.up_id = upId;
-			params.collection_type = collectionType;
-			params.collection_aggregate_enabled = collectionAggregateEnabled;
-			if (cover) {
-				params.cover = cover;
+			params.up_id = form.upId;
+			params.collection_type = form.collectionType;
+			params.collection_aggregate_enabled = form.collectionAggregateEnabled;
+			if (form.cover) {
+				params.cover = form.cover;
 			}
 		}
 
 		if (sourceType === 'bangumi') {
-			params.download_all_seasons = downloadAllSeasons;
+			params.download_all_seasons = form.downloadAllSeasons;
 			// 如果选择了特定季度，添加selected_seasons参数
-			if (bangumi.selected.length > 0 && !downloadAllSeasons) {
+			if (bangumi.selected.length > 0 && !form.downloadAllSeasons) {
 				params.selected_seasons = bangumi.selected;
 			}
 			// 如果选择了合并到现有番剧源，添加merge_to_source_id参数
@@ -828,15 +823,15 @@
 		if (result.data.success) {
 			toast.success('添加成功', { description: result.data.message });
 			// 重置表单
-			sourceId = '';
-			upId = '';
+			form.sourceId = '';
+			form.upId = '';
 			name = '';
 			path = '/Downloads';
 			quick.lastAutoAppliedPath = '';
-			downloadAllSeasons = false;
-			collectionType = 'season';
-			collectionAggregateEnabled = false;
-			isManualInput = false;
+			form.downloadAllSeasons = false;
+			form.collectionType = 'season';
+			form.collectionAggregateEnabled = false;
+			form.isManualInput = false;
 			bangumi.seasons = [];
 			bangumi.selected = [];
 			submission.selectedVideos = [];
@@ -925,7 +920,7 @@
 			return;
 		}
 
-		sourceId = favorite.id.toString();
+		form.sourceId = favorite.id.toString();
 		name = favoriteName;
 		applyQuickSubscriptionPath('favorite', name, true);
 		favoriteValidationResult = {
@@ -954,7 +949,7 @@
 		}
 
 		// 使用完整ID（id字段），而不是短ID（fid字段）
-		sourceId = favorite.id.toString();
+		form.sourceId = favorite.id.toString();
 		name = favorite.title;
 		applyQuickSubscriptionPath('favorite', name, true);
 		favoriteValidationResult = {
@@ -1061,9 +1056,9 @@
 	// 处理收藏夹ID变化
 	function handleFavoriteIdChange() {
 		if (favoriteValidationTimeout) clearTimeout(favoriteValidationTimeout);
-		if (sourceType === 'favorite' && sourceId.trim()) {
+		if (sourceType === 'favorite' && form.sourceId.trim()) {
 			favoriteValidationTimeout = setTimeout(() => {
-				validateFavoriteId(sourceId);
+				validateFavoriteId(form.sourceId);
 			}, 500);
 		} else {
 			favoriteValidationResult = null;
@@ -1073,7 +1068,7 @@
 	// 处理UP主ID变化
 	function handleUpIdChange() {
 		if (upIdTimeout) clearTimeout(upIdTimeout);
-		if (upId.trim()) {
+		if (form.upId.trim()) {
 			subscribedCollections = [];
 			upIdTimeout = setTimeout(() => {
 				fetchUserCollections();
@@ -1085,12 +1080,12 @@
 
 	// 获取UP主合集列表
 	async function fetchUserCollections() {
-		if (!upId.trim()) return;
+		if (!form.upId.trim()) return;
 		clearSearchPanel();
 		clearFollowingsPanel();
 		subscribedCollections = [];
 
-		const result = await runRequest(() => api.getUserCollections(upId), {
+		const result = await runRequest(() => api.getUserCollections(form.upId), {
 			setLoading: (value) => (loadingCollections = value),
 			context: '获取合集列表失败',
 			showErrorToast: false,
@@ -1146,12 +1141,12 @@
 			return;
 		}
 
-		sourceId = collection.sid;
+		form.sourceId = collection.sid;
 		name = collection.name;
 		applyQuickSubscriptionPath('collection', name, true);
-		cover = collection.cover || '';
-		collectionType = collection.collection_type;
-		isManualInput = false; // 从列表选择，不是手动输入
+		form.cover = collection.cover || '';
+		form.collectionType = collection.collection_type;
+		form.isManualInput = false; // 从列表选择，不是手动输入
 		clearSearchPanel();
 		clearFollowingsPanel();
 		clearCollectionPanels();
@@ -1326,7 +1321,7 @@
 
 	// 监听sourceType变化，重置手动输入标志和清空所有缓存
 	$: if (sourceType) {
-		isManualInput = false;
+		form.isManualInput = false;
 		quick.lastAutoAppliedPath = '';
 		// 清空搜索相关状态
 		search.results = [];
@@ -1348,7 +1343,7 @@
 	}
 
 	// 监听 source_id 变化，自动获取季度信息
-	$: if (sourceType === 'bangumi' && sourceId) {
+	$: if (sourceType === 'bangumi' && form.sourceId) {
 		bangumi.fetchSeasons();
 	}
 
@@ -1388,13 +1383,13 @@
 
 		switch (sourceType) {
 			case 'collection':
-				upId = following.mid.toString();
+				form.upId = following.mid.toString();
 				// 触发获取UP主合集列表
 				handleUpIdChange();
 				toast.success('已填充UP主信息', { description: '正在获取合集列表...' });
 				break;
 			case 'submission':
-				sourceId = following.mid.toString();
+				form.sourceId = following.mid.toString();
 				name = following.name;
 				submission.selectedUpName = following.name;
 				applyQuickSubscriptionPath('submission', name, true);
@@ -1447,23 +1442,23 @@
 		if (collection.collection_type === 'favorite') {
 			// 这是收藏夹，切换到收藏夹模式
 			sourceType = 'favorite';
-			sourceId = collection.sid;
+			form.sourceId = collection.sid;
 			name = collection.name;
 			applyQuickSubscriptionPath('favorite', name, true);
-			// 收藏夹不需要 upId 和 cover
-			upId = '';
-			cover = '';
-			collectionType = '';
+			// 收藏夹不需要 form.upId 和 form.cover
+			form.upId = '';
+			form.cover = '';
+			form.collectionType = '';
 			toast.success('已选择收藏夹', { description: collection.name });
 		} else {
 			// 这是合集，保持合集模式
 			sourceType = 'collection';
-			sourceId = collection.sid;
+			form.sourceId = collection.sid;
 			name = collection.name;
 			applyQuickSubscriptionPath('collection', name, true);
-			cover = collection.cover || '';
-			upId = collection.up_mid.toString();
-			collectionType = collection.collection_type;
+			form.cover = collection.cover || '';
+			form.upId = collection.up_mid.toString();
+			form.collectionType = collection.collection_type;
 			toast.success('已选择合集', { description: collection.name });
 		}
 		subscribedCollections = [];
@@ -1865,14 +1860,14 @@
 							{/if}
 
 							<!-- 合集类型（仅合集时显示，且手动输入） -->
-							{#if sourceType === 'collection' && isManualInput}
+							{#if sourceType === 'collection' && form.isManualInput}
 								<div class="space-y-2">
 									<Label for="collection-type">合集类型</Label>
 									<CustomSelect
 										id="collection-type"
-										value={collectionType}
+										value={form.collectionType}
 										options={collectionTypeOptions}
-										onChange={(nextValue) => (collectionType = String(nextValue ?? 'season'))}
+										onChange={(nextValue) => (form.collectionType = String(nextValue ?? 'season'))}
 										class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 									/>
 									<p class="text-sm text-orange-600">
@@ -1889,7 +1884,7 @@
 									<Label for="up-id">UP主ID</Label>
 									<Input
 										id="up-id"
-										bind:value={upId}
+										bind:value={form.upId}
 										placeholder="请输入UP主ID"
 										onblur={handleUpIdChange}
 										required
@@ -1918,7 +1913,7 @@
 										<label class="relative inline-flex cursor-pointer items-center">
 											<input
 												type="checkbox"
-												bind:checked={collectionAggregateEnabled}
+												bind:checked={form.collectionAggregateEnabled}
 												class="peer sr-only"
 											/>
 											<div
@@ -1945,15 +1940,15 @@
 									</Label>
 									<Input
 										id="source-id"
-										bind:value={sourceId}
+										bind:value={form.sourceId}
 										placeholder={`请输入${sourceType === 'collection' ? '合集' : sourceType === 'favorite' ? '任意公开收藏夹' : sourceType === 'submission' ? 'UP主' : sourceType === 'bangumi' ? 'Season' : sourceType === 'pugv' ? '课程 Season' : ''}ID`}
 										oninput={() => {
 											if (sourceType === 'collection') {
-												isManualInput = true;
+												form.isManualInput = true;
 											} else if (sourceType === 'favorite') {
 												handleFavoriteIdChange();
 											} else if (sourceType === 'pugv') {
-												sourceId = normalizePugvSeasonId(sourceId);
+												form.sourceId = normalizePugvSeasonId(form.sourceId);
 											}
 										}}
 										required={!(sourceType === 'pugv' && !!pugv.upMid)}
@@ -1967,10 +1962,10 @@
 											{/if}
 										</p>
 									{/if}
-									{#if sourceType === 'collection' && !isManualInput && sourceId}
+									{#if sourceType === 'collection' && !form.isManualInput && form.sourceId}
 										<p class="mt-1 text-xs text-green-600">✓ 已从列表中选择合集，类型已自动识别</p>
 									{/if}
-									{#if sourceType === 'favorite' && sourceId}
+									{#if sourceType === 'favorite' && form.sourceId}
 										{#if validatingFavorite}
 											<p class="mt-1 text-xs text-blue-600 dark:text-blue-400">
 												🔍 验证收藏夹中...
@@ -1989,14 +1984,14 @@
 									{/if}
 
 									<!-- 下载所有季度（仅番剧时显示，紧跟在Season ID后面） -->
-									{#if sourceType === 'bangumi' && sourceId && bangumi.seasons.length > 0 && !bangumi.loading}
+									{#if sourceType === 'bangumi' && form.sourceId && bangumi.seasons.length > 0 && !bangumi.loading}
 										<div class="mt-3 flex items-center space-x-2">
 											<input
 												type="checkbox"
 												id="download-all-seasons"
-												bind:checked={downloadAllSeasons}
+												bind:checked={form.downloadAllSeasons}
 												onchange={() => {
-													if (downloadAllSeasons) bangumi.selected = [];
+													if (form.downloadAllSeasons) bangumi.selected = [];
 												}}
 												class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 											/>
@@ -2007,7 +2002,7 @@
 												下载所有季度
 											</Label>
 										</div>
-										{#if downloadAllSeasons}
+										{#if form.downloadAllSeasons}
 											<p class="mt-1 ml-6 text-xs text-purple-600">
 												勾选后将下载该番剧的所有季度，无需单独选择
 											</p>
@@ -2048,12 +2043,12 @@
 												{/if}
 											</div>
 										{/if}
-									{:else if sourceType === 'bangumi' && sourceId && bangumi.loading}
+									{:else if sourceType === 'bangumi' && form.sourceId && bangumi.loading}
 										<p class="mt-3 text-xs text-purple-600">正在获取季度信息...</p>
 									{/if}
 
 									<!-- UP主投稿选择状态显示和控制（仅投稿类型时显示） -->
-									{#if sourceType === 'submission' && sourceId}
+									{#if sourceType === 'submission' && form.sourceId}
 										<div
 											class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
 										>
@@ -3238,7 +3233,7 @@
 											<BiliImage
 												src={following.face}
 												alt={following.name}
-												class="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+												class="h-10 w-10 flex-shrink-0 rounded-full object-form.cover"
 												placeholder="头像"
 											/>
 											<div class="min-w-0 flex-1">
@@ -3335,7 +3330,7 @@
 											<BiliImage
 												src={collection.cover}
 												alt={collection.name}
-												class="h-16 w-24 flex-shrink-0 rounded object-cover"
+												class="h-16 w-24 flex-shrink-0 rounded object-form.cover"
 												placeholder="无封面"
 											/>
 											<div class="min-w-0 flex-1">
@@ -3431,7 +3426,7 @@
 											<BiliImage
 												src={favorite.cover}
 												alt={getFavoriteDisplayName(favorite)}
-												class="h-16 w-24 flex-shrink-0 rounded object-cover"
+												class="h-16 w-24 flex-shrink-0 rounded object-form.cover"
 												placeholder="无封面"
 											/>
 											<div class="min-w-0 flex-1">
@@ -3584,7 +3579,7 @@
 				{/if}
 
 				<!-- 番剧季度选择区域（移动到右侧） -->
-				{#if sourceType === 'bangumi' && sourceId && !downloadAllSeasons && (bangumi.loading || bangumi.seasons.length > 1 || (bangumi.fetchAttempted && bangumi.seasons.length === 0))}
+				{#if sourceType === 'bangumi' && form.sourceId && !form.downloadAllSeasons && (bangumi.loading || bangumi.seasons.length > 1 || (bangumi.fetchAttempted && bangumi.seasons.length === 0))}
 					<div class={isCompactLayout ? 'w-full' : 'flex-1'}>
 						<SidePanel
 							isMobile={isCompactLayout}
@@ -3655,7 +3650,7 @@
 													<BiliImage
 														src={season.cover}
 														alt={season.season_title}
-														class="h-20 w-14 flex-shrink-0 rounded object-cover"
+														class="h-20 w-14 flex-shrink-0 rounded object-form.cover"
 														placeholder="无封面"
 													/>
 													<div class="min-w-0 flex-1">
@@ -3684,7 +3679,7 @@
 															<h4 class="truncate pr-6 text-sm font-medium">
 																{season.full_title || season.season_title}
 															</h4>
-															{#if season.season_id === sourceId}
+															{#if season.season_id === form.sourceId}
 																<span
 																	class="mt-1 inline-block rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700 dark:bg-purple-900 dark:text-purple-300"
 																	>当前</span
@@ -3716,7 +3711,7 @@
 										不选择则仅下载{isCompactLayout ? '上方' : '左侧'}输入的当前季度
 									</p>
 								{/if}
-							{:else if sourceId}
+							{:else if form.sourceId}
 								<EmptyState
 									icon={InfoIcon}
 									title="暂无季度信息"
@@ -3810,7 +3805,7 @@
 												<BiliImage
 													src={course.cover || undefined}
 													alt={course.title}
-													class="h-20 w-14 flex-shrink-0 rounded object-cover"
+													class="h-20 w-14 flex-shrink-0 rounded object-form.cover"
 													placeholder="无封面"
 												/>
 												<div class="min-w-0 flex-1">
@@ -3944,7 +3939,7 @@
 											<BiliImage
 												src={collection.cover}
 												alt={collection.name}
-												class="h-16 w-24 flex-shrink-0 rounded object-cover"
+												class="h-16 w-24 flex-shrink-0 rounded object-form.cover"
 												placeholder={collection.collection_type === 'favorite'
 													? '收藏夹'
 													: '无封面'}
@@ -4013,7 +4008,7 @@
 	hoveredItem={hover.item}
 	mousePosition={hover.position}
 	sourceType={sourceType}
-	{sourceId}
+	sourceId={form.sourceId}
 	selectedSeasons={bangumi.selected}
 />
 
