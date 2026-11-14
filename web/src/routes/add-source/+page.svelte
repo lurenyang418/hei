@@ -16,6 +16,7 @@
 	import { SearchStore } from '$lib/stores/add-source/search.svelte';
 	import { SourceOptionsStore } from '$lib/stores/add-source/source-options.svelte';
 	import { QuickSubscriptionStore } from '$lib/stores/add-source/quick-subscription.svelte';
+	import { KeywordFilterStore } from '$lib/stores/add-source/keyword-filter.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -124,6 +125,7 @@
 
 	const options = new SourceOptionsStore();
 	const quick = new QuickSubscriptionStore();
+	const filter = new KeywordFilterStore();
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -245,23 +247,6 @@
 	let existingSubmissionIds: Set<number> = new SvelteSet();
 	let existingBangumiSeasonIds: Set<string> = new SvelteSet();
 
-	// 关键词过滤器相关（双列表模式）
-	let blacklistKeywords: string[] = [];
-	let whitelistKeywords: string[] = [];
-	let keywordCaseSensitive = true; // 是否区分大小写
-	let minDurationSeconds: string | number = '';
-	let maxDurationSeconds: string | number = '';
-	let publishedAfter = '';
-	let publishedBefore = '';
-	let newBlacklistKeyword = '';
-	let newWhitelistKeyword = '';
-	let blacklistValidationError = '';
-	let whitelistValidationError = '';
-	let advancedFilterValidationError = '';
-	let validatingBlacklistKeyword = false;
-	let validatingWhitelistKeyword = false;
-	let showKeywordSection = false; // 是否展开关键词过滤器部分
-	let keywordActiveTab: 'whitelist' | 'blacklist' = 'whitelist'; // 当前选中的标签页
 
 
 	function getFavoriteDisplayName(favorite: Partial<UserFavoriteFolder> & { name?: string }) {
@@ -569,185 +554,27 @@
 		return div.textContent || div.innerText || title;
 	}
 
-	// 检查关键词是否在另一个列表中存在（互斥校验）
-	function checkMutualExclusivity(
-		keyword: string,
-		targetList: 'blacklist' | 'whitelist'
-	): string | null {
-		if (targetList === 'blacklist' && whitelistKeywords.includes(keyword)) {
-			return '该关键词已存在于白名单中，同一关键词不能同时出现在黑名单和白名单';
-		}
-		if (targetList === 'whitelist' && blacklistKeywords.includes(keyword)) {
-			return '该关键词已存在于黑名单中，同一关键词不能同时出现在黑名单和白名单';
-		}
-		return null;
-	}
 
-	// 添加黑名单关键词
-	async function addBlacklistKeyword() {
-		const pattern = newBlacklistKeyword.trim();
-		if (!pattern) {
-			blacklistValidationError = '请输入关键词';
-			return;
-		}
 
-		if (blacklistKeywords.includes(pattern)) {
-			blacklistValidationError = '该关键词已存在于黑名单中';
-			return;
-		}
 
-		// 互斥校验
-		const mutualError = checkMutualExclusivity(pattern, 'blacklist');
-		if (mutualError) {
-			blacklistValidationError = mutualError;
-			return;
-		}
 
-		// 验证正则表达式
-		const result = await runRequest(() => api.validateRegex(pattern), {
-			setLoading: (value) => (validatingBlacklistKeyword = value),
-			showErrorToast: false,
-			onError: () => {
-				blacklistValidationError = '网络错误';
-			}
-		});
-		if (!result) return;
 
-		if (result.status_code === 200) {
-			if (result.data.valid) {
-				blacklistKeywords = [...blacklistKeywords, pattern];
-				newBlacklistKeyword = '';
-				blacklistValidationError = '';
-			} else {
-				blacklistValidationError = result.data.error || '无效的正则表达式';
-			}
-		} else {
-			blacklistValidationError = '验证请求失败';
-		}
-	}
 
-	// 添加白名单关键词
-	async function addWhitelistKeyword() {
-		const pattern = newWhitelistKeyword.trim();
-		if (!pattern) {
-			whitelistValidationError = '请输入关键词';
-			return;
-		}
 
-		if (whitelistKeywords.includes(pattern)) {
-			whitelistValidationError = '该关键词已存在于白名单中';
-			return;
-		}
 
-		// 互斥校验
-		const mutualError = checkMutualExclusivity(pattern, 'whitelist');
-		if (mutualError) {
-			whitelistValidationError = mutualError;
-			return;
-		}
 
-		// 验证正则表达式
-		const result = await runRequest(() => api.validateRegex(pattern), {
-			setLoading: (value) => (validatingWhitelistKeyword = value),
-			showErrorToast: false,
-			onError: () => {
-				whitelistValidationError = '网络错误';
-			}
-		});
-		if (!result) return;
 
-		if (result.status_code === 200) {
-			if (result.data.valid) {
-				whitelistKeywords = [...whitelistKeywords, pattern];
-				newWhitelistKeyword = '';
-				whitelistValidationError = '';
-			} else {
-				whitelistValidationError = result.data.error || '无效的正则表达式';
-			}
-		} else {
-			whitelistValidationError = '验证请求失败';
-		}
-	}
-
-	// 删除黑名单关键词
-	function removeBlacklistKeyword(index: number) {
-		blacklistKeywords = blacklistKeywords.filter((_, i) => i !== index);
-	}
-
-	// 删除白名单关键词
-	function removeWhitelistKeyword(index: number) {
-		whitelistKeywords = whitelistKeywords.filter((_, i) => i !== index);
-	}
-
-	function normalizeDurationInput(value: string | number | null | undefined): string {
-		if (value === null || value === undefined) {
-			return '';
-		}
-		return String(value).trim();
-	}
-
-	function parseDurationInput(
-		value: string | number | null | undefined,
-		fieldName: string
-	): number | null {
-		const trimmed = normalizeDurationInput(value);
-		if (!trimmed) {
-			return null;
-		}
-		if (!/^\d+$/.test(trimmed)) {
-			throw new Error(`${fieldName}必须为非负整数秒数`);
-		}
-		return Number(trimmed);
-	}
-
-	function hasAdvancedFilters() {
-		return (
-			blacklistKeywords.length > 0 ||
-			whitelistKeywords.length > 0 ||
-			!keywordCaseSensitive ||
-			normalizeDurationInput(minDurationSeconds) !== '' ||
-			normalizeDurationInput(maxDurationSeconds) !== '' ||
-			!!publishedAfter ||
-			!!publishedBefore
-		);
-	}
-
-	function getActiveFilterCount() {
-		let count = blacklistKeywords.length + whitelistKeywords.length;
-		if (normalizeDurationInput(minDurationSeconds)) count += 1;
-		if (normalizeDurationInput(maxDurationSeconds)) count += 1;
-		if (publishedAfter) count += 1;
-		if (publishedBefore) count += 1;
-		return count;
-	}
-
-	// 处理黑名单关键词输入框键盘事件
-	function handleBlacklistKeywordKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			event.preventDefault();
-			addBlacklistKeyword();
-		}
-	}
-
-	// 处理白名单关键词输入框键盘事件
-	function handleWhitelistKeywordKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			event.preventDefault();
-			addWhitelistKeyword();
-		}
-	}
 
 	async function handleSubmit() {
-		advancedFilterValidationError = '';
+		filter.advancedError = '';
 
 		let parsedMinDuration: number | null = null;
 		let parsedMaxDuration: number | null = null;
 		try {
-			parsedMinDuration = parseDurationInput(minDurationSeconds, '最短时长');
-			parsedMaxDuration = parseDurationInput(maxDurationSeconds, '最长时长');
+			({ min: parsedMinDuration, max: parsedMaxDuration } = filter.parseDurations());
 		} catch (error) {
 			toast.error('过滤条件无效', { description: (error as Error).message });
-			advancedFilterValidationError = (error as Error).message;
+			filter.advancedError = (error as Error).message;
 			return;
 		}
 
@@ -756,14 +583,14 @@
 			parsedMaxDuration !== null &&
 			parsedMinDuration > parsedMaxDuration
 		) {
-			advancedFilterValidationError = '最短时长不能大于最长时长';
-			toast.error('过滤条件无效', { description: advancedFilterValidationError });
+			filter.advancedError = '最短时长不能大于最长时长';
+			toast.error('过滤条件无效', { description: filter.advancedError });
 			return;
 		}
 
-		if (publishedAfter && publishedBefore && publishedAfter > publishedBefore) {
-			advancedFilterValidationError = '投稿起始日期不能晚于投稿截止日期';
-			toast.error('过滤条件无效', { description: advancedFilterValidationError });
+		if (filter.publishedAfter && filter.publishedBefore && filter.publishedAfter > filter.publishedBefore) {
+			filter.advancedError = '投稿起始日期不能晚于投稿截止日期';
+			toast.error('过滤条件无效', { description: filter.advancedError });
 			return;
 		}
 
@@ -846,11 +673,11 @@
 		// 如果有关键词过滤器，添加blacklist_keywords和whitelist_keywords参数（双列表模式）
 		// 注意：后端API仍使用keyword_filters和keyword_filter_mode，但会被转换为新格式
 		// 为了向后兼容，在添加时使用旧格式，后端会自动处理
-		if (blacklistKeywords.length > 0 || whitelistKeywords.length > 0) {
+		if (filter.blacklist.length > 0 || filter.whitelist.length > 0) {
 			// 使用新的双列表模式，直接传递两个列表
 			// 后端handler会根据是否存在这些字段来决定使用哪种模式
-			if (blacklistKeywords.length > 0) {
-				params.keyword_filters = blacklistKeywords;
+			if (filter.blacklist.length > 0) {
+				params.keyword_filters = filter.blacklist;
 				params.keyword_filter_mode = 'blacklist';
 			}
 			// 注意：当前添加接口只支持单一模式，双列表需要后续通过编辑接口设置
@@ -878,18 +705,18 @@
 							});
 							if (addedResult.data.success) {
 								added += 1;
-								if (hasAdvancedFilters() && addedResult.data.source_id) {
+								if (filter.hasAdvancedFilters() && addedResult.data.source_id) {
 									try {
 										await api.updateVideoSourceKeywordFilters(
 											sourceType,
 											addedResult.data.source_id,
-											blacklistKeywords,
-											whitelistKeywords,
-											keywordCaseSensitive,
+											filter.blacklist,
+											filter.whitelist,
+											filter.caseSensitive,
 											parsedMinDuration,
 											parsedMaxDuration,
-											publishedAfter,
-											publishedBefore
+											filter.publishedAfter,
+											filter.publishedBefore
 										);
 									} catch (e) {
 										console.warn('更新课程关键词过滤器失败:', e);
@@ -932,18 +759,18 @@
 				const result = await api.addVideoSource(params);
 
 				if (result.data.success) {
-					if (hasAdvancedFilters() && result.data.source_id) {
+					if (filter.hasAdvancedFilters() && result.data.source_id) {
 						try {
 							await api.updateVideoSourceKeywordFilters(
 								sourceType,
 								result.data.source_id,
-								blacklistKeywords,
-								whitelistKeywords,
-								keywordCaseSensitive,
+								filter.blacklist,
+								filter.whitelist,
+								filter.caseSensitive,
 								parsedMinDuration,
 								parsedMaxDuration,
-								publishedAfter,
-								publishedBefore
+								filter.publishedAfter,
+								filter.publishedBefore
 							);
 						} catch (e) {
 							console.warn('更新关键词过滤器失败:', e);
@@ -1016,17 +843,17 @@
 			submission.selectedUpName = '';
 			bangumi.mergeToSourceId = null;
 			bangumi.existingSources = [];
-			blacklistKeywords = [];
-			whitelistKeywords = [];
-			newBlacklistKeyword = '';
-			newWhitelistKeyword = '';
-			keywordCaseSensitive = true;
-			minDurationSeconds = '';
-			maxDurationSeconds = '';
-			publishedAfter = '';
-			publishedBefore = '';
-			advancedFilterValidationError = '';
-			showKeywordSection = false;
+			filter.blacklist = [];
+			filter.whitelist = [];
+			filter.newBlacklist = '';
+			filter.newWhitelist = '';
+			filter.caseSensitive = true;
+			filter.minDuration = '';
+			filter.maxDuration = '';
+			filter.publishedAfter = '';
+			filter.publishedBefore = '';
+			filter.advancedError = '';
+			filter.showSection = false;
 			// 重置下载选项
 			options.audioOnly = false;
 			options.audioOnlyM4aOnly = false;
@@ -2926,22 +2753,22 @@
 						<div class="space-y-2">
 							<button
 								type="button"
-								onclick={() => (showKeywordSection = !showKeywordSection)}
+								onclick={() => (filter.showSection = !filter.showSection)}
 								class="flex w-full items-center justify-between rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-left text-sm transition-colors hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-950 dark:hover:bg-purple-900"
 							>
 								<div class="flex items-center gap-2">
 									<FilterIcon class="h-4 w-4 text-purple-600 dark:text-purple-400" />
 									<span class="font-medium text-purple-800 dark:text-purple-200">关键词过滤器</span>
-									{#if getActiveFilterCount() > 0}
+									{#if filter.activeFilterCount > 0}
 										<span
 											class="rounded-full bg-purple-600 px-2 py-0.5 text-xs text-white dark:bg-purple-500"
 										>
-											{getActiveFilterCount()}
+											{filter.activeFilterCount}
 										</span>
 									{/if}
 								</div>
 								<svg
-									class="h-4 w-4 transform text-purple-600 transition-transform dark:text-purple-400 {showKeywordSection
+									class="h-4 w-4 transform text-purple-600 transition-transform dark:text-purple-400 {filter.showSection
 										? 'rotate-180'
 										: ''}"
 									fill="none"
@@ -2957,7 +2784,7 @@
 								</svg>
 							</button>
 
-							{#if showKeywordSection}
+							{#if filter.showSection}
 								<div
 									class="space-y-3 rounded-md border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-800 dark:bg-purple-950/50"
 									transition:fly={{ y: -10, duration: 200 }}
@@ -2999,7 +2826,7 @@
 										<label class="relative inline-flex cursor-pointer items-center">
 											<input
 												type="checkbox"
-												bind:checked={keywordCaseSensitive}
+												bind:checked={filter.caseSensitive}
 												class="peer sr-only"
 											/>
 											<div
@@ -3008,7 +2835,7 @@
 										</label>
 									</div>
 									<p class="text-[10px] text-gray-500 dark:text-gray-400">
-										{keywordCaseSensitive
+										{filter.caseSensitive
 											? '启用：ABC 和 abc 被视为不同的关键词'
 											: '禁用：ABC 和 abc 被视为相同的关键词'}
 									</p>
@@ -3031,7 +2858,7 @@
 													type="number"
 													min="0"
 													step="1"
-													bind:value={minDurationSeconds}
+													bind:value={filter.minDuration}
 													placeholder="例如 60"
 													class="h-8 text-xs"
 												/>
@@ -3047,7 +2874,7 @@
 													type="number"
 													min="0"
 													step="1"
-													bind:value={maxDurationSeconds}
+													bind:value={filter.maxDuration}
 													placeholder="例如 1800"
 													class="h-8 text-xs"
 												/>
@@ -3061,7 +2888,7 @@
 												<Input
 													id="add-source-published-after"
 													type="date"
-													bind:value={publishedAfter}
+													bind:value={filter.publishedAfter}
 													class="h-8 text-xs"
 												/>
 											</div>
@@ -3074,7 +2901,7 @@
 												<Input
 													id="add-source-published-before"
 													type="date"
-													bind:value={publishedBefore}
+													bind:value={filter.publishedBefore}
 													class="h-8 text-xs"
 												/>
 											</div>
@@ -3082,8 +2909,8 @@
 										<p class="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
 											留空表示不限制。投稿时间按自然日过滤，起止日期均包含当天。
 										</p>
-										{#if advancedFilterValidationError}
-											<p class="mt-1 text-[10px] text-red-500">{advancedFilterValidationError}</p>
+										{#if filter.advancedError}
+											<p class="mt-1 text-[10px] text-red-500">{filter.advancedError}</p>
 										{/if}
 									</div>
 
@@ -3091,11 +2918,11 @@
 									<div class="flex border-b border-gray-200 dark:border-gray-700">
 										<button
 											type="button"
-											class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors {keywordActiveTab ===
+											class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors {filter.activeTab ===
 											'whitelist'
 												? 'border-b-2 border-green-500 text-green-600 dark:text-green-400'
 												: 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
-											onclick={() => (keywordActiveTab = 'whitelist')}
+											onclick={() => (filter.activeTab = 'whitelist')}
 										>
 											<svg
 												class="h-3.5 w-3.5"
@@ -3114,16 +2941,16 @@
 											<span
 												class="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] text-green-700 dark:bg-green-900 dark:text-green-300"
 											>
-												{whitelistKeywords.length}
+												{filter.whitelist.length}
 											</span>
 										</button>
 										<button
 											type="button"
-											class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors {keywordActiveTab ===
+											class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors {filter.activeTab ===
 											'blacklist'
 												? 'border-b-2 border-red-500 text-red-600 dark:text-red-400'
 												: 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
-											onclick={() => (keywordActiveTab = 'blacklist')}
+											onclick={() => (filter.activeTab = 'blacklist')}
 										>
 											<svg
 												class="h-3.5 w-3.5"
@@ -3142,13 +2969,13 @@
 											<span
 												class="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700 dark:bg-red-900 dark:text-red-300"
 											>
-												{blacklistKeywords.length}
+												{filter.blacklist.length}
 											</span>
 										</button>
 									</div>
 
 									<!-- 白名单内容 -->
-									{#if keywordActiveTab === 'whitelist'}
+									{#if filter.activeTab === 'whitelist'}
 										<div
 											class="space-y-2 rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950"
 										>
@@ -3159,36 +2986,36 @@
 											<!-- 添加白名单关键词 -->
 											<div class="flex gap-1">
 												<Input
-													bind:value={newWhitelistKeyword}
+													bind:value={filter.newWhitelist}
 													placeholder="输入关键词"
-													onkeydown={handleWhitelistKeywordKeydown}
-													disabled={validatingWhitelistKeyword}
+													onkeydown={filter.handleWhitelistKeydown}
+													disabled={filter.validatingWhitelist}
 													class="h-8 flex-1 text-xs"
 												/>
 												<Button
 													type="button"
 													size="sm"
-													onclick={addWhitelistKeyword}
-													disabled={!newWhitelistKeyword.trim() || validatingWhitelistKeyword}
+													onclick={filter.addWhitelist}
+													disabled={!filter.newWhitelist.trim() || filter.validatingWhitelist}
 													class="h-8 bg-green-600 px-2 text-xs hover:bg-green-700"
 												>
-													{validatingWhitelistKeyword ? '...' : '添加'}
+													{filter.validatingWhitelist ? '...' : '添加'}
 												</Button>
 											</div>
-											{#if whitelistValidationError}
-												<p class="text-[10px] text-red-500">{whitelistValidationError}</p>
+											{#if filter.whitelistError}
+												<p class="text-[10px] text-red-500">{filter.whitelistError}</p>
 											{/if}
 
 											<!-- 白名单列表 -->
 											<div class="max-h-32 space-y-1 overflow-y-auto">
-												{#if whitelistKeywords.length === 0}
+												{#if filter.whitelist.length === 0}
 													<p
 														class="py-2 text-center text-[10px] text-green-600 italic dark:text-green-400"
 													>
 														暂无白名单关键词
 													</p>
 												{:else}
-													{#each whitelistKeywords as keyword, index (keyword)}
+													{#each filter.whitelist as keyword, index (keyword)}
 														<div
 															class="flex items-center justify-between rounded bg-green-100 px-2 py-1 dark:bg-green-900"
 														>
@@ -3198,7 +3025,7 @@
 															>
 															<button
 																type="button"
-																onclick={() => removeWhitelistKeyword(index)}
+																onclick={() => filter.removeWhitelist(index)}
 																class="ml-1 flex-shrink-0 rounded p-0.5 text-green-600 hover:bg-green-200 hover:text-red-600 dark:hover:bg-green-800"
 																title="删除"
 															>
@@ -3212,7 +3039,7 @@
 									{/if}
 
 									<!-- 黑名单内容 -->
-									{#if keywordActiveTab === 'blacklist'}
+									{#if filter.activeTab === 'blacklist'}
 										<div
 											class="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950"
 										>
@@ -3223,36 +3050,36 @@
 											<!-- 添加黑名单关键词 -->
 											<div class="flex gap-1">
 												<Input
-													bind:value={newBlacklistKeyword}
+													bind:value={filter.newBlacklist}
 													placeholder="输入关键词"
-													onkeydown={handleBlacklistKeywordKeydown}
-													disabled={validatingBlacklistKeyword}
+													onkeydown={filter.handleBlacklistKeydown}
+													disabled={filter.validatingBlacklist}
 													class="h-8 flex-1 text-xs"
 												/>
 												<Button
 													type="button"
 													size="sm"
-													onclick={addBlacklistKeyword}
-													disabled={!newBlacklistKeyword.trim() || validatingBlacklistKeyword}
+													onclick={filter.addBlacklist}
+													disabled={!filter.newBlacklist.trim() || filter.validatingBlacklist}
 													class="h-8 bg-red-600 px-2 text-xs hover:bg-red-700"
 												>
-													{validatingBlacklistKeyword ? '...' : '添加'}
+													{filter.validatingBlacklist ? '...' : '添加'}
 												</Button>
 											</div>
-											{#if blacklistValidationError}
-												<p class="text-[10px] text-red-500">{blacklistValidationError}</p>
+											{#if filter.blacklistError}
+												<p class="text-[10px] text-red-500">{filter.blacklistError}</p>
 											{/if}
 
 											<!-- 黑名单列表 -->
 											<div class="max-h-32 space-y-1 overflow-y-auto">
-												{#if blacklistKeywords.length === 0}
+												{#if filter.blacklist.length === 0}
 													<p
 														class="py-2 text-center text-[10px] text-red-600 italic dark:text-red-400"
 													>
 														暂无黑名单关键词
 													</p>
 												{:else}
-													{#each blacklistKeywords as keyword, index (keyword)}
+													{#each filter.blacklist as keyword, index (keyword)}
 														<div
 															class="flex items-center justify-between rounded bg-red-100 px-2 py-1 dark:bg-red-900"
 														>
@@ -3262,7 +3089,7 @@
 															>
 															<button
 																type="button"
-																onclick={() => removeBlacklistKeyword(index)}
+																onclick={() => filter.removeBlacklist(index)}
 																class="ml-1 flex-shrink-0 rounded p-0.5 text-red-600 hover:bg-red-200 hover:text-red-800 dark:hover:bg-red-800"
 																title="删除"
 															>
