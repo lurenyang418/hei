@@ -8,6 +8,7 @@
 	import BiliImage from '$lib/components/bili-image.svelte';
 	import BatchActionBar from '$lib/components/add-source/batch-action-bar.svelte';
 	import HoverDetailCard from '$lib/components/add-source/hover-detail-card.svelte';
+	import { HoverTooltipStore } from '$lib/stores/add-source/hover.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -63,6 +64,8 @@
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import { formatTimestamp } from '$lib/utils/timezone';
 	import { formatSubmissionDateLabel, formatSubmissionMetricLabel } from '$lib/utils/submission';
+
+	const hover = new HoverTooltipStore();
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -170,7 +173,7 @@
 		showSearchResults = false;
 		searchResults = [];
 		searchTotalResults = 0;
-		hoveredItem = null;
+		hover.hide();
 		if (options.clearKeyword) {
 			searchKeyword = '';
 		}
@@ -286,9 +289,6 @@
 	}
 
 	// 悬停详情相关
-	let hoveredItem: HoveredItem | null = null;
-	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
-	let mousePosition = { x: 0, y: 0 };
 
 	// 响应式相关
 	const isMobileQuery = new IsMobile();
@@ -535,7 +535,7 @@
 
 	onDestroy(() => {
 		// 清理定时器
-		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hover.destroy();
 		if (upIdTimeout) clearTimeout(upIdTimeout);
 		if (seasonIdTimeout) clearTimeout(seasonIdTimeout);
 		if (favoriteValidationTimeout) clearTimeout(favoriteValidationTimeout);
@@ -1853,7 +1853,7 @@
 		searchKeyword = '';
 		searchTotalResults = 0;
 		showSearchResults = false;
-		hoveredItem = null;
+		hover.hide();
 		// 清空各类型的缓存数据
 		userFollowings = [];
 		userCollections = [];
@@ -1882,103 +1882,8 @@
 	}
 
 	// 统一的悬浮处理函数
-	let tooltipUpdateRaf: number | null = null;
-	let pendingTooltipPoint: { pageX: number; pageY: number } | null = null;
 
-	function scheduleTooltipUpdate(pageX: number, pageY: number, immediate = false) {
-		pendingTooltipPoint = { pageX, pageY };
 
-		if (immediate) {
-			updateTooltipPosition(pageX, pageY);
-			return;
-		}
-
-		if (tooltipUpdateRaf !== null) return;
-		tooltipUpdateRaf = requestAnimationFrame(() => {
-			tooltipUpdateRaf = null;
-			if (hoveredItem && pendingTooltipPoint) {
-				updateTooltipPosition(pendingTooltipPoint.pageX, pendingTooltipPoint.pageY);
-			}
-		});
-	}
-
-	function handleItemMouseEnter(type: 'search', data: SearchResultItem, event: MouseEvent): void;
-	function handleItemMouseEnter(type: 'season', data: BangumiSeasonInfo, event: MouseEvent): void;
-	function handleItemMouseEnter(
-		type: HoveredItem['type'],
-		data: SearchResultItem | BangumiSeasonInfo,
-		event: MouseEvent
-	) {
-		hoveredItem = { type, data } as HoveredItem;
-		scheduleTooltipUpdate(event.pageX, event.pageY, true);
-	}
-
-	function handleItemMouseMove(event: MouseEvent) {
-		if (hoveredItem) {
-			scheduleTooltipUpdate(event.pageX, event.pageY);
-		}
-	}
-
-	function updateTooltipPosition(pageX: number, pageY: number) {
-		// 获取视窗尺寸
-		const viewportWidth = window.innerWidth;
-		const viewportHeight = window.innerHeight;
-		const tooltipWidth = 400; // 预估悬浮窗宽度
-		const tooltipHeight = 300; // 预估悬浮窗高度
-
-		let x = pageX + 20;
-		let y = pageY - 100;
-
-		// 防止悬浮窗超出右边界
-		if (x + tooltipWidth > viewportWidth) {
-			x = pageX - tooltipWidth - 20;
-		}
-
-		// 防止悬浮窗超出下边界
-		if (y + tooltipHeight > viewportHeight) {
-			y = pageY - tooltipHeight - 20;
-		}
-
-		// 防止悬浮窗超出上边界和左边界
-		mousePosition = {
-			x: Math.max(10, x),
-			y: Math.max(10, y)
-		};
-	}
-
-	function handleItemMouseLeave() {
-		hoveredItem = null;
-		pendingTooltipPoint = null;
-		if (tooltipUpdateRaf !== null) {
-			cancelAnimationFrame(tooltipUpdateRaf);
-			tooltipUpdateRaf = null;
-		}
-	}
-
-	// 为了向后兼容，保留旧的函数名但重定向到新的统一函数
-	function handleMouseEnter(result: SearchResultItem, event: MouseEvent) {
-		handleItemMouseEnter('search', result, event);
-	}
-
-	function handleMouseMove(event: MouseEvent) {
-		handleItemMouseMove(event);
-	}
-
-	function handleMouseLeave() {
-		handleItemMouseLeave();
-	}
-
-	function handleSeasonMouseEnter(season: BangumiSeasonInfo, event: MouseEvent) {
-		handleItemMouseEnter('season', season, event);
-	}
-
-	function handleSeasonMouseMove(event: MouseEvent) {
-		handleItemMouseMove(event);
-	}
-
-	function handleSeasonMouseLeave() {
-		handleItemMouseLeave();
-	}
 
 	// 获取关注的UP主列表
 	async function fetchUserFollowings() {
@@ -4360,9 +4265,9 @@
 						onSelectAll={() => selectAllVisible('search')}
 						onSelectResult={selectSearchResult}
 						onToggleBatch={(key, result) => toggleBatchSelection(key, result, 'search')}
-						onMouseEnter={handleMouseEnter}
-						onMouseLeave={handleMouseLeave}
-						onMouseMove={handleMouseMove}
+						onMouseEnter={(result, e) => hover.show('search', result, e)}
+						onMouseLeave={() => hover.hide()}
+						onMouseMove={(e) => hover.move(e)}
 					/>
 				{/if}
 
@@ -4819,9 +4724,9 @@
 													? 'h-auto'
 													: 'h-[120px]'}"
 												onmouseenter={(e) =>
-													!season.isExisting && handleSeasonMouseEnter(season, e)}
-												onmouseleave={!season.isExisting ? handleSeasonMouseLeave : undefined}
-												onmousemove={!season.isExisting ? handleSeasonMouseMove : undefined}
+													!season.isExisting && hover.show('season', season, e)}
+												onmouseleave={!season.isExisting ? () => hover.hide() : undefined}
+												onmousemove={!season.isExisting ? (e) => hover.move(e) : undefined}
 												onclick={() =>
 													!season.isExisting && toggleSeasonSelection(season.season_id)}
 												onkeydown={(e) =>
@@ -5219,8 +5124,8 @@
 
 <!-- 统一的悬停详情框 -->
 <HoverDetailCard
-	{hoveredItem}
-	mousePosition={mousePosition}
+	hoveredItem={hover.item}
+	mousePosition={hover.position}
 	sourceType={sourceType}
 	{sourceId}
 	{selectedSeasons}
