@@ -10,6 +10,7 @@
 	import { VIDEO_SOURCES, type VideoSourceType } from '$lib/consts';
 	import { VideoSourceBulkStore } from '$lib/stores/video-sources/bulk.svelte';
 	import { VideoSourceScanConfigStore } from '$lib/stores/video-sources/scan-config.svelte';
+	import { VideoSourceFilterOptionStore } from '$lib/stores/video-sources/filter-option.svelte';
 	import { videoSourceStore, setVideoSources } from '$lib/stores/video-source';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
@@ -117,6 +118,16 @@
 
 	const scanConfig = new VideoSourceScanConfigStore();
 
+	const filterOptionStore = new VideoSourceFilterOptionStore({
+		updateSource: updateSourceInStore,
+		loadGlobalFilterOption: async () => {
+			const response = await runRequest(() => api.getConfig(), {
+				context: '加载全局流过滤设置失败'
+			});
+			return response ? filterOptionFromConfig(response.data) : null;
+		}
+	});
+
 	let loading = false;
 	let platformTab = 'bilibili';
 	const videoSourcesStream = createManagedEventSource();
@@ -171,18 +182,6 @@
 	};
 
 	// 源级流过滤/码率设置对话框状态
-	let showFilterOptionDialog = false;
-	let filterOptionInfo = {
-		type: '',
-		id: 0,
-		name: ''
-	};
-	let filterOptionDraft: FilterOption = {
-		...DEFAULT_FILTER_OPTION,
-		codecs: [...DEFAULT_FILTER_OPTION.codecs]
-	};
-	let filterOptionInheritGlobal = true;
-	let filterOptionSaving = false;
 
 	// AI提示词对话框状态
 	let showAiPromptDialog = false;
@@ -627,55 +626,7 @@
 		);
 	}
 
-	async function handleOpenFilterOptionDialog(sourceType: string, source: VideoSource) {
-		filterOptionInfo = {
-			type: sourceType,
-			id: source.id,
-			name: source.name
-		};
-		filterOptionInheritGlobal = !source.filter_option;
-		filterOptionDraft = cloneFilterOption(source.filter_option ?? DEFAULT_FILTER_OPTION);
-		showFilterOptionDialog = true;
 
-		if (!source.filter_option) {
-			const response = await runRequest(() => api.getConfig(), {
-				context: '加载全局流过滤设置失败'
-			});
-			if (response) {
-				filterOptionDraft = filterOptionFromConfig(response.data);
-			}
-		}
-	}
-
-	async function handleSaveFilterOption() {
-		if (!filterOptionInheritGlobal && filterOptionDraft.codecs.length === 0) {
-			toast.error('保存失败', { description: '至少保留一个编解码器' });
-			return;
-		}
-
-		filterOptionSaving = true;
-		const result = await runRequest(
-			() =>
-				api.updateVideoSourceDownloadOptions(filterOptionInfo.type, filterOptionInfo.id, {
-					filter_option: filterOptionInheritGlobal ? null : cloneFilterOption(filterOptionDraft)
-				}),
-			{ context: '保存源级流过滤设置失败' }
-		);
-		filterOptionSaving = false;
-		if (!result) return;
-
-		if (!result.data.success) {
-			toast.error('保存失败', { description: result.data.message });
-			return;
-		}
-
-		updateSourceInStore(filterOptionInfo.type, filterOptionInfo.id, (source) => ({
-			...source,
-			filter_option: result.data.filter_option ?? null
-		}));
-		toast.success(filterOptionInheritGlobal ? '已恢复继承全局流过滤设置' : '已保存源级码率设置');
-		showFilterOptionDialog = false;
-	}
 
 	// 切换仅下载音频设置
 	async function handleToggleAudioOnly(
@@ -1713,7 +1664,7 @@
 															size="sm"
 															variant="ghost"
 															onclick={() =>
-																handleOpenFilterOptionDialog(sourceConfig.type, source)}
+																filterOptionStore.open(sourceConfig.type, source)}
 															title={source.filter_option
 																? '编辑源级码率/流过滤'
 																: '设置源级码率/流过滤'}
@@ -2035,12 +1986,12 @@
 
 <!-- 源级流过滤/码率设置对话框 -->
 <SourceFilterOptionDialog
-	bind:open={showFilterOptionDialog}
-	sourceName={filterOptionInfo.name}
-	bind:inheritGlobal={filterOptionInheritGlobal}
-	bind:filterOptionDraft
-	saving={filterOptionSaving}
-	onSave={handleSaveFilterOption}
+	bind:open={filterOptionStore.dialogOpen}
+	sourceName={filterOptionStore.info.name}
+	bind:inheritGlobal={filterOptionStore.inheritGlobal}
+	bind:filterOptionDraft={filterOptionStore.draft}
+	saving={filterOptionStore.saving}
+	onSave={filterOptionStore.save}
 />
 
 <!-- 删除确认对话框 -->
