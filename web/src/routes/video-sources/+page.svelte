@@ -3,12 +3,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import { Switch } from '$lib/components/ui/switch';
 	import { CustomSelect } from '$lib/components/ui/select';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import * as Tabs from '$lib/components/ui/tabs';
 	import { setBreadcrumb } from '$lib/stores/breadcrumb';
 	import { toast } from 'svelte-sonner';
 	import api from '$lib/api';
@@ -21,7 +16,8 @@
 	import SubmissionSelectionDialog from '$lib/components/submission-selection-dialog.svelte';
 	import KeywordFilterDialog from '$lib/components/keyword-filter-dialog.svelte';
 	import AiPromptDialog from '$lib/components/ai-prompt-dialog.svelte';
-	import FilterOptionEditor from '$lib/components/filter-option-editor.svelte';
+	import SubmissionScanConfigDialog from '$lib/components/submission-scan-config-dialog.svelte';
+	import SourceFilterOptionDialog from '$lib/components/source-filter-option-dialog.svelte';
 	import Loading from '$lib/components/ui/Loading.svelte';
 	import SelectAllButton from '$lib/components/select-all-button.svelte';
 	import EmptyState from '$lib/components/empty-state.svelte';
@@ -2213,144 +2209,26 @@
 </div>
 
 <!-- B站源扫描优化弹窗 -->
-<AlertDialog.Root bind:open={showSubmissionScanConfigDialog}>
-	<AlertDialog.Content class="max-w-2xl">
-		<AlertDialog.Header>
-			<AlertDialog.Title title="配置合集、收藏夹和UP主投稿源的扫描优化策略">
-				B站源扫描优化
-			</AlertDialog.Title>
-			<AlertDialog.Description>
-				分批扫描覆盖合集、收藏夹和UP主投稿源；自适应会对长期无更新的源自动降频，减少风控概率。
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-
-		<div class="mt-3 grid gap-4 md:grid-cols-3">
-			<div class="space-y-1">
-				<Label>每轮扫描数量</Label>
-				<Input
-					type="number"
-					min="0"
-					step="1"
-					disabled={submissionScanConfigLoading || submissionScanConfigSaving}
-					bind:value={submissionScanBatchSize}
-				/>
-				<div class="text-muted-foreground text-xs">
-					0 表示不限制；统计合集、收藏夹和投稿源总数。源多时建议从 20~40 开始。
-				</div>
-			</div>
-
-			<div class="flex items-center gap-3 md:pt-7">
-				<Switch
-					disabled={submissionScanConfigLoading || submissionScanConfigSaving}
-					bind:checked={submissionAdaptiveScan}
-				/>
-				<div class="space-y-0.5">
-					<Label>自适应扫描频率</Label>
-					<div class="text-muted-foreground text-xs">
-						合集、收藏夹和投稿源连续无更新时都会逐步延长扫描间隔。
-					</div>
-				</div>
-			</div>
-
-			<div class="space-y-1">
-				<Label>最大间隔（小时）</Label>
-				<Input
-					type="number"
-					min="1"
-					max="168"
-					step="1"
-					disabled={!submissionAdaptiveScan ||
-						submissionScanConfigLoading ||
-						submissionScanConfigSaving}
-					bind:value={submissionAdaptiveMaxHours}
-				/>
-				<div class="text-muted-foreground text-xs">范围 1~168。</div>
-			</div>
-		</div>
-
-		<AlertDialog.Footer class="mt-4">
-			<Button
-				size="sm"
-				variant="outline"
-				disabled={submissionScanConfigLoading || submissionScanConfigSaving}
-				onclick={loadSubmissionScanConfig}
-			>
-				刷新
-			</Button>
-			<Button
-				size="sm"
-				variant="outline"
-				disabled={submissionScanConfigSaving}
-				onclick={() => (showSubmissionScanConfigDialog = false)}
-			>
-				关闭
-			</Button>
-			<Button
-				size="sm"
-				disabled={submissionScanConfigLoading || submissionScanConfigSaving}
-				onclick={saveSubmissionScanConfig}
-			>
-				{submissionScanConfigSaving ? '保存中…' : '保存'}
-			</Button>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+<SubmissionScanConfigDialog
+	bind:open={showSubmissionScanConfigDialog}
+	bind:batchSize={submissionScanBatchSize}
+	bind:adaptiveScan={submissionAdaptiveScan}
+	bind:adaptiveMaxHours={submissionAdaptiveMaxHours}
+	loading={submissionScanConfigLoading}
+	saving={submissionScanConfigSaving}
+	onReload={loadSubmissionScanConfig}
+	onSave={saveSubmissionScanConfig}
+/>
 
 <!-- 源级流过滤/码率设置对话框 -->
-<AlertDialog.Root bind:open={showFilterOptionDialog}>
-	<AlertDialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-		<AlertDialog.Header>
-			<AlertDialog.Title title="单独设置该同步源使用的视频/音频质量筛选规则">
-				源级码率设置
-			</AlertDialog.Title>
-			<AlertDialog.Description>
-				为「{filterOptionInfo.name}」单独设置视频质量、音频质量和编码优先级；继承全局时会使用设置页的全局视频质量配置。
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-
-		<div class="mt-4 space-y-5">
-			<div class="flex items-center justify-between rounded-lg border p-3">
-				<div class="space-y-1">
-					<Label for="filter-option-inherit-global">继承全局流过滤设置</Label>
-					<p class="text-muted-foreground text-xs">
-						开启后清空该源的自定义配置；关闭后保存当前编辑器内容作为该源专用码率规则。
-					</p>
-				</div>
-				<Switch
-					id="filter-option-inherit-global"
-					disabled={filterOptionSaving}
-					bind:checked={filterOptionInheritGlobal}
-				/>
-			</div>
-
-			{#if filterOptionInheritGlobal}
-				<div class="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-					当前将继承全局配置。如需给该专集、UP、收藏夹或稍后再看任务单独限码率，请关闭上面的开关。
-				</div>
-			{:else}
-				<FilterOptionEditor
-					value={filterOptionDraft}
-					disabled={filterOptionSaving}
-					on:change={(event) => (filterOptionDraft = event.detail)}
-				/>
-			{/if}
-		</div>
-
-		<AlertDialog.Footer class="mt-4">
-			<Button
-				size="sm"
-				variant="outline"
-				disabled={filterOptionSaving}
-				onclick={() => (showFilterOptionDialog = false)}
-			>
-				取消
-			</Button>
-			<Button size="sm" disabled={filterOptionSaving} onclick={handleSaveFilterOption}>
-				{filterOptionSaving ? '保存中…' : '保存'}
-			</Button>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+<SourceFilterOptionDialog
+	bind:open={showFilterOptionDialog}
+	sourceName={filterOptionInfo.name}
+	bind:inheritGlobal={filterOptionInheritGlobal}
+	bind:filterOptionDraft
+	saving={filterOptionSaving}
+	onSave={handleSaveFilterOption}
+/>
 
 <!-- 删除确认对话框 -->
 <DeleteVideoSourceDialog
