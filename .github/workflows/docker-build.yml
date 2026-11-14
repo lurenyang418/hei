@@ -98,19 +98,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      BILI_SYNC_RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+      RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
     strategy:
       fail-fast: false
       matrix:
         platform:
           - target: x86_64-unknown-linux-musl
             name: Linux-x86_64-musl
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-Linux-x86_64-musl.tar.gz
+            bin: hei
+            archive_name: hei-Linux-x86_64-musl.tar.gz
           - target: aarch64-unknown-linux-musl
             name: Linux-aarch64-musl
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-Linux-aarch64-musl.tar.gz
+            bin: hei
+            archive_name: hei-Linux-aarch64-musl.tar.gz
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -185,13 +185,13 @@ jobs:
       - name: Download Linux x86_64 binary
         uses: actions/download-artifact@v8
         with:
-          name: bili-sync-rs-Linux-x86_64-musl.tar.gz
+          name: hei-Linux-x86_64-musl.tar.gz
           path: ./
 
       - name: Download Linux ARM64 binary
         uses: actions/download-artifact@v8
         with:
-          name: bili-sync-rs-Linux-aarch64-musl.tar.gz
+          name: hei-Linux-aarch64-musl.tar.gz
           path: ./
 
       - name: List downloaded files
@@ -220,7 +220,7 @@ jobs:
           sbom: false
           build-args: |
             BUILDKIT_INLINE_CACHE=1
-            BILI_SYNC_RELEASE_CHANNEL=${{ needs.prepare.outputs.channel }}
+            RELEASE_CHANNEL=${{ needs.prepare.outputs.channel }}
 
       - name: Test Docker image
         shell: bash

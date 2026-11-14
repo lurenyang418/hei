@@ -15829,7 +15829,7 @@ mod tests {
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
-        dir.push(format!("bili-sync-workflow-{}-{}", prefix, uuid::Uuid::new_v4()));
+        dir.push(format!("workflow-{}-{}", prefix, uuid::Uuid::new_v4()));
         dir
     }
 

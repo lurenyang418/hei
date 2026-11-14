@@ -1443,7 +1443,7 @@
 </script>
 
 <svelte:head>
-	<title>视频源管理 - Bili Sync-up</title>
+	<title>视频源管理</title>
 </svelte:head>
 
 <div class="space-y-6">

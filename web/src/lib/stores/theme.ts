@@ -18,7 +18,7 @@ function getSystemTheme(): boolean {
 // 从localStorage加载主题设置
 function loadTheme(): Theme {
 	if (!browser) return 'system';
-	const stored = localStorage.getItem('bili-sync-theme');
+	const stored = localStorage.getItem('theme');
 	if (stored && ['light', 'dark', 'system'].includes(stored)) {
 		return stored as Theme;
 	}
@@ -28,7 +28,7 @@ function loadTheme(): Theme {
 // 保存主题设置到localStorage
 function saveTheme(newTheme: Theme) {
 	if (!browser) return;
-	localStorage.setItem('bili-sync-theme', newTheme);
+	localStorage.setItem('theme', newTheme);
 }
 
 // 应用主题到DOM

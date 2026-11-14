@@ -989,7 +989,7 @@
 </script>
 
 <svelte:head>
-	<title>视频管理 - Bili Sync-up</title>
+	<title>视频管理</title>
 </svelte:head>
 
 <div class="space-y-6">

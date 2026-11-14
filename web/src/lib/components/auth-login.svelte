@@ -58,7 +58,7 @@
 <div class="bg-background flex min-h-screen items-center justify-center">
 	<div class="w-full max-w-md space-y-8">
 		<div class="text-center">
-			<h1 class="text-foreground mb-2 text-3xl font-bold">hei 管理页</h1>
+			<h1 class="text-foreground mb-2 text-3xl font-bold">管理页</h1>
 			<p class="text-muted-foreground">请输入API Token以访问管理功能</p>
 		</div>
 		<div class="bg-card rounded-lg p-8 shadow-md">

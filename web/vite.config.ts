@@ -11,7 +11,7 @@ export default defineConfig({
 			registerType: 'autoUpdate',
 			includeAssets: ['favicon.png', 'icon-192.png', 'icon-512.png'],
 			manifest: {
-				name: 'hei 管理面板',
+				name: '管理面板',
 				short_name: 'hei',
 				description: 'B站视频同步下载管理工具',
 				theme_color: '#ffffff',

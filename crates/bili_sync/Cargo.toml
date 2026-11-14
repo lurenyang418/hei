@@ -86,5 +86,5 @@ built = { workspace = true }
 release = true
 
 [[bin]]
-name = "bili-sync-rs"
+name = "hei"
 path = "src/main.rs"

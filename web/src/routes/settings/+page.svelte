@@ -1826,7 +1826,7 @@
 </script>
 
 <svelte:head>
-	<title>设置 - Bili Sync-up</title>
+	<title>设置</title>
 </svelte:head>
 
 <div class="py-2">
@@ -4460,7 +4460,7 @@
 								<p>
 									支持占位符：&#123;&#123;source&#125;&#125;、&#123;&#123;title&#125;&#125;、&#123;&#123;content&#125;&#125;、&#123;&#123;channel&#125;&#125;、&#123;&#123;event&#125;&#125;、&#123;&#123;sent_at&#125;&#125;
 								</p>
-								<p>&#123;&#123;source&#125;&#125;：固定来源名，当前为 bili-sync</p>
+								<p>&#123;&#123;source&#125;&#125;：固定来源名</p>
 								<p>&#123;&#123;title&#125;&#125;：推送标题</p>
 								<p>&#123;&#123;content&#125;&#125;：推送正文内容</p>
 								<p>&#123;&#123;channel&#125;&#125;：当前通知渠道名称，例如 webhook</p>
@@ -4750,7 +4750,7 @@
 			>
 				<h4 class="mb-3 font-medium text-purple-800 dark:text-purple-400">推送内容示例</h4>
 				<div class="space-y-2 font-mono text-sm text-purple-700 dark:text-purple-300">
-					<p><strong>标题：</strong>Bili Sync-up 扫描完成</p>
+					<p><strong>标题：</strong>扫描完成</p>
 					<p><strong>内容：</strong></p>
 					<div class="ml-4 space-y-1">
 						<p>📊 扫描摘要</p>

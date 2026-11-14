@@ -40,9 +40,9 @@
 
 ```bash
 docker run -d \
-  --name bili-sync \
+  --name hei \
   -p 12345:12345 \
-  -v ./config:/app/.config/bili-sync \
+  -v ./config:/app/.config/hei \
   -v ./Downloads:/Downloads \
   ghcr.io/lurenyang418/hei:latest
 ```
@@ -53,7 +53,7 @@ docker run -d \
 ```yaml
 services:
 
-  bili-sync:
+  hei:
     image: ghcr.io/lurenyang418/hei:latest
     # build:
     #   context: .
@@ -66,20 +66,18 @@ services:
     # 可以执行 `id ${user}` 获取 `user` 用户的 uid 及 gid
     # 程序下载的所有文件权限将与此处的用户保持一致，不设置默认为 Root
     # user: 1000:1000
-    hostname: bili-sync
-    container_name: bili-sync
+    hostname: hei
+    container_name: hei
     # 程序默认绑定 0.0.0.0:12345 运行 http 服务
     ports:
       - 12345:12345
     volumes:
-      - ./config:/app/.config/bili-sync
+      - ./config:/app/.config/hei
       - ./Downloads:/Downloads # 下载目录：程序默认下载到容器内 /Downloads，这里映射到宿主机 ./Downloads
 
     environment:
       - TZ=Asia/Shanghai
       - RUST_LOG=None,bili_sync=info
-      # 可选：设置执行周期，默认为每天凌晨3点执行
-      # - BILI_SYNC_SCHEDULE=0 3 * * *
     # 资源限制（可选）
     # deploy:
     #   resources:

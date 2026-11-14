@@ -1546,7 +1546,7 @@ pub async fn split_media_segments_with_ffmpeg(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let temp_dir = output_dir.join(format!(".bili-sync-chapters-{}-{}", std::process::id(), ts));
+    let temp_dir = output_dir.join(format!(".chapters-{}-{}", std::process::id(), ts));
     fs::create_dir_all(&temp_dir).await?;
 
     let input_path_str = input_path.to_string_lossy().to_string();

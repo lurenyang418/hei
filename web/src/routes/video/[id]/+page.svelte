@@ -697,7 +697,7 @@
 </script>
 
 <svelte:head>
-	<title>{videoData?.video.name || '视频详情'} - Bili Sync-up</title>
+	<title>{videoData?.video.name || '视频详情'}</title>
 </svelte:head>
 
 {#if loading}
@@ -1062,7 +1062,7 @@
 							{/if}
 							{#if onlinePlayMode}
 								<div class="mb-3 text-sm text-gray-500">
-									当前为 B 站内嵌播放，清晰度和码率由平台播放器控制，不继承 hei
+									当前为 B 站内嵌播放，清晰度和码率由平台播放器控制，不继承本程序
 									的清晰度设置。
 								</div>
 							{/if}

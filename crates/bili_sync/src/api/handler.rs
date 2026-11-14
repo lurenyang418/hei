@@ -348,13 +348,13 @@ static IMAGE_PROXY_CACHE_LAST_CLEANUP_AT: Lazy<RwLock<Option<DateTime<Utc>>>> = 
 const GHCR_REGISTRY_BASE: &str = "https://ghcr.io";
 const GHCR_TOKEN_ENDPOINT: &str = "https://ghcr.io/token";
 const GHCR_REGISTRY_SERVICE: &str = "ghcr.io";
-const GHCR_BILI_SYNC_REPOSITORY: &str = "lurenyang418/hei";
+const GHCR_REPOSITORY: &str = "lurenyang418/hei";
 const GHCR_BETA_TAG: &str = "beta";
 const GHCR_LATEST_TAG: &str = "latest";
 const GHCR_DEV_TAG: &str = "dev";
-const BILI_SYNC_RELEASE_CHANNEL_ENV: &str = "BILI_SYNC_RELEASE_CHANNEL";
-const BILI_SYNC_RELEASE_CHANNEL_FILE: &str = "/app/release-channel.txt";
-const BILI_SYNC_RELEASE_CHANNEL_BUILT: Option<&str> = option_env!("BILI_SYNC_RELEASE_CHANNEL_BUILT");
+const RELEASE_CHANNEL_ENV: &str = "RELEASE_CHANNEL";
+const RELEASE_CHANNEL_FILE: &str = "/app/release-channel.txt";
+const RELEASE_CHANNEL_BUILT: Option<&str> = option_env!("RELEASE_CHANNEL_BUILT");
 
 fn normalize_release_channel(value: &str) -> Option<String> {
     let raw = value.trim();
@@ -374,21 +374,21 @@ fn normalize_release_channel(value: &str) -> Option<String> {
 
 fn get_release_channel() -> String {
     // 1) 运行时环境变量（允许用户手动覆盖）
-    if let Ok(value) = std::env::var(BILI_SYNC_RELEASE_CHANNEL_ENV) {
+    if let Ok(value) = std::env::var(RELEASE_CHANNEL_ENV) {
         if let Some(normalized) = normalize_release_channel(&value) {
             return normalized;
         }
     }
 
     // 2) Docker 镜像内标记文件（Dockerfile 写入，不需要用户设置环境变量）
-    if let Ok(value) = std::fs::read_to_string(BILI_SYNC_RELEASE_CHANNEL_FILE) {
+    if let Ok(value) = std::fs::read_to_string(RELEASE_CHANNEL_FILE) {
         if let Some(normalized) = normalize_release_channel(&value) {
             return normalized;
         }
     }
 
     // 3) 编译期写入（CI 构建二进制时注入）
-    if let Some(value) = BILI_SYNC_RELEASE_CHANNEL_BUILT {
+    if let Some(value) = RELEASE_CHANNEL_BUILT {
         if let Some(normalized) = normalize_release_channel(value) {
             return normalized;
         }
@@ -416,7 +416,7 @@ mod beta_image_update_tests {
 
     #[test]
     fn test_get_local_built_time_utc_uses_env_override() {
-        let key = "BILI_SYNC_IMAGE_BUILT_AT";
+        let key = "IMAGE_BUILT_AT";
         let original = std::env::var(key).ok();
 
         std::env::set_var(key, "2026-01-21T09:02:18Z");
@@ -451,7 +451,7 @@ fn parse_http_date_to_utc(value: &str) -> Option<DateTime<Utc>> {
 fn get_local_built_time_utc() -> Result<DateTime<Utc>> {
     // 1) Prefer container/image injected built time (avoid false positives in Docker)
     // Expected format: RFC3339 (e.g. 2026-01-21T17:02:18+08:00 or 2026-01-21T09:02:18Z)
-    if let Ok(value) = std::env::var("BILI_SYNC_IMAGE_BUILT_AT") {
+    if let Ok(value) = std::env::var("IMAGE_BUILT_AT") {
         if let Ok(parsed) = DateTime::parse_from_rfc3339(value.trim()) {
             return Ok(parsed.with_timezone(&Utc));
         }
@@ -497,7 +497,7 @@ async fn fetch_ghcr_remote_pushed_at_via_registry(client: &reqwest::Client, tag:
         token: String,
     }
 
-    let scope = format!("repository:{GHCR_BILI_SYNC_REPOSITORY}:pull");
+    let scope = format!("repository:{GHCR_REPOSITORY}:pull");
     let token = client
         .get(GHCR_TOKEN_ENDPOINT)
         .query(&[("service", GHCR_REGISTRY_SERVICE), ("scope", scope.as_str())])
@@ -511,7 +511,7 @@ async fn fetch_ghcr_remote_pushed_at_via_registry(client: &reqwest::Client, tag:
         .context("解析 GHCR Token 响应失败")?
         .token;
 
-    let manifest_url = format!("{GHCR_REGISTRY_BASE}/v2/{GHCR_BILI_SYNC_REPOSITORY}/manifests/{tag}");
+    let manifest_url = format!("{GHCR_REGISTRY_BASE}/v2/{GHCR_REPOSITORY}/manifests/{tag}");
     let manifest_res = client
         .get(&manifest_url)
         .header(
@@ -552,7 +552,7 @@ async fn fetch_ghcr_remote_pushed_at_via_registry(client: &reqwest::Client, tag:
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("manifest 中未找到 config.digest"))?;
 
-        let config_url = format!("{GHCR_REGISTRY_BASE}/v2/{GHCR_BILI_SYNC_REPOSITORY}/blobs/{config_digest}");
+        let config_url = format!("{GHCR_REGISTRY_BASE}/v2/{GHCR_REPOSITORY}/blobs/{config_digest}");
         let config_value: serde_json::Value = client
             .get(&config_url)
             .bearer_auth(token)
@@ -599,8 +599,7 @@ async fn fetch_ghcr_remote_pushed_at_via_registry(client: &reqwest::Client, tag:
             })
             .ok_or_else(|| anyhow!("manifest list 中未找到可用 digest"))?;
 
-        let sub_manifest_url =
-            format!("{GHCR_REGISTRY_BASE}/v2/{GHCR_BILI_SYNC_REPOSITORY}/manifests/{selected_digest}");
+        let sub_manifest_url = format!("{GHCR_REGISTRY_BASE}/v2/{GHCR_REPOSITORY}/manifests/{selected_digest}");
         let sub_manifest_value: serde_json::Value = client
             .get(&sub_manifest_url)
             .header(
@@ -823,7 +822,7 @@ mod rename_tests {
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
-        dir.push(format!("bili-sync-rename-{}-{}", prefix, uuid::Uuid::new_v4()));
+        dir.push(format!("rename-{}-{}", prefix, uuid::Uuid::new_v4()));
         dir
     }
 
@@ -1056,7 +1055,7 @@ mod cleanup_tests {
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
-        dir.push(format!("bili-sync-{}-{}", prefix, uuid::Uuid::new_v4()));
+        dir.push(format!("{}-{}", prefix, uuid::Uuid::new_v4()));
         dir
     }
 
@@ -1269,7 +1268,7 @@ mod reset_path_tests {
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
-        dir.push(format!("bili-sync-reset-path-{prefix}-{}", uuid::Uuid::new_v4()));
+        dir.push(format!("reset-path-{prefix}-{}", uuid::Uuid::new_v4()));
         dir
     }
 
@@ -1368,7 +1367,7 @@ mod queue_sse_tests {
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let mut dir = std::env::temp_dir();
-        dir.push(format!("bili-sync-{}-{}", prefix, uuid::Uuid::new_v4()));
+        dir.push(format!("{}-{}", prefix, uuid::Uuid::new_v4()));
         dir
     }
 
@@ -19916,7 +19915,7 @@ pub async fn restore_database_upload(
             continue;
         }
         let original_name = field.file_name().unwrap_or("backup.sqlite").to_string();
-        let tmp_path = std::env::temp_dir().join(format!("bili-sync-db-import-{}.sqlite", uuid::Uuid::new_v4()));
+        let tmp_path = std::env::temp_dir().join(format!("db-import-{}.sqlite", uuid::Uuid::new_v4()));
         let mut out = tokio::fs::File::create(&tmp_path)
             .await
             .map_err(|err| ApiError::bad_request(format!("创建上传临时文件失败：{err}")))?;

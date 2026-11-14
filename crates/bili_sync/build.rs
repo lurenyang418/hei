@@ -5,13 +5,13 @@ fn main() {
     built::write_built_file().expect("Failed to acquire build-time information");
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-env-changed=BILI_SYNC_RELEASE_CHANNEL");
+    println!("cargo:rerun-if-env-changed=RELEASE_CHANNEL");
     track_frontend_build_output();
 
-    if let Ok(value) = env::var("BILI_SYNC_RELEASE_CHANNEL") {
+    if let Ok(value) = env::var("RELEASE_CHANNEL") {
         let trimmed = value.trim();
         if !trimmed.is_empty() {
-            println!("cargo:rustc-env=BILI_SYNC_RELEASE_CHANNEL_BUILT={}", trimmed);
+            println!("cargo:rustc-env=RELEASE_CHANNEL_BUILT={}", trimmed);
         }
     }
 }

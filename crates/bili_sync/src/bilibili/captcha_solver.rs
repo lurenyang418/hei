@@ -32,7 +32,7 @@ impl CaptchaSolver {
     pub fn new(config: AutoSolveConfig) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(config.solve_timeout + 30))
-            .user_agent("bili-sync/2.7.6")
+            .user_agent(concat!("hei/", env!("CARGO_PKG_VERSION")))
             .build()
             .unwrap_or_default();
 

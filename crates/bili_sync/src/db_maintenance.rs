@@ -288,7 +288,7 @@ fn backup_timestamp(name: &str) -> Option<String> {
         .map(|time| time.format("%Y-%m-%d %H:%M:%S").to_string())
 }
 
-/// 校验备份文件确实是可用的 bili-sync SQLite 数据库。
+/// 校验备份文件确实是可用的 SQLite 数据库。
 async fn validate_backup_is_sqlite(path: &std::path::Path) -> Result<()> {
     use sea_orm::sqlx::sqlite::SqliteConnectOptions;
     use sea_orm::sqlx::SqlitePool;
@@ -327,7 +327,7 @@ pub async fn restore_backup(backup_file: &str) -> Result<DatabaseRestoreResponse
     info!(backup = name, "数据库恢复已安排：重启后生效");
     Ok(DatabaseRestoreResponse {
         success: true,
-        message: format!("已安排恢复「{name}」，重启 bili-sync 后生效"),
+        message: format!("已安排恢复「{name}」，重启后生效"),
         backup_name: Some(name.to_string()),
         restart_required: true,
     })
@@ -372,7 +372,7 @@ async fn import_backup_at(
     src_path: &std::path::Path,
     _original_name: &str,
 ) -> Result<DatabaseRestoreResponse> {
-    // 仅接受真实的 bili-sync SQLite 数据库，避免导入任意文件。
+    // 仅接受真实的 SQLite 数据库，避免导入任意文件。
     validate_backup_is_sqlite(src_path).await?;
 
     let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
@@ -395,7 +395,7 @@ async fn import_backup_at(
     info!(path = %target.display(), "数据库管理：已导入外部备份包并安排恢复（重启后生效）");
     Ok(DatabaseRestoreResponse {
         success: true,
-        message: format!("已导入备份包「{name}」并安排恢复，重启 bili-sync 后生效"),
+        message: format!("已导入备份包「{name}」并安排恢复，重启后生效"),
         backup_name: Some(name),
         restart_required: true,
     })
@@ -407,7 +407,7 @@ mod tests {
     use sea_orm::sqlx::SqlitePool;
     use sea_orm::SqlxSqliteConnector;
 
-    /// 构造一个最小但有效的 bili-sync 备份库（含必需表）。
+    /// 构造一个最小但有效的备份库（含必需表）。
     async fn make_valid_backup(path: &std::path::Path) {
         let options = SqliteConnectOptions::new().filename(path).create_if_missing(true);
         let pool = SqlitePool::connect_with(options).await.unwrap();
@@ -466,7 +466,7 @@ mod tests {
 
     #[tokio::test]
     async fn validate_backup_accepts_real_db_and_rejects_junk() {
-        let dir = temp_dir("bili-sync-backup-test").await;
+        let dir = temp_dir("backup-test").await;
         let valid = dir.join("valid.sqlite");
         make_valid_backup(&valid).await;
         assert!(validate_backup_is_sqlite(&valid).await.is_ok());
@@ -479,7 +479,7 @@ mod tests {
 
     #[tokio::test]
     async fn stage_restore_writes_marker_and_staged_copy() {
-        let dir = temp_dir("bili-sync-restore-test").await;
+        let dir = temp_dir("restore-test").await;
         let backup = dir.join("data-backup-20260824-123456.sqlite");
         make_valid_backup(&backup).await;
 
@@ -581,7 +581,7 @@ mod tests {
     }
     #[tokio::test]
     async fn stage_restore_accepts_import_named_file() {
-        let dir = temp_dir("bili-sync-import-stage-test").await;
+        let dir = temp_dir("import-stage-test").await;
         let backup = dir.join("data-import-20260824-120000.sqlite");
         make_valid_backup(&backup).await;
 
@@ -595,7 +595,7 @@ mod tests {
 
     #[tokio::test]
     async fn import_backup_moves_stages_and_keeps_import_file() {
-        let dir = temp_dir("bili-sync-import-test").await;
+        let dir = temp_dir("import-test").await;
         let external = dir.join("external-backup.sqlite");
         make_valid_backup(&external).await;
 
@@ -615,7 +615,7 @@ mod tests {
 
     #[tokio::test]
     async fn import_backup_rejects_invalid_sqlite() {
-        let dir = temp_dir("bili-sync-import-invalid-test").await;
+        let dir = temp_dir("import-invalid-test").await;
         let junk = dir.join("junk.sqlite");
         tokio::fs::write(&junk, b"not a sqlite database at all").await.unwrap();
 

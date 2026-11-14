@@ -223,8 +223,8 @@ fn init() {
     let _ = &*file_logger::FILE_LOG_WRITER;
 
     init_logger(&ARGS.log_level);
-    info!("欢迎使用 Bili-Sync，当前程序版本：{}", config::version());
-    info!("现项目地址：https://github.com/NeeYoonc/bili-sync-up");
+    info!("程序启动，当前程序版本：{}", config::version());
+    info!("现项目地址：https://github.com/lurenyang418/hei");
     info!("原项目地址：https://github.com/amtoaer/bili-sync");
     debug!("系统初始化完成，日志级别: {}", ARGS.log_level);
 

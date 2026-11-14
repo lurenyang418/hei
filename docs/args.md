@@ -1,12 +1,12 @@
 # 命令行参数
 
-程序支持有限的命令行参数，可以通过执行 `bili-sync-rs --help` 查看说明。
+程序支持有限的命令行参数，可以通过执行 `hei --help` 查看说明。
 
 ```shell
-./bili-sync-rs --help
+./hei --help
 由 Rust & Tokio 驱动的哔哩哔哩同步工具（升级优化版）
 
-Usage: bili-sync-rs [OPTIONS]
+Usage: hei [OPTIONS]
 
 Options:
   -s, --scan-only              [env: SCAN_ONLY=]

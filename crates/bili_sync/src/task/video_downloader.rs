@@ -1760,7 +1760,7 @@ mod tests {
 
     async fn create_test_db(prefix: &str) -> DatabaseConnection {
         let mut dir = std::env::temp_dir();
-        dir.push(format!("bili-sync-watch-later-{}-{}", prefix, uuid::Uuid::new_v4()));
+        dir.push(format!("watch-later-{}-{}", prefix, uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).expect("应能创建临时数据库目录");
         let db_path = dir.join("data.sqlite");
 

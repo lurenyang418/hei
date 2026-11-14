@@ -747,7 +747,7 @@ const AI_RATE_LIMIT_BACKOFFS: [u64; 3] = [30, 60, 120];
 /// 退避全部用尽后如果直接丢掉整批，文件会永久漏掉。这里在任务末尾对**限频失败**的批次
 /// 再等 5 分钟重试一轮，最多一轮，避免任务无限挂起。
 ///
-/// 可用环境变量 `BILI_SYNC_AI_RENAME_RATE_LIMIT_RETRY_SECS` 调整（调试用；低于 300 的值
+/// 可用环境变量 `AI_RENAME_RATE_LIMIT_RETRY_SECS` 调整（调试用；低于 300 的值
 /// 会被忽略，保证「至少 5 分钟」的语义不被破坏）。
 const AI_RATE_LIMIT_RETRY_DELAY_SECS: u64 = 300;
 const AI_RATE_LIMIT_RETRY_MIN_DELAY_SECS: u64 = 300;
@@ -852,7 +852,7 @@ async fn wait_before_rate_limit_retry(delay: Duration, cancel: Option<&Arc<Atomi
 
 /// 任务末尾限频重试的等待时间（默认 5 分钟，可用环境变量覆盖，见模块常量注释）
 fn rate_limit_retry_delay() -> Duration {
-    let seconds = std::env::var("BILI_SYNC_AI_RENAME_RATE_LIMIT_RETRY_SECS")
+    let seconds = std::env::var("AI_RENAME_RATE_LIMIT_RETRY_SECS")
         .ok()
         .and_then(|value| value.trim().parse::<u64>().ok())
         .filter(|seconds| *seconds >= AI_RATE_LIMIT_RETRY_MIN_DELAY_SECS)
@@ -3028,7 +3028,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "需要真实 AI API 凭证与网络，用于人工联调（设置 BILI_SYNC_CONFIG_DIR 指向含 ai_rename 配置的临时库）"]
+    #[ignore = "需要真实 AI API 凭证与网络，用于人工联调（设置 CONFIG_DIR 指向含 ai_rename 配置的临时库）"]
     fn live_ai_api_multi_page_and_bangumi_one_to_one() {
         use std::path::PathBuf;
 

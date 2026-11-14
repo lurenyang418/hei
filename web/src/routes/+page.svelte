@@ -453,7 +453,7 @@
 </script>
 
 <svelte:head>
-	<title>首页 - Bili Sync-up</title>
+	<title>首页</title>
 </svelte:head>
 
 {#if checkingSetup}

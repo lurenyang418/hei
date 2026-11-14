@@ -1150,7 +1150,7 @@ mod tests {
         // 最后再 rebuild_interest_cache() 收尾 —— 顺序反了会留下竞态（见函数注释）。
         warm_up_db_operation_trace_callsites(&logs);
 
-        let db_path = std::env::temp_dir().join(format!("bili-sync-db-trace-{}.sqlite", Uuid::new_v4()));
+        let db_path = std::env::temp_dir().join(format!("db-trace-{}.sqlite", Uuid::new_v4()));
         let connection_1 = create_test_connection(&db_path, 50).await?;
         let connection_2 = create_test_connection(&db_path, 50).await?;
 
@@ -1227,7 +1227,7 @@ mod restore_tests {
 
     #[tokio::test]
     async fn pending_restore_swaps_db_and_keeps_snapshot() {
-        let dir = temp_dir("bili-sync-db-restore").await;
+        let dir = temp_dir("db-restore").await;
         // 当前库 + WAL/SHM
         tokio::fs::write(dir.join("data.sqlite"), b"old-main").await.unwrap();
         tokio::fs::write(dir.join("data.sqlite-wal"), b"old-wal").await.unwrap();

@@ -1,4 +1,4 @@
-name: Build bili-sync
+name: Build hei
 
 on:
   push:
@@ -69,13 +69,13 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-24.04
             name: Linux-x86_64-musl
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-Linux-x86_64-musl.tar.gz
+            bin: hei
+            archive_name: hei-Linux-x86_64-musl.tar.gz
           - target: aarch64-unknown-linux-musl
             os: ubuntu-24.04
             name: Linux-aarch64-musl
-            bin: bili-sync-rs
-            archive_name: bili-sync-rs-Linux-aarch64-musl.tar.gz
+            bin: hei
+            archive_name: hei-Linux-aarch64-musl.tar.gz
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -146,13 +146,13 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: bili-sync-rs-*
+          pattern: hei-*
           merge-multiple: true
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: bili-sync-rs*
+          files: hei-*
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'dev') }}
           generate_release_notes: true

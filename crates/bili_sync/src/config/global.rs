@@ -344,16 +344,17 @@ pub fn load_config() -> Config {
 pub static ARGS: Lazy<Args> = Lazy::new(Args::parse);
 
 /// 全局的 CONFIG_DIR，表示配置文件夹的路径。
-/// 默认 `dirs::config_dir()/bili-sync`；可通过 `BILI_SYNC_CONFIG_DIR` 环境变量
-/// 覆盖（多实例 / 隔离测试 / Docker 迁移配置目录时使用）。
+/// 默认 `dirs::config_dir()/hei`；可通过 `CONFIG_DIR` 环境变量覆盖
+/// （多实例 / 隔离测试 / Docker 迁移配置目录时使用）。
 pub static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    if let Ok(override_dir) = std::env::var("BILI_SYNC_CONFIG_DIR") {
+    if let Ok(override_dir) = std::env::var("CONFIG_DIR") {
         let trimmed = override_dir.trim();
         if !trimmed.is_empty() {
             return PathBuf::from(trimmed);
         }
     }
-    dirs::config_dir().expect("No config path found").join("bili-sync")
+
+    dirs::config_dir().expect("No config path found").join("hei")
 });
 
 #[cfg(not(test))]

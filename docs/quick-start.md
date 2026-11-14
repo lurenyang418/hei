@@ -6,9 +6,9 @@
 
 ```bash
 docker run -d \
-  --name bili-sync \
+  --name hei \
   -p 12345:12345 \
-  -v /path/to/data:/app/.config/bili-sync \
+  -v /path/to/data:/app/.config/hei \
   -v /path/to/videos:/Downloads \
   ghcr.io/lurenyang418/hei:latest
 ```
@@ -18,7 +18,7 @@ docker run -d \
 1. 从 [GitHub Releases](https://github.com/lurenyang418/hei/releases) 下载 Linux amd64 / arm64 二进制文件
 2. 解压并运行：
    ```bash
-   ./bili-sync-rs
+   ./hei
    ```
 
 ### 方式三：从源码编译
@@ -27,7 +27,7 @@ docker run -d \
 git clone https://github.com/lurenyang418/hei.git
 cd hei
 cargo build --release
-./target/release/bili-sync-rs
+./target/release/hei
 ```
 
 ## 使用步骤

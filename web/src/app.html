@@ -8,7 +8,7 @@
 		<!-- PWA Meta Tags -->
 		<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 		<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
-		<meta name="description" content="hei - B站视频同步下载管理工具" />
+		<meta name="description" content="B站视频同步下载管理工具" />
 
 		<!-- iOS PWA Support -->
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-192.png" />
@@ -22,7 +22,7 @@
 		<script>
 			(() => {
 				try {
-					const storedTheme = localStorage.getItem('bili-sync-theme');
+					const storedTheme = localStorage.getItem('theme');
 					const theme =
 						storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
 							? storedTheme

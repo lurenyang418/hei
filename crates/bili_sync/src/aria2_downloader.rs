@@ -849,7 +849,7 @@ impl Aria2Downloader {
             .as_nanos()
             .hash(&mut hasher);
 
-        format!("bili-sync-{:x}", hasher.finish())
+        format!("{:x}", hasher.finish())
     }
 
     /// 启动单个aria2实例

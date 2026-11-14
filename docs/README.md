@@ -14,10 +14,10 @@
 
 ```bash
 # Docker 一键启动
-docker run -d -p 12345:12345 -v /path/to/data:/app/.config/bili-sync -v /path/to/videos:/Downloads ghcr.io/lurenyang418/hei:latest
+docker run -d -p 12345:12345 -v /path/to/data:/app/.config/hei -v /path/to/videos:/Downloads ghcr.io/lurenyang418/hei:latest
 
 # 或下载二进制文件直接运行
-./bili-sync-rs
+./hei
 ```
 
 访问 `http://localhost:12345` 开始使用

@@ -2831,7 +2831,7 @@
 </script>
 
 <svelte:head>
-	<title>添加视频源 - Bili Sync-up</title>
+	<title>添加视频源</title>
 </svelte:head>
 
 <div class="py-2">

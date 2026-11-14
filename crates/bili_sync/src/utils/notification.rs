@@ -404,7 +404,7 @@ impl NotificationClient {
 
     async fn send_to_webhook(&self, url: &str, title: &str, content: &str, event: &str) -> Result<()> {
         let payload = GenericWebhookRequest {
-            source: "bili-sync".to_string(),
+            source: "hei".to_string(),
             title: title.to_string(),
             content: content.to_string(),
             channel: self.config.active_channel.clone(),
@@ -444,7 +444,7 @@ impl NotificationClient {
             // 不能把 JSON 字符串再包进一个 JSON 对象，否则群晖会静默丢弃消息。
             let synology_payload = serde_json::to_string(&serde_json::json!({
                 "text": self.render_synology_chat_text(&payload),
-                "username": "bili-sync"
+                "username": "hei"
             }))?;
             req.form(&[("payload", synology_payload)]).send().await?
         } else {
@@ -791,8 +791,8 @@ impl NotificationClient {
         }
 
         let sample_payload = GenericWebhookRequest {
-            source: "bili-sync".to_string(),
-            title: "Bili Sync-up 测试推送".to_string(),
+            source: "hei".to_string(),
+            title: "测试推送".to_string(),
             content: "这是一条Webhook测试推送消息。".to_string(),
             channel: "webhook".to_string(),
             event: "test_notification".to_string(),
@@ -815,8 +815,8 @@ impl NotificationClient {
             return Err(anyhow!("自定义 POST Body 不能为空"));
         }
         let sample_payload = GenericWebhookRequest {
-            source: "bili-sync".to_string(),
-            title: "Bili Sync-up 测试推送".to_string(),
+            source: "hei".to_string(),
+            title: "测试推送".to_string(),
             content: "这是一条Webhook测试推送消息。".to_string(),
             channel: "webhook".to_string(),
             event: "test_notification".to_string(),
@@ -871,7 +871,7 @@ impl NotificationClient {
     }
 
     fn format_scan_message(&self, summary: &ScanSummary) -> (String, String) {
-        let title = "Bili Sync-up 扫描完成".to_string();
+        let title = "扫描完成".to_string();
 
         // 限制最大内容长度为30KB（留一些余量）
         const MAX_CONTENT_LENGTH: usize = 30000;
@@ -1020,7 +1020,7 @@ impl NotificationClient {
                     return Err(anyhow!("Server酱渠道已选择但未配置密钥"));
                 };
 
-                let title = "Bili Sync-up 测试推送";
+                let title = "测试推送";
                 let content =
                     "这是一条测试推送消息。\n\n如果您收到此消息，说明Server酱推送配置正确。\n\n🎉 推送功能工作正常！";
 
@@ -1035,7 +1035,7 @@ impl NotificationClient {
                     return Err(anyhow!("Server酱3渠道已选择但未配置UID或SendKey"));
                 };
 
-                let title = "Bili Sync-up 测试推送";
+                let title = "测试推送";
                 let content =
                     "这是一条测试推送消息。\n\n如果您收到此消息，说明Server酱3推送配置正确。\n\n🎉 推送功能工作正常！";
 
@@ -1044,7 +1044,7 @@ impl NotificationClient {
                 Ok(())
             }
             "wecom" => {
-                let title = "Bili Sync-up 测试推送";
+                let title = "测试推送";
                 let content = "这是一条企业微信测试推送消息。\n\n如果您收到此消息，说明企业微信推送配置正确。\n\n🎉 推送功能工作正常！";
 
                 self.send_to_wecom(title, content).await?;
@@ -1065,7 +1065,7 @@ impl NotificationClient {
                     return Err(anyhow!("Webhook渠道已选择自定义请求 但未配置 POST Body"));
                 }
 
-                let title = "Bili Sync-up 测试推送";
+                let title = "测试推送";
                 let content = "这是一条Webhook测试推送消息。\n\n如果您收到此消息，说明Webhook推送配置正确。\n\n🎉 推送功能工作正常！";
                 self.send_to_webhook(webhook_url, title, content, "test_notification")
                     .await?;
@@ -1083,7 +1083,7 @@ impl NotificationClient {
             return Err(anyhow!("未选择通知渠道"));
         }
 
-        let title = "Bili Sync-up 自定义测试推送";
+        let title = "自定义测试推送";
         let content = format!("🧪 **自定义测试消息**\n\n{}", message);
 
         match active_channel {
@@ -1144,7 +1144,7 @@ impl NotificationClient {
             return Ok(());
         }
 
-        let title = "Bili Sync-up 风控验证提醒";
+        let title = "风控验证提醒";
         let content = match mode {
             "manual" => "检测到B站风控验证，需要手动完成验证码。\n\n请访问管理页面 /captcha 完成验证。".to_string(),
             "auto" => "检测到B站风控验证，正在自动处理验证码...".to_string(),
@@ -1231,7 +1231,7 @@ impl NotificationClient {
             return Ok(());
         }
 
-        let title = "Bili Sync-up 视频结构变更提醒";
+        let title = "视频结构变更提醒";
         let path_info = old_path
             .map(|p| format!("\n\n**原文件路径**: `{}`\n\n请手动清理原单P文件。", p))
             .unwrap_or_default();
@@ -1325,7 +1325,7 @@ impl NotificationClient {
             return Ok(());
         }
 
-        let title = format!("Bili Sync-up 错误提醒 - {}", error_type);
+        let title = format!("错误提醒 - {}", error_type);
         let context_info = context.map(|c| format!("\n\n**上下文**: {}", c)).unwrap_or_default();
 
         let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -1557,7 +1557,7 @@ mod tests {
     #[test]
     fn test_custom_webhook_body_allows_raw_templates() {
         let payload = GenericWebhookRequest {
-            source: "bili-sync".to_string(),
+            source: "hei".to_string(),
             title: "测试标题".to_string(),
             content: "测试正文".to_string(),
             channel: "webhook".to_string(),
@@ -1582,7 +1582,7 @@ mod tests {
     fn test_synology_chat_default_template_uses_plain_text() {
         let client = NotificationClient::new(NotificationConfig::default());
         let payload = GenericWebhookRequest {
-            source: "bili-sync".to_string(),
+            source: "hei".to_string(),
             title: "扫描完成".to_string(),
             content: "📊 **扫描摘要**\n- 新增视频: 1个".to_string(),
             channel: "webhook".to_string(),
@@ -1806,10 +1806,7 @@ mod tests {
         let payload: serde_json::Value =
             serde_json::from_str(request.payload.as_deref().expect("form must contain payload"))
                 .expect("payload must be a JSON object, not an escaped JSON string");
-        assert_eq!(
-            payload.get("username").and_then(|value| value.as_str()),
-            Some("bili-sync")
-        );
+        assert_eq!(payload.get("username").and_then(|value| value.as_str()), Some("hei"));
         assert_eq!(
             payload.get("text").and_then(|value| value.as_str()),
             Some(":loudspeaker: 群晖标题\n:mailbox_closed: 群晖正文\n• 第二项\ntest_notification")

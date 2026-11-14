@@ -472,7 +472,7 @@ const GLOSSARY_ENTRIES: GlossaryEntry[] = [
 		description: '账号与界面入口操作；用于重新登录、切换主题或处理未授权状态。'
 	},
 	{
-		terms: ['安装', '安装 hei'],
+		terms: ['安装', '安装应用'],
 		description: 'PWA 安装入口，可将管理页添加到桌面或移动设备主屏。'
 	},
 	{
@@ -659,8 +659,8 @@ const GLOSSARY_ENTRIES: GlossaryEntry[] = [
 	},
 	{
 		terms: [
-			'欢迎使用 hei',
-			'hei 管理页',
+			'欢迎使用',
+			'管理页',
 			'API Token 用于保护管理界面的访问安全',
 			'Markdown格式支持富文本显示，纯文本更简洁'
 		],
