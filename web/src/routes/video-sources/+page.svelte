@@ -8,6 +8,7 @@
 	import { toast } from 'svelte-sonner';
 	import api from '$lib/api';
 	import { VIDEO_SOURCES, type VideoSourceType } from '$lib/consts';
+	import { VideoSourceBulkStore } from '$lib/stores/video-sources/bulk.svelte';
 	import { videoSourceStore, setVideoSources } from '$lib/stores/video-source';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
@@ -109,9 +110,12 @@
 	};
 
 
+	const bulk = new VideoSourceBulkStore({
+		updateSources: updateSourcesInStore
+	});
+
 	let loading = false;
 	let platformTab = 'bilibili';
-	let bulkUpdating = false;
 	const videoSourcesStream = createManagedEventSource();
 	const queuedDeleteNoticeMap = new SvelteMap<
 		string,
@@ -127,8 +131,6 @@
 	let collapsedSections: Record<string, boolean> = {};
 
 	// 批量操作状态（按分类）
-	let bulkModeSections: Record<string, boolean> = {};
-	let bulkSelectedIds: Record<string, SvelteSet<number>> = {};
 	const retryingChargeVideoSources = new SvelteSet<string>();
 
 	// 删除对话框状态
@@ -543,100 +545,13 @@
 		applyLocalUpdate?.(result.data);
 	}
 
-	function getSelectedSet(sectionKey: string) {
-		return bulkSelectedIds[sectionKey] ?? new SvelteSet<number>();
-	}
 
-	function setSelectedSet(sectionKey: string, set: SvelteSet<number>) {
-		bulkSelectedIds = { ...bulkSelectedIds, [sectionKey]: set };
-	}
 
-	function clearSelection(sectionKey: string) {
-		const { [sectionKey]: removed, ...rest } = bulkSelectedIds;
-		void removed;
-		bulkSelectedIds = rest;
-	}
 
-	function toggleBulkMode(sectionKey: string) {
-		const next = !(bulkModeSections[sectionKey] === true);
-		bulkModeSections = { ...bulkModeSections, [sectionKey]: next };
-		if (!next) {
-			clearSelection(sectionKey);
-		}
-	}
 
-	function toggleSelect(sectionKey: string, sourceId: number) {
-		const current = getSelectedSet(sectionKey);
-		const next = new SvelteSet(current);
-		if (next.has(sourceId)) {
-			next.delete(sourceId);
-		} else {
-			next.add(sourceId);
-		}
-		setSelectedSet(sectionKey, next);
-	}
 
-	function selectAll(sectionKey: string, sources: { id: number }[]) {
-		setSelectedSet(sectionKey, new SvelteSet(sources.map((s) => s.id)));
-	}
 
-	function clearAll(sectionKey: string) {
-		setSelectedSet(sectionKey, new SvelteSet());
-	}
 
-	async function bulkSetEnabled(sectionKey: string, sourceType: string, enabled: boolean) {
-		const ids = Array.from(getSelectedSet(sectionKey));
-		if (ids.length === 0) {
-			toast.error('请先选择要操作的视频源');
-			return;
-		}
-
-		bulkUpdating = true;
-		let successCount = 0;
-		const failed: { id: number; message: string }[] = [];
-
-		for (const id of ids) {
-			const result = await runRequest(() => api.updateVideoSourceEnabled(sourceType, id, enabled), {
-				showErrorToast: false,
-				onError: (error) => {
-					console.error('批量更新失败:', error);
-				}
-			});
-
-			if (!result) {
-				failed.push({ id, message: '请求失败' });
-				continue;
-			}
-
-			if (result.data.success) {
-				successCount += 1;
-			} else {
-				failed.push({ id, message: result.data.message });
-			}
-		}
-
-		const actionLabel = enabled ? '启用' : '禁用';
-		if (failed.length === 0) {
-			toast.success(`批量${actionLabel}成功`, { description: `共 ${successCount} 个视频源` });
-		} else {
-			const preview = failed
-				.slice(0, 3)
-				.map((item) => `#${item.id} ${item.message}`)
-				.join('；');
-			toast.error(`批量${actionLabel}完成（成功 ${successCount}，失败 ${failed.length}）`, {
-				description: preview + (failed.length > 3 ? '…' : '')
-			});
-		}
-
-		if (successCount > 0) {
-			const failedIds = new Set(failed.map((item) => item.id));
-			updateSourcesInStore(sourceType, ids, (source) =>
-				failedIds.has(source.id) ? source : { ...source, enabled }
-			);
-		}
-		clearSelection(sectionKey);
-		bulkUpdating = false;
-	}
 
 	// 切换视频源启用状态
 	async function handleToggleEnabled(
@@ -1408,8 +1323,8 @@
 
 		// 折叠时退出批量模式，避免误操作
 		if (collapsedSections[sectionKey] !== false) {
-			bulkModeSections = { ...bulkModeSections, [sectionKey]: false };
-			clearSelection(sectionKey);
+			bulk.modeSections = { ...bulk.modeSections, [sectionKey]: false };
+			bulk.clearSelection(sectionKey);
 		}
 	}
 
@@ -1530,8 +1445,8 @@
 							{#if collapsedSections[sourceKey] === false}
 								<CardContent>
 									{#if sources && sources.length > 0}
-										{@const bulkMode = bulkModeSections[sourceKey] === true}
-										{@const selectedSet = bulkSelectedIds[sourceKey] ?? new SvelteSet<number>()}
+										{@const bulkMode = bulk.modeSections[sourceKey] === true}
+										{@const selectedSet = bulk.selectedIds[sourceKey] ?? new SvelteSet<number>()}
 
 										<div
 											class="mb-3 flex flex-wrap items-center gap-2 {isMobileQuery.current
@@ -1541,8 +1456,8 @@
 											<Button
 												size="sm"
 												variant="outline"
-												disabled={bulkUpdating}
-												onclick={() => toggleBulkMode(sourceKey)}
+												disabled={bulk.updating}
+												onclick={() => bulk.toggleBulkMode(sourceKey)}
 											>
 												{bulkMode ? '退出批量' : '批量操作'}
 											</Button>
@@ -1554,30 +1469,30 @@
 
 												<div class="ml-auto flex flex-wrap items-center gap-2">
 													<SelectAllButton
-														disabled={bulkUpdating}
-														onclick={() => selectAll(sourceKey, sources)}
+														disabled={bulk.updating}
+														onclick={() => bulk.selectAll(sourceKey, sources)}
 														className="text-sm"
 													/>
 													<Button
 														size="sm"
 														variant="outline"
-														disabled={bulkUpdating || selectedSet.size === 0}
-														onclick={() => clearAll(sourceKey)}
+														disabled={bulk.updating || selectedSet.size === 0}
+														onclick={() => bulk.clearAll(sourceKey)}
 													>
 														清空
 													</Button>
 													<Button
 														size="sm"
-														disabled={bulkUpdating || selectedSet.size === 0}
-														onclick={() => bulkSetEnabled(sourceKey, sourceConfig.type, true)}
+														disabled={bulk.updating || selectedSet.size === 0}
+														onclick={() => bulk.setEnabled(sourceKey, sourceConfig.type, true)}
 													>
 														批量启用
 													</Button>
 													<Button
 														size="sm"
 														variant="secondary"
-														disabled={bulkUpdating || selectedSet.size === 0}
-														onclick={() => bulkSetEnabled(sourceKey, sourceConfig.type, false)}
+														disabled={bulk.updating || selectedSet.size === 0}
+														onclick={() => bulk.setEnabled(sourceKey, sourceConfig.type, false)}
 													>
 														批量禁用
 													</Button>
@@ -1599,8 +1514,8 @@
 															<input
 																type="checkbox"
 																checked={selectedSet.has(source.id)}
-																disabled={bulkUpdating}
-																onchange={() => toggleSelect(sourceKey, source.id)}
+																disabled={bulk.updating}
+																onchange={() => bulk.toggleSelect(sourceKey, source.id)}
 																class="h-4 w-4 rounded border-gray-300"
 															/>
 														</label>
