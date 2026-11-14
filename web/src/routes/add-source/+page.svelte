@@ -14,6 +14,7 @@
 	import { BangumiSeasonStore } from '$lib/stores/add-source/bangumi.svelte';
 	import { PugvCourseStore } from '$lib/stores/add-source/pugv.svelte';
 	import { SearchStore } from '$lib/stores/add-source/search.svelte';
+	import { SourceOptionsStore } from '$lib/stores/add-source/source-options.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -83,24 +84,7 @@
 		getQuickTemplate: (type) => getQuickSubscriptionTemplate(type),
 		renderPath: (template, name) => renderQuickSubscriptionPath(template, name),
 		getBaseParams: () => ({
-			audio_only: audioOnly,
-			audio_only_m4a_only: audioOnlyM4aOnly,
-			flat_folder: flatFolder,
-			split_chapters_after_download: splitChaptersAfterDownload,
-			download_charge_videos: downloadChargeVideos,
-			download_danmaku: downloadDanmaku,
-			download_subtitle: downloadSubtitle,
-			download_ai_subtitle: downloadAiSubtitle,
-			ai_subtitle_language: aiSubtitleLanguage.trim() || DEFAULT_AI_SUBTITLE_LANGUAGE,
-			use_dynamic_api: useDynamicApi,
-			ai_rename: aiRename,
-			ai_rename_video_prompt: aiRenameVideoPrompt.trim() || undefined,
-			ai_rename_audio_prompt: aiRenameAudioPrompt.trim() || undefined,
-			filter_option: filterOptionInheritGlobal ? undefined : cloneFilterOption(filterOptionDraft),
-			ai_rename_enable_multi_page: showAiRenameAdvanced ? aiRenameEnableMultiPage : undefined,
-			ai_rename_enable_collection: showAiRenameAdvanced ? aiRenameEnableCollection : undefined,
-			ai_rename_enable_bangumi: showAiRenameAdvanced ? aiRenameEnableBangumi : undefined,
-			ai_rename_rename_parent_dir: showAiRenameAdvanced ? aiRenameRenameParentDir : undefined
+			...options.toPayload()
 		}),
 		onBatchAdded: async () => {
 			await runRequest(() => api.refreshScanning(), {
@@ -136,6 +120,8 @@
 			}
 		}
 	});
+
+	const options = new SourceOptionsStore();
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -198,35 +184,12 @@
 	let loading = false;
 
 	// 下载选项
-	let audioOnly = false; // 仅下载音频
-	let audioOnlyM4aOnly = false; // 仅音频时只保留m4a（不下载封面/nfo/弹幕/字幕）
-	let flatFolder = false; // 平铺目录模式
 	let generateImagePostVideo = true; // 图文作品是否额外合成幻灯片 MP4
-	let splitChaptersAfterDownload = false; // 下载后按播放器章节切分为独立视频
-	let downloadChargeVideos = true; // 下载充电视频（默认开启）
-	let downloadDanmaku = true; // 下载弹幕（默认开启）
-	let downloadSubtitle = true; // 下载字幕（默认开启）
-	let downloadAiSubtitle = true; // 下载 B 站 AI 字幕（默认开启）
-	let aiSubtitleLanguage = DEFAULT_AI_SUBTITLE_LANGUAGE; // AI 字幕优先语言
-	let filterOptionInheritGlobal = true; // 是否继承全局流过滤/码率设置
-	let filterOptionDraft: FilterOption = {
-		...DEFAULT_FILTER_OPTION,
-		codecs: [...DEFAULT_FILTER_OPTION.codecs]
-	};
 	let globalFilterOptionDefault: FilterOption = {
 		...DEFAULT_FILTER_OPTION,
 		codecs: [...DEFAULT_FILTER_OPTION.codecs]
 	};
-	let useDynamicApi = false; // 投稿源：使用动态API
-	let aiRename = false; // AI重命名（默认关闭）
-	let aiRenameVideoPrompt = ''; // AI重命名视频提示词
-	let aiRenameAudioPrompt = ''; // AI重命名音频提示词
 	// AI重命名高级选项
-	let showAiRenameAdvanced = false;
-	let aiRenameEnableMultiPage = false;
-	let aiRenameEnableCollection = false;
-	let aiRenameEnableBangumi = false;
-	let aiRenameRenameParentDir = false;
 
 	// 添加手动输入标志
 	let isManualInput = false;
@@ -461,8 +424,8 @@
 		bangumiQuickSubscribePathTemplate = config.bangumi_quick_subscribe_path || '';
 		pugvQuickSubscribePathTemplate = config.pugv_quick_subscribe_path || '';
 		globalFilterOptionDefault = filterOptionFromConfig(config);
-		if (filterOptionInheritGlobal) {
-			filterOptionDraft = cloneFilterOption(globalFilterOptionDefault);
+		if (options.filterOptionInheritGlobal) {
+			options.resetFilterDraft(globalFilterOptionDefault);
 		}
 	}
 
@@ -859,7 +822,7 @@
 			return;
 		}
 
-		if (!filterOptionInheritGlobal && filterOptionDraft.codecs.length === 0) {
+		if (!options.filterOptionInheritGlobal && options.filterOptionDraft.codecs.length === 0) {
 			toast.error('码率设置无效', { description: '至少保留一个编解码器' });
 			return;
 		}
@@ -881,25 +844,7 @@
 			name,
 			path,
 			// 下载选项
-			audio_only: audioOnly,
-			audio_only_m4a_only: audioOnlyM4aOnly,
-			flat_folder: flatFolder,
-			split_chapters_after_download: splitChaptersAfterDownload,
-			download_charge_videos: downloadChargeVideos,
-			download_danmaku: downloadDanmaku,
-			download_subtitle: downloadSubtitle,
-			download_ai_subtitle: downloadAiSubtitle,
-			ai_subtitle_language: aiSubtitleLanguage.trim() || DEFAULT_AI_SUBTITLE_LANGUAGE,
-			use_dynamic_api: useDynamicApi,
-			ai_rename: aiRename,
-			ai_rename_video_prompt: aiRenameVideoPrompt.trim() || undefined,
-			ai_rename_audio_prompt: aiRenameAudioPrompt.trim() || undefined,
-			filter_option: filterOptionInheritGlobal ? undefined : cloneFilterOption(filterOptionDraft),
-			// AI重命名高级选项（仅当开启高级选项时传递）
-			ai_rename_enable_multi_page: showAiRenameAdvanced ? aiRenameEnableMultiPage : undefined,
-			ai_rename_enable_collection: showAiRenameAdvanced ? aiRenameEnableCollection : undefined,
-			ai_rename_enable_bangumi: showAiRenameAdvanced ? aiRenameEnableBangumi : undefined,
-			ai_rename_rename_parent_dir: showAiRenameAdvanced ? aiRenameRenameParentDir : undefined
+			...options.toPayload()
 		};
 
 		if (sourceType === 'collection') {
@@ -1115,27 +1060,27 @@
 			advancedFilterValidationError = '';
 			showKeywordSection = false;
 			// 重置下载选项
-			audioOnly = false;
-			audioOnlyM4aOnly = false;
-			flatFolder = false;
+			options.audioOnly = false;
+			options.audioOnlyM4aOnly = false;
+			options.flatFolder = false;
 			generateImagePostVideo = true;
-			splitChaptersAfterDownload = false;
-			downloadChargeVideos = true;
-			downloadDanmaku = true;
-			downloadSubtitle = true;
-			downloadAiSubtitle = true;
-			aiSubtitleLanguage = DEFAULT_AI_SUBTITLE_LANGUAGE;
-			filterOptionInheritGlobal = true;
-			filterOptionDraft = cloneFilterOption(globalFilterOptionDefault);
-			useDynamicApi = false;
-			aiRename = false;
-			aiRenameVideoPrompt = '';
-			aiRenameAudioPrompt = '';
-			showAiRenameAdvanced = false;
-			aiRenameEnableMultiPage = false;
-			aiRenameEnableCollection = false;
-			aiRenameEnableBangumi = false;
-			aiRenameRenameParentDir = false;
+			options.splitChaptersAfterDownload = false;
+			options.downloadChargeVideos = true;
+			options.downloadDanmaku = true;
+			options.downloadSubtitle = true;
+			options.downloadAiSubtitle = true;
+			options.aiSubtitleLanguage = DEFAULT_AI_SUBTITLE_LANGUAGE;
+			options.filterOptionInheritGlobal = true;
+			options.filterOptionDraft = cloneFilterOption(globalFilterOptionDefault);
+			options.useDynamicApi = false;
+			options.aiRename = false;
+			options.aiRenameVideoPrompt = '';
+			options.aiRenameAudioPrompt = '';
+			options.showAiRenameAdvanced = false;
+			options.aiRenameEnableMultiPage = false;
+			options.aiRenameEnableCollection = false;
+			options.aiRenameEnableBangumi = false;
+			options.aiRenameRenameParentDir = false;
 			// 跳转到视频源管理页面
 			goto(resolve('/video-sources'));
 		} else {
@@ -1780,7 +1725,7 @@
 
 
 	function startBatchAdd() {
-		if (!filterOptionInheritGlobal && filterOptionDraft.codecs.length === 0) {
+		if (!options.filterOptionInheritGlobal && options.filterOptionDraft.codecs.length === 0) {
 			toast.error('码率设置无效', { description: '至少保留一个编解码器' });
 			return;
 		}
@@ -2472,7 +2417,7 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={audioOnly} class="peer sr-only" />
+										<input type="checkbox" bind:checked={options.audioOnly} class="peer sr-only" />
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 										></div>
@@ -2480,7 +2425,7 @@
 								</div>
 
 								<!-- 仅保留M4A（仅在音频模式开启时显示） -->
-								{#if audioOnly}
+								{#if options.audioOnly}
 									<div
 										class="flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-600 dark:bg-amber-900/30"
 									>
@@ -2508,7 +2453,7 @@
 											</div>
 										</div>
 										<label class="relative inline-flex cursor-pointer items-center">
-											<input type="checkbox" bind:checked={audioOnlyM4aOnly} class="peer sr-only" />
+											<input type="checkbox" bind:checked={options.audioOnlyM4aOnly} class="peer sr-only" />
 											<div
 												class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-amber-600 peer-focus:ring-2 peer-focus:ring-amber-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-amber-500"
 											></div>
@@ -2545,7 +2490,7 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={flatFolder} class="peer sr-only" />
+										<input type="checkbox" bind:checked={options.flatFolder} class="peer sr-only" />
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-purple-600 peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-purple-500"
 										></div>
@@ -2583,7 +2528,7 @@
 										<label class="relative inline-flex cursor-pointer items-center">
 											<input
 												type="checkbox"
-												bind:checked={splitChaptersAfterDownload}
+												bind:checked={options.splitChaptersAfterDownload}
 												class="peer sr-only"
 											/>
 											<div
@@ -2622,7 +2567,7 @@
 										<label class="relative inline-flex cursor-pointer items-center">
 											<input
 												type="checkbox"
-												bind:checked={downloadChargeVideos}
+												bind:checked={options.downloadChargeVideos}
 												class="peer sr-only"
 											/>
 											<div
@@ -2661,7 +2606,7 @@
 												</div>
 											</div>
 											<label class="relative inline-flex cursor-pointer items-center">
-												<input type="checkbox" bind:checked={useDynamicApi} class="peer sr-only" />
+												<input type="checkbox" bind:checked={options.useDynamicApi} class="peer sr-only" />
 												<div
 													class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 												></div>
@@ -2698,7 +2643,7 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={downloadDanmaku} class="peer sr-only" />
+										<input type="checkbox" bind:checked={options.downloadDanmaku} class="peer sr-only" />
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 										></div>
@@ -2733,14 +2678,14 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={downloadSubtitle} class="peer sr-only" />
+										<input type="checkbox" bind:checked={options.downloadSubtitle} class="peer sr-only" />
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 										></div>
 									</label>
 								</div>
 
-								{#if downloadSubtitle}
+								{#if options.downloadSubtitle}
 									<div
 										class="mt-3 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 dark:border-blue-900 dark:bg-blue-950/40"
 									>
@@ -2761,7 +2706,7 @@
 													<label class="relative inline-flex cursor-pointer items-center">
 														<input
 															type="checkbox"
-															bind:checked={downloadAiSubtitle}
+															bind:checked={options.downloadAiSubtitle}
 															class="peer sr-only"
 														/>
 														<div
@@ -2770,12 +2715,12 @@
 													</label>
 												{/if}
 												<CustomSelect
-													value={aiSubtitleLanguage}
+													value={options.aiSubtitleLanguage}
 													options={AI_SUBTITLE_LANGUAGE_OPTIONS}
-													disabled={!downloadAiSubtitle}
+													disabled={!options.downloadAiSubtitle}
 													title="AI 字幕优先语言"
 													onChange={(nextValue) =>
-														(aiSubtitleLanguage = String(
+														(options.aiSubtitleLanguage = String(
 															nextValue ?? DEFAULT_AI_SUBTITLE_LANGUAGE
 														))}
 													size="sm"
@@ -2814,7 +2759,7 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={aiRename} class="peer sr-only" />
+										<input type="checkbox" bind:checked={options.aiRename} class="peer sr-only" />
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 										></div>
@@ -2822,7 +2767,7 @@
 								</div>
 
 								<!-- AI重命名提示词设置（仅在启用AI重命名时显示） -->
-								{#if aiRename}
+								{#if options.aiRename}
 									<div
 										class="mt-3 space-y-3 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-950"
 									>
@@ -2839,7 +2784,7 @@
 											</label>
 											<textarea
 												id="ai-video-prompt"
-												bind:value={aiRenameVideoPrompt}
+												bind:value={options.aiRenameVideoPrompt}
 												placeholder="例如：作者-标题-来源-清晰度"
 												rows="2"
 												class="w-full resize-none rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
@@ -2855,7 +2800,7 @@
 											</label>
 											<textarea
 												id="ai-audio-prompt"
-												bind:value={aiRenameAudioPrompt}
+												bind:value={options.aiRenameAudioPrompt}
 												placeholder="例如：歌手-歌名-版本信息"
 												rows="2"
 												class="w-full resize-none rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
@@ -2881,14 +2826,14 @@
 										>
 											<button
 												type="button"
-												onclick={() => (showAiRenameAdvanced = !showAiRenameAdvanced)}
+												onclick={() => (options.showAiRenameAdvanced = !options.showAiRenameAdvanced)}
 												class="flex w-full items-center justify-between text-left"
 											>
 												<span class="text-[10px] font-medium text-gray-700 dark:text-gray-300"
 													>高级选项（默认关闭，有风险）</span
 												>
 												<svg
-													class="h-3 w-3 transform text-gray-500 transition-transform {showAiRenameAdvanced
+													class="h-3 w-3 transform text-gray-500 transition-transform {options.showAiRenameAdvanced
 														? 'rotate-180'
 														: ''}"
 													fill="none"
@@ -2904,12 +2849,12 @@
 												</svg>
 											</button>
 
-											{#if showAiRenameAdvanced}
+											{#if options.showAiRenameAdvanced}
 												<div class="space-y-1.5 pt-1">
 													<label class="flex items-center space-x-2">
 														<input
 															type="checkbox"
-															bind:checked={aiRenameEnableMultiPage}
+															bind:checked={options.aiRenameEnableMultiPage}
 															class="h-3 w-3 rounded border-gray-300"
 														/>
 														<span class="text-[10px] text-gray-700 dark:text-gray-300"
@@ -2919,7 +2864,7 @@
 													<label class="flex items-center space-x-2">
 														<input
 															type="checkbox"
-															bind:checked={aiRenameEnableCollection}
+															bind:checked={options.aiRenameEnableCollection}
 															class="h-3 w-3 rounded border-gray-300"
 														/>
 														<span class="text-[10px] text-gray-700 dark:text-gray-300"
@@ -2929,7 +2874,7 @@
 													<label class="flex items-center space-x-2">
 														<input
 															type="checkbox"
-															bind:checked={aiRenameEnableBangumi}
+															bind:checked={options.aiRenameEnableBangumi}
 															class="h-3 w-3 rounded border-gray-300"
 														/>
 														<span class="text-[10px] text-gray-700 dark:text-gray-300"
@@ -2939,7 +2884,7 @@
 													<label class="flex items-center space-x-2">
 														<input
 															type="checkbox"
-															bind:checked={aiRenameRenameParentDir}
+															bind:checked={options.aiRenameRenameParentDir}
 															class="h-3 w-3 rounded border-gray-300"
 														/>
 														<span class="text-[10px] text-gray-700 dark:text-gray-300"
@@ -2983,7 +2928,7 @@
 									<label class="relative inline-flex cursor-pointer items-center">
 										<input
 											type="checkbox"
-											bind:checked={filterOptionInheritGlobal}
+											bind:checked={options.filterOptionInheritGlobal}
 											class="peer sr-only"
 										/>
 										<div
@@ -2993,7 +2938,7 @@
 								</div>
 							</div>
 
-							{#if filterOptionInheritGlobal}
+							{#if options.filterOptionInheritGlobal}
 								<p class="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
 									当前新源会继承设置页的全局视频/音频质量配置；关闭“继承全局”后可为该同步源单独限码率。
 								</p>
@@ -3002,8 +2947,8 @@
 									class="rounded-md border border-blue-200 bg-white p-4 dark:border-blue-800 dark:bg-gray-900"
 								>
 									<FilterOptionEditor
-										value={filterOptionDraft}
-										on:change={(event) => (filterOptionDraft = event.detail)}
+										value={options.filterOptionDraft}
+										on:change={(event) => (options.filterOptionDraft = event.detail)}
 									/>
 								</div>
 							{/if}
@@ -4283,8 +4228,8 @@
 	selectedItems={batch.selectedItems}
 	bind:batchBasePath={batch.basePath}
 	selectedTemplate={batchSelectedTemplate}
-	bind:filterOptionInheritGlobal
-	bind:filterOptionDraft
+	bind:filterOptionInheritGlobal={options.filterOptionInheritGlobal}
+	bind:filterOptionDraft={options.filterOptionDraft}
 	bind:collectionAggregateEnabled={batch.collectionAggregateEnabled}
 	adding={batch.adding}
 	selectedSourceType={batch.selectedSourceType}
