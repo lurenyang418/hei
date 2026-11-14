@@ -9,6 +9,7 @@
 	import BatchActionBar from '$lib/components/add-source/batch-action-bar.svelte';
 	import HoverDetailCard from '$lib/components/add-source/hover-detail-card.svelte';
 	import { HoverTooltipStore } from '$lib/stores/add-source/hover.svelte';
+	import { SubmissionSelectionStore } from '$lib/stores/add-source/submission.svelte';
 	import BatchConfigDialog from '$lib/components/add-source/batch-config-dialog.svelte';
 	import SubmissionSelectionPanel from '$lib/components/add-source/submission-selection-panel.svelte';
 	import SearchResultsPanel from '$lib/components/add-source/search-results-panel.svelte';
@@ -66,6 +67,11 @@
 	import { formatSubmissionDateLabel, formatSubmissionMetricLabel } from '$lib/utils/submission';
 
 	const hover = new HoverTooltipStore();
+
+	const submission = new SubmissionSelectionStore({
+		getUpId: () => sourceId,
+		getPlatform: () => sourcePlatform
+	});
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -500,33 +506,6 @@
 	let subscribedCollections: UserCollectionInfo[] = [];
 	let loadingSubscribedCollections = false;
 
-	// UP主投稿选择相关
-	let showSubmissionSelection = false;
-	let selectedVideos: string[] = [];
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	let selectedUpName = ''; // UP主名称，用于投稿选择
-
-	// 投稿选择详细状态
-	let submissionVideos: SubmissionVideoInfo[] = [];
-	let selectedSubmissionVideos: Set<string> = new SvelteSet();
-	let submissionLoading = false;
-	let submissionError: string | null = null;
-	let submissionTotalCount = 0;
-	let submissionSearchQuery = '';
-	let filteredSubmissionVideos: SubmissionVideoInfo[] = [];
-
-	// 分页加载相关状态
-	let currentLoadedPage = 0; // 当前加载到的页码
-	let isLoadingMore = false; // 正在加载更多
-	let hasMoreVideos = true; // 是否还有更多视频
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	let loadingProgress = ''; // 加载进度提示
-	let showLoadMoreButton = false; // 是否显示加载更多按钮
-
-	const SUBMISSION_PAGE_SIZE = 20;
-	const INITIAL_LOAD_SIZE = 100; // 初始加载100个视频
-	const LOAD_MORE_SIZE = 200; // 每次加载更多200个视频
-	const PAGE_DELAY = 500; // 页面间延迟500ms
 
 	onMount(async () => {
 		setBreadcrumb([{ label: '主页', href: '/' }, { label: '添加视频源', isActive: true }]);
@@ -536,6 +515,7 @@
 	onDestroy(() => {
 		// 清理定时器
 		hover.destroy();
+		submission.destroy();
 		if (upIdTimeout) clearTimeout(upIdTimeout);
 		if (seasonIdTimeout) clearTimeout(seasonIdTimeout);
 		if (favoriteValidationTimeout) clearTimeout(favoriteValidationTimeout);
@@ -575,7 +555,7 @@
 		} else if (sourceType === 'favorite') {
 			clearFavoritePanels();
 		} else if (sourceType === 'submission') {
-			showSubmissionSelection = false;
+			submission.open = false;
 		}
 
 		// 根据参数或当前选择的视频源类型确定搜索类型
@@ -705,10 +685,10 @@
 				if (result.mid) {
 					sourceId = result.mid.toString();
 					name = cleanTitle(result.title);
-					selectedUpName = cleanTitle(result.title);
+					submission.selectedUpName = cleanTitle(result.title);
 					applyQuickSubscriptionPath('submission', name, true);
 					// 打开投稿选择对话框
-					showSubmissionSelection = true;
+					submission.open = true;
 				}
 				break;
 			case 'bangumi':
@@ -1049,8 +1029,8 @@
 
 		if (sourceType === 'submission') {
 			// 如果有选择的视频，添加selected_videos参数
-			if (selectedVideos.length > 0) {
-				params.selected_videos = selectedVideos;
+			if (submission.selectedVideos.length > 0) {
+				params.selected_videos = submission.selectedVideos;
 			}
 		}
 
@@ -1223,8 +1203,8 @@
 			isManualInput = false;
 			bangumiSeasons = [];
 			selectedSeasons = [];
-			selectedVideos = [];
-			selectedUpName = '';
+			submission.selectedVideos = [];
+			submission.selectedUpName = '';
 			mergeToSourceId = null;
 			existingBangumiSources = [];
 			blacklistKeywords = [];
@@ -1919,10 +1899,10 @@
 			case 'submission':
 				sourceId = following.mid.toString();
 				name = following.name;
-				selectedUpName = following.name;
+				submission.selectedUpName = following.name;
 				applyQuickSubscriptionPath('submission', name, true);
 				// 打开投稿选择对话框
-				showSubmissionSelection = true;
+				submission.open = true;
 				toast.success('已填充UP主信息');
 				break;
 		}
@@ -1995,8 +1975,8 @@
 	// 处理投稿选择确认
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function handleSubmissionSelectionConfirm(selectedBvids: string[]) {
-		selectedVideos = selectedBvids;
-		showSubmissionSelection = false;
+		submission.selectedVideos = selectedBvids;
+		submission.open = false;
 		if (selectedBvids.length > 0) {
 			toast.success('已选择投稿', {
 				description: `选择了 ${selectedBvids.length} 个历史投稿，新投稿将自动下载`
@@ -2011,271 +1991,35 @@
 	// 处理投稿选择取消
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	function handleSubmissionSelectionCancel() {
-		showSubmissionSelection = false;
+		submission.open = false;
 		// 保留已有的选择，不做清空
 	}
 
 	// 投稿选择相关函数
 
-	// 重置投稿选择状态
-	function resetSubmissionState() {
-		submissionVideos = [];
-		selectedSubmissionVideos = new SvelteSet(selectedVideos);
-		submissionLoading = false;
-		submissionError = null;
-		submissionTotalCount = 0;
-		submissionSearchQuery = '';
-		filteredSubmissionVideos = [];
-	}
 
-	// 搜索相关状态
-	let searchTimeout: NodeJS.Timeout;
-	let isSearching = false;
 
 	const isDouyin = false;
 	const isTiktok = false;
 
 	// 搜索过滤投稿 - 使用后端API搜索
 
-	$: {
-		if (submissionSearchQuery.trim()) {
-			// 清除之前的搜索定时器
-			if (searchTimeout) {
-				clearTimeout(searchTimeout);
-			}
-
-			// 设置新的搜索定时器（防抖）
-			searchTimeout = setTimeout(() => {
-				// eslint-disable-next-line svelte/infinite-reactive-loop
-				performSearch();
-			}, 500); // 500ms防抖
-		} else {
-			filteredSubmissionVideos = submissionVideos;
-		}
-	}
 
 	// 执行搜索
-	/* eslint-disable svelte/infinite-reactive-loop */
-	async function performSearch() {
-		if (!sourceId || !submissionSearchQuery.trim()) {
-			filteredSubmissionVideos = submissionVideos;
-			return;
-		}
 
-		const response = await runRequest(
-			() =>
-				api.getSubmissionVideos({
-					up_id: sourceId,
-					page: 1,
-					page_size: 30, // 获取更多结果
-					keyword: submissionSearchQuery.trim()
-				}),
-			{
-				setLoading: (value) => (isSearching = value),
-				context: '搜索失败',
-				showErrorToast: false,
-				onError: () => {
-					toast.error('搜索失败', {
-						description: '请稍后重试'
-					});
-					// 搜索失败时回退到本地过滤
-					filteredSubmissionVideos = submissionVideos.filter((video) =>
-						video.title.toLowerCase().includes(submissionSearchQuery.toLowerCase().trim())
-					);
-				}
-			}
-		);
-		if (!response) return;
 
-		if (response.data && response.data.videos) {
-			filteredSubmissionVideos = response.data.videos;
-		} else {
-			filteredSubmissionVideos = [];
-		}
-	}
-	/* eslint-enable svelte/infinite-reactive-loop */
 
-	// 加载UP主投稿列表（分页加载，初始100个）
-	async function loadSubmissionVideos() {
-		if (!sourceId) return;
 
-		submissionError = null;
-		submissionVideos = [];
-		// 重置总数，避免切换来源后 Math.max(旧总数, 新total) 残留旧值导致“历史选择”显示错误数量
-		submissionTotalCount = 0;
-		currentLoadedPage = 0;
-		hasMoreVideos = true;
-		showLoadMoreButton = false;
 
-		await runRequest(
-			async () => {
-				await loadVideosInBatch(INITIAL_LOAD_SIZE);
-				return true;
-			},
-			{
-				setLoading: (value) => (submissionLoading = value),
-				context: '加载投稿列表失败',
-				showErrorToast: false,
-				onError: (error) => {
-					submissionError =
-						error && typeof error === 'object' && 'message' in error
-							? String(error.message)
-							: error instanceof Error
-								? error.message
-								: '网络请求失败';
-				}
-			}
-		);
-	}
 
-	// 批量加载视频（串行请求，带延迟）
-	async function loadVideosInBatch(loadCount: number) {
-		const startPage = currentLoadedPage + 1;
-		const pageSize = SUBMISSION_PAGE_SIZE;
-		const targetVideos = Math.min(
-			submissionVideos.length + loadCount,
-			submissionTotalCount || Infinity
-		);
-		const neededPages = Math.ceil(targetVideos / pageSize);
 
-		for (let page = startPage; page <= neededPages; page++) {
-			// 更新进度
-			loadingProgress = `正在加载第 ${page} 页...`;
 
-			// 延迟（除了第一页）
-			if (page > startPage) {
-				await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY));
-			}
 
-			const response = await api.getSubmissionVideos({
-				up_id: sourceId,
-				page,
-				page_size: pageSize
-			});
 
-			if (!response.data) {
-				throw new Error('获取投稿列表失败');
-			}
-
-			// 第一次请求时获取总数
-			submissionTotalCount = Math.max(submissionTotalCount, response.data.total);
-
-			// 添加新视频（去重）
-			const newVideos = response.data.videos || [];
-			const existingBvids = new Set(submissionVideos.map((v) => v.bvid));
-			const uniqueNewVideos = newVideos.filter((video) => !existingBvids.has(video.bvid));
-
-			submissionVideos = [...submissionVideos, ...uniqueNewVideos];
-			currentLoadedPage = page;
-
-			// 检查是否达到目标数量或已加载全部
-			if (
-				submissionVideos.length >= targetVideos ||
-				submissionVideos.length >= submissionTotalCount
-			) {
-				break;
-			}
-		}
-
-		// 更新状态
-		hasMoreVideos = submissionVideos.length < submissionTotalCount;
-		// 不自动显示按钮，等待用户滚动到底部时才显示
-		loadingProgress = '';
-	}
-
-	// 加载更多投稿视频
-	async function loadMoreSubmissionVideos() {
-		if (!hasMoreVideos || isLoadingMore) return;
-
-		showLoadMoreButton = false; // 隐藏按钮
-		await runRequest(
-			async () => {
-				await loadVideosInBatch(LOAD_MORE_SIZE);
-				return true;
-			},
-			{
-				setLoading: (value) => (isLoadingMore = value),
-				context: '加载更多视频失败'
-			}
-		);
-	}
-
-	// 处理视频选择
-	function toggleSubmissionVideo(bvid: string) {
-		if (selectedSubmissionVideos.has(bvid)) {
-			selectedSubmissionVideos.delete(bvid);
-		} else {
-			selectedSubmissionVideos.add(bvid);
-		}
-		selectedSubmissionVideos = selectedSubmissionVideos; // 触发响应式更新
-	}
-
-	function handleSubmissionCardKeydown(event: KeyboardEvent, bvid: string) {
-		if (event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			toggleSubmissionVideo(bvid);
-		}
-	}
-
-	// 全选投稿
-	function selectAllSubmissions() {
-		filteredSubmissionVideos.forEach((video) => selectedSubmissionVideos.add(video.bvid));
-		selectedSubmissionVideos = selectedSubmissionVideos;
-	}
-
-	// 全不选投稿
-	function selectNoneSubmissions() {
-		filteredSubmissionVideos.forEach((video) => selectedSubmissionVideos.delete(video.bvid));
-		selectedSubmissionVideos = selectedSubmissionVideos;
-	}
-
-	// 反选投稿
-	function invertSubmissionSelection() {
-		filteredSubmissionVideos.forEach((video) => {
-			if (selectedSubmissionVideos.has(video.bvid)) {
-				selectedSubmissionVideos.delete(video.bvid);
-			} else {
-				selectedSubmissionVideos.add(video.bvid);
-			}
-		});
-		selectedSubmissionVideos = selectedSubmissionVideos;
-	}
-
-	// 确认投稿选择
-	function confirmSubmissionSelection() {
-		selectedVideos = Array.from(selectedSubmissionVideos);
-		showSubmissionSelection = false;
-		if (sourcePlatform === 'bilibili') {
-			if (selectedVideos.length > 0) {
-				toast.success('已选择投稿', {
-					description: `选择了 ${selectedVideos.length} 个历史投稿，新投稿将自动下载`
-				});
-			} else {
-				toast.info('未选择投稿', {
-					description: '将下载所有历史投稿和新投稿'
-				});
-			}
-			return;
-		}
-	}
-
-	// 取消投稿选择
-	function cancelSubmissionSelection() {
-		showSubmissionSelection = false;
-		// 保留已有的选择，不做清空
-	}
 
 	// 当显示投稿选择且有sourceId时加载数据
-	$: if (showSubmissionSelection && sourceId && sourceType === 'submission') {
-		resetSubmissionState();
-		loadSubmissionVideos();
-	}
 
 	// 计算已选择的投稿数量
-	$: selectedSubmissionCount = Array.from(selectedSubmissionVideos).filter((bvid) =>
-		filteredSubmissionVideos.some((video) => video.bvid === bvid)
-	).length;
-
 	// 批量选择相关函数
 	function resolveBatchItemSourceTypeByRawType(itemType: string): string {
 		// 将原始的批量项类别映射为其对应的视频源类型
@@ -3152,8 +2896,8 @@
 														>历史投稿选择</span
 													>
 													<span class="ml-2 text-xs text-blue-600 dark:text-blue-400">
-														{#if selectedVideos.length > 0}
-															已选择 {selectedVideos.length} 个历史投稿
+														{#if submission.selectedVideos.length > 0}
+															已选择 {submission.selectedVideos.length} 个历史投稿
 														{:else}
 															未选择特定投稿（将下载全部）
 														{/if}
@@ -3163,11 +2907,11 @@
 													size="sm"
 													variant="outline"
 													onclick={() => {
-														showSubmissionSelection = true;
+														submission.open = true;
 													}}
 													class="border-blue-300 text-blue-700 hover:bg-blue-100"
 												>
-													{selectedVideos.length > 0 ? '重新选择' : '选择投稿'}
+													{submission.selectedVideos.length > 0 ? '重新选择' : '选择投稿'}
 												</Button>
 											</div>
 											<p class="mt-2 text-xs text-blue-600 dark:text-blue-400">
@@ -5077,33 +4821,8 @@
 				{/if}
 
 				<!-- B站投稿内容选择面板 -->
-				{#if sourceType === 'submission' && showSubmissionSelection}
-					<SubmissionSelectionPanel
-						{isCompactLayout}
-						{isMobile}
-						{submissionLoading}
-						submissionError={submissionError ?? ''}
-						{submissionTotalCount}
-						{submissionVideos}
-						{filteredSubmissionVideos}
-						{selectedSubmissionVideos}
-						{selectedSubmissionCount}
-						bind:submissionSearchQuery
-						{isSearching}
-						{showLoadMoreButton}
-						{hasMoreVideos}
-						{isLoadingMore}
-						onCancel={cancelSubmissionSelection}
-						onRetry={loadSubmissionVideos}
-						onSelectAll={selectAllSubmissions}
-						onSelectNone={selectNoneSubmissions}
-						onInvert={invertSubmissionSelection}
-						onToggleVideo={toggleSubmissionVideo}
-						onCardKeydown={handleSubmissionCardKeydown}
-						onScrollNearBottom={() => (showLoadMoreButton = true)}
-						onLoadMore={loadMoreSubmissionVideos}
-						onConfirm={confirmSubmissionSelection}
-					/>
+				{#if sourceType === 'submission' && submission.open}
+					<SubmissionSelectionPanel {isCompactLayout} {isMobile} store={submission} />
 				{/if}
 			</div>
 		</div>

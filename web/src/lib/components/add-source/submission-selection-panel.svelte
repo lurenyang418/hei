@@ -10,44 +10,23 @@
 	import { formatSubmissionDateLabel, formatSubmissionMetricLabel } from '$lib/utils/submission';
 	import type { SubmissionVideoInfo } from '$lib/types';
 
+	import type { SubmissionSelectionStore } from '$lib/stores/add-source/submission.svelte';
+
+	export let store: SubmissionSelectionStore;
 	export let isCompactLayout = false;
 	export let isMobile = false;
-
-	export let submissionLoading = false;
-	export let submissionError = '';
-	export let submissionTotalCount = 0;
-	export let submissionVideos: SubmissionVideoInfo[] = [];
-	export let filteredSubmissionVideos: SubmissionVideoInfo[] = [];
-	export let selectedSubmissionVideos: Set<string> = new Set();
-	export let selectedSubmissionCount = 0;
-	export let submissionSearchQuery = '';
-	export let isSearching = false;
-	export let showLoadMoreButton = false;
-	export let hasMoreVideos = false;
-	export let isLoadingMore = false;
-
-	export let onCancel: () => void = () => {};
-	export let onRetry: () => void = () => {};
-	export let onSelectAll: () => void = () => {};
-	export let onSelectNone: () => void = () => {};
-	export let onInvert: () => void = () => {};
-	export let onToggleVideo: (bvid: string) => void = () => {};
-	export let onCardKeydown: (event: KeyboardEvent, bvid: string) => void = () => {};
-	export let onScrollNearBottom: () => void = () => {};
-	export let onLoadMore: () => void = () => {};
-	export let onConfirm: () => void = () => {};
 
 	// 处理滚动事件，检测是否需要显示加载更多按钮
 	function handleScroll(event: Event) {
 		const container = event.target as HTMLElement | null;
-		if (!container || !hasMoreVideos) return;
+		if (!container || !store.hasMore) return;
 
 		const { scrollTop, scrollHeight, clientHeight } = container;
 		const threshold = 100; // 距离底部100px时显示按钮
 
 		// 当滚动接近底部时显示加载更多按钮
 		if (scrollHeight - scrollTop - clientHeight < threshold) {
-			onScrollNearBottom();
+			(store.showLoadMore = true);
 		}
 	}
 </script>
@@ -70,10 +49,10 @@
 					>
 				</div>
 				<span class="text-sm text-blue-600 dark:text-blue-400 {isMobile ? 'block' : 'ml-2'} mt-1">
-					{#if submissionLoading && submissionVideos.length === 0}
+					{#if store.loading && store.videos.length === 0}
 						正在加载...
-					{:else if submissionTotalCount > 0}
-						共 {submissionTotalCount} 个投稿
+					{:else if store.totalCount > 0}
+						共 {store.totalCount} 个投稿
 					{:else}
 						暂无投稿
 					{/if}
@@ -82,14 +61,14 @@
 		{/snippet}
 		{#snippet actions()}
 			<button
-				onclick={onCancel}
+				onclick={() => store.cancel()}
 				class="p-1 text-xl text-blue-500 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-100"
 			>
 				<X class="h-5 w-5" />
 			</button>
 		{/snippet}
 
-		{#if submissionError}
+		{#if store.error}
 			<div class="m-3 rounded-lg border border-red-200 bg-red-50 p-4">
 				<div class="flex items-center gap-2">
 					<svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,11 +81,11 @@
 					</svg>
 					<span class="text-sm font-medium text-red-800 dark:text-red-200">加载失败</span>
 				</div>
-				<p class="mt-1 text-sm text-red-700 dark:text-red-300">{submissionError}</p>
+				<p class="mt-1 text-sm text-red-700 dark:text-red-300">{store.error}</p>
 				<button
 					type="button"
 					class="mt-2 text-sm text-red-600 underline hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
-					onclick={onRetry}
+					onclick={() => void store.load()}
 				>
 					重试
 				</button>
@@ -114,49 +93,49 @@
 		{:else}
 			<!-- 搜索和操作栏 -->
 			<SubmissionSelectionToolbar
-				bind:query={submissionSearchQuery}
+				bind:query={store.searchQuery}
 				placeholder="搜索视频标题（支持关键词搜索UP主所有视频）..."
-				{isSearching}
-				statusText={isSearching
+				isSearching={store.searching}
+				statusText={store.searching
 					? '搜索中...'
-					: `搜索模式：在UP主所有视频中搜索 "${submissionSearchQuery}"`}
-				selectedCount={selectedSubmissionCount}
-				totalCount={filteredSubmissionVideos.length}
+					: `搜索模式：在UP主所有视频中搜索 "${store.searchQuery}"`}
+				selectedCount={store.selectedCount}
+				totalCount={store.filtered.length}
 				itemLabel="视频"
-				onSelectAll={onSelectAll}
-				onSelectNone={onSelectNone}
-				onInvert={onInvert}
-				selectAllDisabled={filteredSubmissionVideos.length === 0}
-				selectNoneDisabled={selectedSubmissionCount === 0}
-				invertDisabled={filteredSubmissionVideos.length === 0}
+				onSelectAll={() => store.selectAll()}
+				onSelectNone={() => store.selectNone()}
+				onInvert={() => store.invert()}
+				selectAllDisabled={store.filtered.length === 0}
+				selectNoneDisabled={store.selectedCount === 0}
+				invertDisabled={store.filtered.length === 0}
 			/>
 
 			<!-- 视频列表 -->
 			<div class="min-h-0 flex-1 overflow-y-auto p-3 pt-0" onscroll={handleScroll}>
-				{#if submissionLoading && submissionVideos.length === 0}
+				{#if store.loading && store.videos.length === 0}
 					<Loading
 						showSpinner={true}
 						spinnerClass="text-blue-600 dark:text-blue-400"
 						textClass="text-sm"
 						class="py-8"
 					/>
-				{:else if filteredSubmissionVideos.length === 0}
+				{:else if store.filtered.length === 0}
 					<EmptyState
 						icon={Search}
 						iconClass="h-12 w-12"
-						title={submissionSearchQuery.trim() ? '没有找到视频' : '暂无投稿'}
-						description={submissionSearchQuery.trim()
-							? `没有找到包含 "${submissionSearchQuery}" 的视频`
+						title={store.searchQuery.trim() ? '没有找到视频' : '暂无投稿'}
+						description={store.searchQuery.trim()
+							? `没有找到包含 "${store.searchQuery}" 的视频`
 							: '该UP主暂无投稿'}
 						class="border-0 bg-transparent p-0 py-8"
 					>
 						{#snippet actions()}
-							{#if submissionSearchQuery.trim()}
+							{#if store.searchQuery.trim()}
 								<Button
 									type="button"
 									size="sm"
 									variant="outline"
-									onclick={() => (submissionSearchQuery = '')}
+									onclick={() => (store.searchQuery = '')}
 								>
 									清空搜索
 								</Button>
@@ -170,19 +149,19 @@
 							? ''
 							: 'grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));'}
 					>
-						{#each filteredSubmissionVideos as video (video.bvid)}
+						{#each store.filtered as video (video.bvid)}
 							<div
 								role="button"
 								tabindex="0"
-								class="hover:bg-muted relative rounded-lg border p-4 transition-all duration-300 hover:shadow-md {selectedSubmissionVideos.has(
+								class="hover:bg-muted relative rounded-lg border p-4 transition-all duration-300 hover:shadow-md {store.selected.has(
 									video.bvid
 								)
 									? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-950'
 									: 'border-gray-200 dark:border-gray-700'} {isMobile
 									? 'h-auto'
 									: 'h-[100px]'}"
-								onclick={() => onToggleVideo(video.bvid)}
-								onkeydown={(event) => onCardKeydown(event, video.bvid)}
+								onclick={() => store.toggle(video.bvid)}
+								onkeydown={(event) => store.handleKeydown(event, video.bvid)}
 							>
 								<div class="flex h-full gap-3">
 									<div class="relative flex-shrink-0">
@@ -196,8 +175,8 @@
 									<div class="relative flex min-w-0 flex-1 flex-col overflow-hidden">
 										<input
 											type="checkbox"
-											checked={selectedSubmissionVideos.has(video.bvid)}
-											onchange={() => onToggleVideo(video.bvid)}
+											checked={store.selected.has(video.bvid)}
+											onchange={() => store.toggle(video.bvid)}
 											onclick={(event) => event.stopPropagation()}
 											class="absolute top-1 right-1 z-10 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:text-blue-400"
 										/>
@@ -221,16 +200,16 @@
 						{/each}
 					</div>
 
-					{#if submissionVideos.length > 0}
-						{#if showLoadMoreButton && hasMoreVideos}
+					{#if store.videos.length > 0}
+						{#if store.showLoadMore && store.hasMore}
 							<div class="py-4 text-center">
 								<button
 									type="button"
 									class="rounded-md border border-transparent bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-									onclick={onLoadMore}
-									disabled={isLoadingMore}
+									onclick={() => store.loadMore()}
+									disabled={store.loadingMore}
 								>
-									{#if isLoadingMore}
+									{#if store.loadingMore}
 										<Loading
 											inline={true}
 											showSpinner={true}
@@ -239,13 +218,13 @@
 											class="gap-2"
 										/>
 									{:else}
-										加载更多 ({submissionVideos.length}/{submissionTotalCount})
+										加载更多 ({store.videos.length}/{store.totalCount})
 									{/if}
 								</button>
 							</div>
-						{:else if submissionTotalCount > 0}
+						{:else if store.totalCount > 0}
 							<div class="text-muted-foreground py-4 text-center text-sm">
-								已加载全部 {submissionVideos.length} 个视频
+								已加载全部 {store.videos.length} 个视频
 							</div>
 						{/if}
 					{/if}
@@ -257,16 +236,16 @@
 				<button
 					type="button"
 					class="bg-card text-foreground hover:bg-muted rounded-md border border-gray-300 px-4 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
-					onclick={onCancel}
+					onclick={() => store.cancel()}
 				>
 					取消
 				</button>
 				<button
 					type="button"
 					class="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
-					onclick={onConfirm}
+					onclick={() => store.confirm()}
 				>
-					确认选择 ({selectedSubmissionCount} 个视频)
+					确认选择 ({store.selectedCount} 个视频)
 				</button>
 			</div>
 		{/if}
