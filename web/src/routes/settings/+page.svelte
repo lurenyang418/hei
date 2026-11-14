@@ -15,13 +15,7 @@
 	import RiskSheet from '$lib/components/settings/risk-sheet.svelte';
 	import SectionHeader from '$lib/components/section-header.svelte';
 	import { setBreadcrumb } from '$lib/stores/breadcrumb';
-	import type {
-		ConfigResponse,
-		CredentialRefreshTestResponse,
-		FilenamePreviewResponse,
-		UserInfo,
-		UpdateConfigRequest
-	} from '$lib/types';
+	import type { ConfigResponse, UpdateConfigRequest } from '$lib/types';
 	import {
 		DownloadIcon,
 		FileTextIcon,
@@ -43,6 +37,7 @@
 	import { normalizeConcurrencyValue, normalizeNumberInput } from '$lib/utils/number';
 	import { NotificationSettingsStore } from '$lib/stores/settings/notification.svelte';
 	import { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
+	import { CredentialSettingsStore } from '$lib/stores/settings/credential.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
@@ -53,6 +48,10 @@
 	// 各设置域的状态容器（runes class，见 $lib/stores/settings）
 	const notification = new NotificationSettingsStore();
 	const naming = new SettingsNamingStore();
+	const credential = new CredentialSettingsStore({
+		reloadConfig: loadConfig,
+		closeSheet: () => (openSheet = null)
+	});
 
 	// 控制各个抽屉的开关状态
 	let openSheet: string | null = null;
@@ -287,18 +286,6 @@
 	let ffmpegPath = ''; // ffmpeg可执行路径（文件或目录）
 
 	// B站凭证设置
-	let sessdata = '';
-	let biliJct = '';
-	let buvid3 = '';
-	let dedeUserId = '';
-	let acTimeValue = '';
-	let buvid4 = '';
-	let dedeUserIdCkMd5 = '';
-	let credentialSaving = false;
-	let credentialRefreshTesting = false;
-	let credentialRefreshForceTesting = false;
-	let credentialRefreshTestResult: CredentialRefreshTestResponse | null = null;
-	let currentUser: UserInfo | null = null;
 
 	// UP主投稿风控配置
 	let largeSubmissionThreshold = 100;
@@ -502,7 +489,7 @@
 
 		await loadConfig();
 		// 检查当前用户信息
-		await checkCurrentUser();
+		await credential.checkCurrentUser();
 		// 加载推送通知配置
 		await notification.loadStatus();
 		await notification.loadConfig();
@@ -574,13 +561,7 @@
 		ffmpegPath = config.ffmpeg_path || '';
 
 		// B站凭证设置
-		sessdata = config.credential?.sessdata || '';
-		biliJct = config.credential?.bili_jct || '';
-		buvid3 = config.credential?.buvid3 || '';
-		dedeUserId = config.credential?.dedeuserid || '';
-		acTimeValue = config.credential?.ac_time_value || '';
-		buvid4 = config.credential?.buvid4 || '';
-		dedeUserIdCkMd5 = config.credential?.dedeuserid_ckmd5 || '';
+		credential.applyFromConfig(config);
 
 		// UP主投稿风控配置
 		largeSubmissionThreshold = config.large_submission_threshold || 100;
@@ -1083,96 +1064,11 @@
 		}
 	}
 
-	async function saveCredential() {
-		const params = {
-			sessdata: sessdata.trim(),
-			bili_jct: biliJct.trim(),
-			buvid3: buvid3.trim(),
-			dedeuserid: dedeUserId.trim(),
-			ac_time_value: acTimeValue.trim(),
-			buvid4: buvid4.trim() || undefined,
-			dedeuserid_ckmd5: dedeUserIdCkMd5.trim() || undefined
-		};
 
-		const response = await runRequest(() => api.updateCredential(params), {
-			setLoading: (value) => (credentialSaving = value),
-			context: '保存B站凭证失败'
-		});
-		if (!response) return;
 
-		if (response.data.success) {
-			toast.success('B站凭证保存成功', { description: response.data.message });
-			// 重新加载配置以获取最新状态
-			await loadConfig();
-			openSheet = null; // 关闭抽屉
-		} else {
-			toast.error('保存失败', { description: response.data.message });
-		}
-	}
 
-	async function testCredentialRefresh(force = false) {
-		const response = await runRequest(() => api.testCredentialRefresh(force), {
-			setLoading: (value) =>
-				force ? (credentialRefreshForceTesting = value) : (credentialRefreshTesting = value),
-			context: force ? '强制刷新B站凭据失败' : '测试B站凭据刷新失败'
-		});
-		if (!response) return;
 
-		credentialRefreshTestResult = response.data;
-		if (response.data.success) {
-			toast.success(force ? '凭据强制刷新完成' : '凭据刷新测试通过', {
-				description: response.data.message
-			});
-			if (force) await loadConfig();
-		} else {
-			toast.error(force ? '凭据强制刷新失败' : '凭据刷新测试失败', {
-				description: response.data.diagnosis
-			});
-		}
-	}
 
-	// 处理扫码登录成功
-	async function handleQrLoginSuccess(userInfo: UserInfo) {
-		// 扫码登录成功后，凭证已经在后端保存
-		toast.success(`欢迎，${userInfo.username}！登录成功`);
-		// 更新当前用户信息
-		currentUser = userInfo;
-		// 重新加载配置以获取最新凭证
-		await loadConfig();
-		openSheet = null; // 关闭抽屉
-	}
-
-	// 处理扫码登录错误
-	function handleQrLoginError(error: string) {
-		toast.error('扫码登录失败: ' + error);
-	}
-
-	// 处理退出登录
-	function handleLogout() {
-		// 可以在这里清除凭证，但通常用户只是想切换账号
-		toast.info('请扫码登录新账号');
-	}
-
-	// 检查当前用户信息
-	async function checkCurrentUser() {
-		const response = await runRequest(() => fetch('/api/auth/current-user'), {
-			showErrorToast: false
-		});
-		if (!response) {
-			currentUser = null;
-			return;
-		}
-
-		if (response.ok) {
-			const result = await response.json();
-			if (result.status_code === 200 && result.data) {
-				currentUser = result.data;
-				return;
-			}
-		}
-
-		currentUser = null;
-	}
 
 
 
@@ -1451,24 +1347,8 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:sessdata
-	bind:biliJct
-	bind:buvid3
-	bind:dedeUserId
-	bind:acTimeValue
-	bind:buvid4
-	bind:dedeUserIdCkMd5
-	currentUser={currentUser}
-	credentialSaving={credentialSaving}
-	credentialRefreshTesting={credentialRefreshTesting}
-	credentialRefreshForceTesting={credentialRefreshForceTesting}
-	credentialRefreshTestResult={credentialRefreshTestResult}
-	getProxiedImageUrl={getProxiedImageUrl}
-	onSave={saveCredential}
-	onTestRefresh={testCredentialRefresh}
-	onQrLoginSuccess={handleQrLoginSuccess}
-	onQrLoginError={handleQrLoginError}
-	onLogout={handleLogout}
+	store={credential}
+	{getProxiedImageUrl}
 />
 
 <RiskSheet

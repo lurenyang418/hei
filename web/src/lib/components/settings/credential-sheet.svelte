@@ -8,32 +8,13 @@
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 	import QrLogin from '$lib/components/qr-login.svelte';
 	import { RefreshCwIcon } from '@lucide/svelte';
-	import type { CredentialRefreshTestResponse, UserInfo } from '$lib/types';
+	import type { CredentialSettingsStore } from '$lib/stores/settings/credential.svelte';
 
+	export let store: CredentialSettingsStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let sessdata = '';
-	export let biliJct = '';
-	export let buvid3 = '';
-	export let dedeUserId = '';
-	export let acTimeValue = '';
-	export let buvid4 = '';
-	export let dedeUserIdCkMd5 = '';
-	export let currentUser: UserInfo | null = null;
-
-	export let credentialSaving = false;
-	export let credentialRefreshTesting = false;
-	export let credentialRefreshForceTesting = false;
-	export let credentialRefreshTestResult: CredentialRefreshTestResponse | null = null;
-
 	export let getProxiedImageUrl: (url: string) => string = () => '';
-	export let onSave: () => void = () => {};
-	export let onTestRefresh: (force: boolean) => void = () => {};
-	export let onQrLoginSuccess: (userInfo: UserInfo) => void = () => {};
-	export let onQrLoginError: (error: string) => void = () => {};
-	export let onLogout: () => void = () => {};
 </script>
 
 <!-- B站凭证设置抽屉 -->
@@ -48,16 +29,16 @@
 	<div slot="header">
 		<div class="text-foreground font-semibold">B站凭证设置</div>
 		<div class="text-muted-foreground text-sm">配置B站登录凭证信息</div>
-		{#if currentUser}
+		{#if store.currentUser}
 			<div
 				class="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950/20"
 			>
 				<div class="flex items-center space-x-3">
 					<div class="bg-muted relative h-10 w-10 overflow-hidden rounded-full">
-						{#if currentUser.avatar_url}
+						{#if store.currentUser.avatar_url}
 							<img
-								src={getProxiedImageUrl(currentUser.avatar_url)}
-								alt={currentUser.username}
+								src={getProxiedImageUrl(store.currentUser.avatar_url)}
+								alt={store.currentUser.username}
 								class="h-full w-full object-cover"
 								loading="lazy"
 							/>
@@ -65,15 +46,15 @@
 							<div
 								class="bg-muted flex h-full w-full items-center justify-center text-xs font-semibold"
 							>
-								{currentUser.username.slice(0, 2).toUpperCase()}
+								{store.currentUser.username.slice(0, 2).toUpperCase()}
 							</div>
 						{/if}
 					</div>
 					<div class="flex-1">
 						<div class="text-sm font-semibold text-green-800 dark:text-green-200">
-							当前登录：{currentUser.username}
+							当前登录：{store.currentUser.username}
 						</div>
-						<div class="text-xs text-green-600 dark:text-green-400">UID: {currentUser.user_id}</div>
+						<div class="text-xs text-green-600 dark:text-green-400">UID: {store.currentUser.user_id}</div>
 					</div>
 					<Badge variant="default" class="bg-green-500">已登录</Badge>
 				</div>
@@ -94,7 +75,7 @@
 				<form
 					onsubmit={(e) => {
 						e.preventDefault();
-						onSave();
+						store.save();
 					}}
 					class="flex h-full flex-col"
 				>
@@ -115,18 +96,18 @@
 								</ol>
 								<div class="mt-2 text-xs text-amber-600 dark:text-amber-400">
 									💡
-									提示：SESSDATA、bili_jct、buvid3、DedeUserID是必填项，ac_time_value、buvid4、DedeUserID__ckMd5可选
+									提示：SESSDATA、bili_jct、store.buvid3、DedeUserID是必填项，ac_time_value、store.buvid4、DedeUserID__ckMd5可选
 								</div>
 							</div>
 						</div>
 
 						<div class="grid grid-cols-1 gap-4 {isMobile ? 'sm:grid-cols-1' : 'md:grid-cols-2'}">
 							<div class="space-y-2">
-								<Label for="sessdata">SESSDATA *</Label>
+								<Label for="store.sessdata">SESSDATA *</Label>
 								<Input
-									id="sessdata"
+									id="store.sessdata"
 									type="password"
-									bind:value={sessdata}
+									bind:value={store.sessdata}
 									placeholder="请输入SESSDATA"
 								/>
 							</div>
@@ -136,40 +117,40 @@
 								<Input
 									id="bili-jct"
 									type="password"
-									bind:value={biliJct}
+									bind:value={store.biliJct}
 									placeholder="请输入bili_jct"
 								/>
 							</div>
 
 							<div class="space-y-2">
-								<Label for="buvid3">buvid3 *</Label>
-								<Input id="buvid3" bind:value={buvid3} placeholder="请输入buvid3" />
+								<Label for="store.buvid3">store.buvid3 *</Label>
+								<Input id="store.buvid3" bind:value={store.buvid3} placeholder="请输入buvid3" />
 							</div>
 
 							<div class="space-y-2">
 								<Label for="dedeuserid">DedeUserID *</Label>
-								<Input id="dedeuserid" bind:value={dedeUserId} placeholder="请输入DedeUserID" />
+								<Input id="dedeuserid" bind:value={store.dedeUserId} placeholder="请输入DedeUserID" />
 							</div>
 
 							<div class="space-y-2 md:col-span-2">
 								<Label for="ac-time-value">ac_time_value (可选)</Label>
 								<Input
 									id="ac-time-value"
-									bind:value={acTimeValue}
+									bind:value={store.acTimeValue}
 									placeholder="请输入ac_time_value（可选）"
 								/>
 							</div>
 
 							<div class="space-y-2">
-								<Label for="buvid4">buvid4 (可选)</Label>
-								<Input id="buvid4" bind:value={buvid4} placeholder="请输入buvid4（可选）" />
+								<Label for="store.buvid4">store.buvid4 (可选)</Label>
+								<Input id="store.buvid4" bind:value={store.buvid4} placeholder="请输入buvid4（可选）" />
 							</div>
 
 							<div class="space-y-2">
 								<Label for="dedeuserid-ckmd5">DedeUserID__ckMd5 (可选)</Label>
 								<Input
 									id="dedeuserid-ckmd5"
-									bind:value={dedeUserIdCkMd5}
+									bind:value={store.dedeUserIdCkMd5}
 									placeholder="请输入DedeUserID__ckMd5（可选）"
 								/>
 							</div>
@@ -181,7 +162,7 @@
 							<div class="text-sm text-green-800 dark:text-green-200">
 								<div class="mb-1 font-medium">✅ 凭证状态检查：</div>
 								<div class="text-xs">
-									{#if sessdata && biliJct && buvid3 && dedeUserId}
+									{#if store.sessdata && store.biliJct && store.buvid3 && store.dedeUserId}
 										<span class="text-green-600 dark:text-green-400">✓ 必填凭证已填写完整</span>
 									{:else}
 										<span class="text-orange-600 dark:text-orange-400">⚠ 请填写所有必填凭证项</span
@@ -208,107 +189,107 @@
 										type="button"
 										variant="outline"
 										size="sm"
-										onclick={() => onTestRefresh(false)}
-										disabled={credentialRefreshTesting || credentialRefreshForceTesting}
+										onclick={() => store.testRefresh(false)}
+										disabled={store.refreshTesting || store.refreshForceTesting}
 										class="w-full sm:w-auto"
 									>
-										<RefreshCwIcon class={credentialRefreshTesting ? 'animate-spin' : ''} />
-										{credentialRefreshTesting ? '测试中...' : '测试刷新'}
+										<RefreshCwIcon class={store.refreshTesting ? 'animate-spin' : ''} />
+										{store.refreshTesting ? '测试中...' : '测试刷新'}
 									</Button>
 									<Button
 										type="button"
 										variant="outline"
 										size="sm"
-										onclick={() => onTestRefresh(true)}
-										disabled={credentialRefreshTesting || credentialRefreshForceTesting}
+										onclick={() => store.testRefresh(true)}
+										disabled={store.refreshTesting || store.refreshForceTesting}
 										class="w-full border-amber-300 text-amber-700 hover:bg-amber-50 sm:w-auto dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/30"
 									>
-										<RefreshCwIcon class={credentialRefreshForceTesting ? 'animate-spin' : ''} />
-										{credentialRefreshForceTesting ? '强刷中...' : '强制刷新'}
+										<RefreshCwIcon class={store.refreshForceTesting ? 'animate-spin' : ''} />
+										{store.refreshForceTesting ? '强刷中...' : '强制刷新'}
 									</Button>
 								</div>
 							</div>
 
-							{#if credentialRefreshTestResult}
+							{#if store.testResult}
 								<div
 									class={`rounded-md border p-3 ${
-										credentialRefreshTestResult.success
+										store.testResult.success
 											? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/20'
 											: 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'
 									}`}
 								>
 									<div class="mb-2 flex flex-wrap items-center gap-2">
 										<Badge
-											variant={credentialRefreshTestResult.success ? 'default' : 'secondary'}
-											class={credentialRefreshTestResult.success
+											variant={store.testResult.success ? 'default' : 'secondary'}
+											class={store.testResult.success
 												? 'bg-green-600 text-white'
 												: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100'}
 										>
-											{credentialRefreshTestResult.success ? '通过' : '失败'}
+											{store.testResult.success ? '通过' : '失败'}
 										</Badge>
 										<span class="text-sm font-medium text-slate-900 dark:text-slate-100">
-											{credentialRefreshTestResult.message}
+											{store.testResult.message}
 										</span>
 									</div>
 
 									<div
 										class="grid grid-cols-1 gap-2 text-xs text-slate-700 sm:grid-cols-2 dark:text-slate-300"
 									>
-										<div>阶段：{credentialRefreshTestResult.stage}</div>
-										<div>类型：{credentialRefreshTestResult.error_type ?? '无'}</div>
-										<div>建议重试：{credentialRefreshTestResult.should_retry ? '是' : '否'}</div>
+										<div>阶段：{store.testResult.stage}</div>
+										<div>类型：{store.testResult.error_type ?? '无'}</div>
+										<div>建议重试：{store.testResult.should_retry ? '是' : '否'}</div>
 										<div>
-											凭据：{credentialRefreshTestResult.credential_fields.has_credential
+											凭据：{store.testResult.credential_fields.has_credential
 												? '已加载'
 												: '未加载'}
 										</div>
 									</div>
 
 									<div class="mt-2 text-xs text-slate-700 dark:text-slate-300">
-										{credentialRefreshTestResult.diagnosis}
+										{store.testResult.diagnosis}
 									</div>
 
 									<div class="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
 										<div class="bg-background rounded border px-2 py-1">
-											SESSDATA：{credentialRefreshTestResult.credential_fields.sessdata_len}
+											SESSDATA：{store.testResult.credential_fields.sessdata_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											bili_jct：{credentialRefreshTestResult.credential_fields.bili_jct_len}
+											bili_jct：{store.testResult.credential_fields.bili_jct_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											buvid3：{credentialRefreshTestResult.credential_fields.buvid3_len}
+											store.buvid3：{store.testResult.credential_fields.buvid3_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											DedeUserID：{credentialRefreshTestResult.credential_fields.dedeuserid_len}
+											DedeUserID：{store.testResult.credential_fields.dedeuserid_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											ac_time_value：{credentialRefreshTestResult.credential_fields
+											ac_time_value：{store.testResult.credential_fields
 												.ac_time_value_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											buvid4：{credentialRefreshTestResult.credential_fields.has_buvid4
+											store.buvid4：{store.testResult.credential_fields.has_buvid4
 												? '有'
 												: '无'}
 										</div>
 										<div class="bg-background rounded border px-2 py-1 sm:col-span-2">
-											DedeUserID__ckMd5：{credentialRefreshTestResult.credential_fields
+											DedeUserID__ckMd5：{store.testResult.credential_fields
 												.has_dedeuserid_ckmd5
 												? '有'
 												: '无'}
 										</div>
 									</div>
 
-									{#if credentialRefreshTestResult.details}
+									{#if store.testResult.details}
 										<pre
-											class="bg-background mt-3 max-h-36 overflow-auto rounded border p-2 text-xs whitespace-pre-wrap text-slate-700 dark:text-slate-300">{credentialRefreshTestResult.details}</pre>
+											class="bg-background mt-3 max-h-36 overflow-auto rounded border p-2 text-xs whitespace-pre-wrap text-slate-700 dark:text-slate-300">{store.testResult.details}</pre>
 									{/if}
 								</div>
 							{/if}
 						</div>
 					</div>
 					<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-						<Button type="submit" disabled={credentialSaving} class="w-full">
-							{credentialSaving ? '保存中...' : '保存凭证'}
+						<Button type="submit" disabled={store.saving} class="w-full">
+							{store.saving ? '保存中...' : '保存凭证'}
 						</Button>
 					</SheetFooter>
 				</form>
@@ -322,9 +303,9 @@
 				>
 					<div class="mx-auto w-full max-w-md">
 						<QrLogin
-							onLoginSuccess={onQrLoginSuccess}
-							onLoginError={onQrLoginError}
-							onLogout={onLogout}
+							onLoginSuccess={store.handleQrLoginSuccess}
+							onLoginError={store.handleQrLoginError}
+							onLogout={store.handleLogout}
 						/>
 					</div>
 				</div>
