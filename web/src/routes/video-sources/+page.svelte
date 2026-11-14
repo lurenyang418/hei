@@ -12,6 +12,7 @@
 	import { VideoSourceScanConfigStore } from '$lib/stores/video-sources/scan-config.svelte';
 	import { VideoSourceFilterOptionStore } from '$lib/stores/video-sources/filter-option.svelte';
 	import { VideoSourceDialogsStore } from '$lib/stores/video-sources/dialogs.svelte';
+	import { VideoSourceListStore } from '$lib/stores/video-sources/list.svelte';
 	import { videoSourceStore, setVideoSources } from '$lib/stores/video-source';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
@@ -131,14 +132,9 @@
 	});
 
 	const dialogs = new VideoSourceDialogsStore();
+	const list = new VideoSourceListStore();
 
-	let loading = false;
 	let platformTab = 'bilibili';
-	const videoSourcesStream = createManagedEventSource();
-	const queuedDeleteNoticeMap = new SvelteMap<
-		string,
-		{ sourceType: VideoSourceType; sourceId: number; sourceName: string }
-	>();
 
 	// 响应式相关
 	const isMobileQuery = new IsMobile();
@@ -205,77 +201,12 @@
 	}
 
 
-	async function loadVideoSources(silent = false) {
-		const response = await runRequest(() => api.getVideoSources(), {
-			setLoading: silent ? undefined : (value) => (loading = value),
-			context: '加载视频源失败'
-		});
-		if (!response) return;
-		setVideoSources(response.data);
-	}
 
-	function buildVideoSourcesStreamUrl(): string | null {
-		return buildAuthenticatedStreamUrl('/api/video-sources/live');
-	}
 
-	function sourceStillExists(
-		sources: VideoSourcesResponse,
-		sourceType: VideoSourceType,
-		sourceId: number
-	): boolean {
-		return sources[sourceType]?.some((source) => source.id === sourceId) ?? false;
-	}
 
-	function markQueuedDeletePending(
-		sourceType: VideoSourceType,
-		sourceId: number,
-		sourceName: string
-	) {
-		queuedDeleteNoticeMap.set(`${sourceType}:${sourceId}`, {
-			sourceType,
-			sourceId,
-			sourceName
-		});
-	}
 
-	function notifyCompletedQueuedDeletions(sources: VideoSourcesResponse) {
-		for (const [key, pendingDelete] of queuedDeleteNoticeMap.entries()) {
-			if (sourceStillExists(sources, pendingDelete.sourceType, pendingDelete.sourceId)) {
-				continue;
-			}
 
-			queuedDeleteNoticeMap.delete(key);
-			toast.success('删除完成', {
-				description: `视频源「${pendingDelete.sourceName}」已从列表移除`
-			});
-		}
-	}
 
-	function stopVideoSourcesStream() {
-		videoSourcesStream.stop();
-	}
-
-	function startVideoSourcesStream() {
-		videoSourcesStream.start({
-			url: buildVideoSourcesStreamUrl(),
-			handlers: {
-				sources: (event) => {
-					try {
-						const payload = JSON.parse(event.data) as VideoSourcesResponse;
-						notifyCompletedQueuedDeletions(payload);
-						setVideoSources({
-							...payload
-						});
-					} catch (error) {
-						console.error('解析视频源实时更新失败:', error);
-					}
-				}
-			},
-			onError: () => {
-				console.warn('视频源实时更新连接异常，等待浏览器自动重连');
-			}
-		});
-	}
 
 	// B站合集/收藏夹/投稿源扫描策略配置（分批/自适应）
 
@@ -996,7 +927,7 @@
 				},
 				applyLocalUpdate: (data) => {
 					if (isQueuedMessage(data.message)) {
-						markQueuedDeletePending(
+						list.markQueuedDeletePending(
 							dialogs.deleteInfo.type as VideoSourceType,
 							dialogs.deleteInfo.id,
 							dialogs.deleteInfo.name
@@ -1193,14 +1124,14 @@
 
 	onMount(() => {
 		setBreadcrumb([{ label: '视频源管理' }]);
-		loadVideoSources();
-		startVideoSourcesStream();
+		list.load();
+		list.startStream();
 		scanConfig.load();
 
 	});
 
 	onDestroy(() => {
-		stopVideoSourcesStream();
+		list.stopStream();
 	});
 </script>
 
@@ -1226,7 +1157,7 @@
 
 
 		<div class="mt-6">
-			{#if loading}
+			{#if list.loading}
 				<Loading />
 			{:else}
 					<Card class="mb-4 py-3">
