@@ -38,6 +38,7 @@
 	import { NotificationSettingsStore } from '$lib/stores/settings/notification.svelte';
 	import { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
 	import { CredentialSettingsStore } from '$lib/stores/settings/credential.svelte';
+	import { CaptchaSettingsStore } from '$lib/stores/settings/captcha.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
@@ -49,6 +50,10 @@
 	const notification = new NotificationSettingsStore();
 	const naming = new SettingsNamingStore();
 	const credential = new CredentialSettingsStore({
+		reloadConfig: loadConfig,
+		closeSheet: () => (openSheet = null)
+	});
+	const captcha = new CaptchaSettingsStore({
 		reloadConfig: loadConfig,
 		closeSheet: () => (openSheet = null)
 	});
@@ -293,16 +298,6 @@
 	let largeSubmissionDelayMultiplier = 2;
 
 	// 风控验证配置
-	let riskControlEnabled = false;
-	let riskControlMode = 'manual';
-	let riskControlTimeout = 300;
-	let isSaving = false;
-
-	// 自动验证配置
-	let autoSolveService = '2captcha';
-	let autoSolveApiKey = '';
-	let autoSolveMaxRetries = 3;
-	let autoSolveTimeout = 300;
 	let enableProgressiveDelay = true;
 	let maxDelayMultiplier = 4;
 	let enableIncrementalFetch = true;
@@ -603,15 +598,7 @@
 		audioOnlyUseLowQnForPlayurl = config.audio_only_use_low_qn_for_playurl ?? true;
 
 		// 风控验证配置
-		riskControlEnabled = config.risk_control?.enabled ?? false;
-		riskControlMode = config.risk_control?.mode || 'manual';
-		riskControlTimeout = config.risk_control?.timeout || 300;
-
-		// 自动验证配置
-		autoSolveService = config.risk_control?.auto_solve?.service || '2captcha';
-		autoSolveApiKey = config.risk_control?.auto_solve?.api_key || '';
-		autoSolveMaxRetries = config.risk_control?.auto_solve?.max_retries || 3;
-		autoSolveTimeout = config.risk_control?.auto_solve?.solve_timeout || 300;
+		captcha.applyFromConfig(config);
 
 		// aria2监控配置
 		enableAria2HealthCheck = config.enable_aria2_health_check ?? false;
@@ -1027,12 +1014,7 @@
 				DEFAULT_CONFIG_VALUES.aria2HealthCheckInterval
 			),
 			// 风控验证配置
-			risk_control_enabled: riskControlEnabled,
-			risk_control_mode: riskControlMode,
-			risk_control_timeout: normalizeNumberInput(
-				riskControlTimeout,
-				DEFAULT_CONFIG_VALUES.riskControlTimeout
-			)
+			...captcha.toMainConfigPayload()
 		};
 
 		const response = await runRequest(() => api.updateConfig(params), {
@@ -1072,41 +1054,6 @@
 
 
 
-	async function saveRiskControlConfig() {
-		const config: UpdateConfigRequest = {
-			risk_control_enabled: riskControlEnabled,
-			risk_control_mode: riskControlMode,
-			risk_control_timeout: normalizeNumberInput(
-				riskControlTimeout,
-				DEFAULT_CONFIG_VALUES.riskControlTimeout
-			),
-			risk_control_auto_solve_service: autoSolveService,
-			risk_control_auto_solve_api_key: autoSolveApiKey.trim(),
-			risk_control_auto_solve_max_retries: normalizeNumberInput(
-				autoSolveMaxRetries,
-				DEFAULT_CONFIG_VALUES.autoSolveMaxRetries
-			),
-			risk_control_auto_solve_timeout: normalizeNumberInput(
-				autoSolveTimeout,
-				DEFAULT_CONFIG_VALUES.autoSolveTimeout
-			)
-		};
-
-		const response = await runRequest(() => api.updateConfig(config), {
-			setLoading: (value) => (isSaving = value),
-			context: '保存验证码风控配置失败'
-		});
-		if (!response) return;
-
-		if (response.data.success) {
-			toast.success('验证码风控配置保存成功');
-			// 重新加载配置以确保同步
-			await loadConfig();
-			openSheet = null; // 关闭抽屉
-		} else {
-			toast.error('保存失败', { description: response.data.message });
-		}
-	}
 
 	// 保存AI重命名配置
 	async function saveAiRenameConfig() {
@@ -1439,15 +1386,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:riskControlEnabled
-	bind:riskControlMode
-	bind:riskControlTimeout
-	bind:autoSolveService
-	bind:autoSolveApiKey
-	bind:autoSolveMaxRetries
-	bind:autoSolveTimeout
-	isSaving={isSaving}
-	onSave={saveRiskControlConfig}
+	store={captcha}
 />
 
 <AiRenameSheet

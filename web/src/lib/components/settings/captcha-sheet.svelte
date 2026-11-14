@@ -6,20 +6,12 @@
 	import { SheetFooter } from '$lib/components/ui/sheet';
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 
+	import type { CaptchaSettingsStore } from '$lib/stores/settings/captcha.svelte';
+
+	export let store: CaptchaSettingsStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let riskControlEnabled = false;
-	export let riskControlMode = 'manual';
-	export let riskControlTimeout = 300;
-	export let autoSolveService = '2captcha';
-	export let autoSolveApiKey = '';
-	export let autoSolveMaxRetries = 3;
-	export let autoSolveTimeout = 300;
-
-	export let isSaving = false;
-	export let onSave: () => void = () => {};
 </script>
 
 <!-- 验证码风控设置抽屉 -->
@@ -34,7 +26,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -45,7 +37,7 @@
 					<input
 						id="risk-control-enabled"
 						type="checkbox"
-						bind:checked={riskControlEnabled}
+						bind:checked={store.enabled}
 						class="h-4 w-4"
 					/>
 					<p class="text-muted-foreground text-xs">启用后，遇到v_voucher风控时将进行验证码验证</p>
@@ -55,13 +47,13 @@
 					<Label for="risk-control-mode">验证模式</Label>
 					<CustomSelect
 						id="risk-control-mode"
-						value={riskControlMode}
+						value={store.mode}
 						options={[
 							{ value: 'manual', label: 'manual - 手动验证' },
 							{ value: 'auto', label: 'auto - 自动验证' },
 							{ value: 'skip', label: 'skip - 跳过验证' }
 						]}
-						onChange={(nextValue) => (riskControlMode = String(nextValue ?? 'manual'))}
+						onChange={(nextValue) => (store.mode = String(nextValue ?? 'manual'))}
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					/>
 					<p class="text-muted-foreground text-xs">
@@ -75,7 +67,7 @@
 					<Input
 						id="risk-control-timeout"
 						type="number"
-						bind:value={riskControlTimeout}
+						bind:value={store.timeout}
 						min="60"
 						max="3600"
 						placeholder="300"
@@ -86,7 +78,7 @@
 				</div>
 
 				<!-- 自动验证配置 (仅在auto模式下显示) -->
-				{#if riskControlMode === 'auto'}
+				{#if store.mode === 'auto'}
 					<div class="space-y-4 rounded-lg border bg-gray-50 p-4 dark:bg-gray-900/50">
 						<h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">自动验证配置</h4>
 
@@ -94,12 +86,12 @@
 							<Label for="auto-solve-service">验证码服务</Label>
 							<CustomSelect
 								id="auto-solve-service"
-								value={autoSolveService}
+								value={store.autoSolveService}
 								options={[
 									{ value: '2captcha', label: '2Captcha' },
 									{ value: 'anticaptcha', label: 'AntiCaptcha' }
 								]}
-								onChange={(nextValue) => (autoSolveService = String(nextValue ?? '2captcha'))}
+								onChange={(nextValue) => (store.autoSolveService = String(nextValue ?? '2captcha'))}
 								class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 							/>
 							<p class="text-muted-foreground text-xs">选择验证码识别服务提供商</p>
@@ -110,7 +102,7 @@
 							<Input
 								id="auto-solve-api-key"
 								type="password"
-								bind:value={autoSolveApiKey}
+								bind:value={store.autoSolveApiKey}
 								placeholder="输入API密钥"
 							/>
 							<p class="text-muted-foreground text-xs">验证码服务的API密钥，请确保账户有足够余额</p>
@@ -122,7 +114,7 @@
 								<Input
 									id="auto-solve-max-retries"
 									type="number"
-									bind:value={autoSolveMaxRetries}
+									bind:value={store.autoSolveMaxRetries}
 									min="1"
 									max="10"
 									placeholder="3"
@@ -134,7 +126,7 @@
 								<Input
 									id="auto-solve-timeout"
 									type="number"
-									bind:value={autoSolveTimeout}
+									bind:value={store.autoSolveTimeout}
 									min="60"
 									max="600"
 									placeholder="300"
@@ -184,8 +176,8 @@
 			</div>
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="submit" disabled={isSaving} class="w-full">
-				{isSaving ? '保存中...' : '保存设置'}
+			<Button type="submit" disabled={store.saving} class="w-full">
+				{store.saving ? '保存中...' : '保存设置'}
 			</Button>
 		</SheetFooter>
 	</form>
