@@ -7,27 +7,12 @@
 	import ResponsiveSheet from '$lib/components/responsive-sheet.svelte';
 	import { RefreshCwIcon } from '@lucide/svelte';
 
+	import type { AiRenameSettingsStore } from '$lib/stores/settings/ai-rename.svelte';
+
+	export let store: AiRenameSettingsStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
-
-	export let aiRenameEnabled = false;
-	export let aiRenameProvider = 'deepseek';
-	export let aiRenameBaseUrl = 'https://api.deepseek.com/v1';
-	export let aiRenameApiKey = '';
-	export let aiRenameModel = 'deepseek-v4-flash';
-	export let aiRenameTimeoutSeconds = 30;
-	export let aiRenameVideoPromptHint = '';
-	export let aiRenameAudioPromptHint = '';
-	export let aiRenameRenameParentDir = false;
-	export let aiRenameSaving = false;
-	export let aiRenameClearingCache = false;
-	export let aiRenameModels: string[] = [];
-	export let aiRenameModelsLoading = false;
-
-	export let onSave: () => void = () => {};
-	export let onClearCache: () => void = () => {};
-	export let onFetchModels: () => void = () => {};
 </script>
 
 <!-- AI重命名设置抽屉 -->
@@ -42,7 +27,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			onSave();
+			store.save();
 		}}
 		class="flex flex-col {isMobile ? 'h-[calc(90vh-8rem)]' : 'h-[calc(100vh-12rem)]'}"
 	>
@@ -65,7 +50,7 @@
 						<input
 							type="checkbox"
 							id="ai-rename-enabled"
-							bind:checked={aiRenameEnabled}
+							bind:checked={store.enabled}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label
@@ -79,7 +64,7 @@
 						<input
 							type="checkbox"
 							id="ai-rename-rename-parent-dir"
-							bind:checked={aiRenameRenameParentDir}
+							bind:checked={store.renameParentDir}
 							class="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
 						/>
 						<Label
@@ -100,12 +85,12 @@
 						<Label for="ai-rename-provider">API提供商</Label>
 						<CustomSelect
 							id="ai-rename-provider"
-							value={aiRenameProvider}
+							value={store.provider}
 							options={[
 								{ value: 'deepseek', label: 'DeepSeek 官方' },
 								{ value: 'custom', label: 'OpenAI 兼容' }
 							]}
-							onChange={(nextValue) => (aiRenameProvider = String(nextValue ?? 'deepseek'))}
+							onChange={(nextValue) => (store.provider = String(nextValue ?? 'deepseek'))}
 							class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 						/>
 						<p class="text-muted-foreground text-xs">使用 OpenAI 兼容接口，需要 API Key</p>
@@ -115,7 +100,7 @@
 						<Input
 							id="ai-rename-timeout"
 							type="number"
-							bind:value={aiRenameTimeoutSeconds}
+							bind:value={store.timeoutSeconds}
 							min="10"
 							max="120"
 							placeholder="30"
@@ -130,7 +115,7 @@
 						<Input
 							id="ai-rename-base-url"
 							type="text"
-							bind:value={aiRenameBaseUrl}
+							bind:value={store.baseUrl}
 							placeholder="https://api.deepseek.com/v1"
 						/>
 						<p class="text-muted-foreground text-xs">
@@ -143,7 +128,7 @@
 						<Input
 							id="ai-rename-api-key"
 							type="password"
-							bind:value={aiRenameApiKey}
+							bind:value={store.apiKey}
 							placeholder="sk-xxxxxxxxxxxxxxxx"
 						/>
 						<p class="text-muted-foreground text-xs">
@@ -157,12 +142,12 @@
 							<Input
 								id="ai-rename-model"
 								type="text"
-								bind:value={aiRenameModel}
+								bind:value={store.model}
 								placeholder="deepseek-v4-flash"
 								list="ai-rename-model-options"
 							/>
 							<datalist id="ai-rename-model-options">
-								{#each aiRenameModels as model (model)}
+								{#each store.models as model (model)}
 									<option value={model}></option>
 								{/each}
 							</datalist>
@@ -171,12 +156,12 @@
 								variant="outline"
 								size="sm"
 								class="flex-shrink-0 px-2"
-								onclick={onFetchModels}
-								disabled={aiRenameModelsLoading}
+								onclick={() => store.fetchModels()}
+								disabled={store.modelsLoading}
 								title="获取模型列表"
 								aria-label="获取模型列表"
 							>
-								<RefreshCwIcon class="h-4 w-4 {aiRenameModelsLoading ? 'animate-spin' : ''}" />
+								<RefreshCwIcon class="h-4 w-4 {store.modelsLoading ? 'animate-spin' : ''}" />
 							</Button>
 						</div>
 						<p class="text-muted-foreground text-xs">
@@ -190,7 +175,7 @@
 					<Label for="ai-rename-video-hint">视频重命名提示词（可选）</Label>
 					<textarea
 						id="ai-rename-video-hint"
-						bind:value={aiRenameVideoPromptHint}
+						bind:value={store.videoPromptHint}
 						placeholder="例如：保留集数信息，使用中文括号"
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					></textarea>
@@ -202,7 +187,7 @@
 					<Label for="ai-rename-audio-hint">音频重命名提示词（可选）</Label>
 					<textarea
 						id="ai-rename-audio-hint"
-						bind:value={aiRenameAudioPromptHint}
+						bind:value={store.audioPromptHint}
 						placeholder="例如：保留歌手名称和专辑信息"
 						class="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
 					></textarea>
@@ -260,14 +245,14 @@
 				<Button
 					type="button"
 					variant="outline"
-					onclick={onClearCache}
-					disabled={aiRenameClearingCache}
+					onclick={() => store.clearCache()}
+					disabled={store.clearingCache}
 					class="flex-shrink-0 text-orange-600 hover:text-orange-700 dark:text-orange-400"
 				>
-					{aiRenameClearingCache ? '清除中...' : '清除全部缓存'}
+					{store.clearingCache ? '清除中...' : '清除全部缓存'}
 				</Button>
-				<Button type="submit" disabled={aiRenameSaving} class="flex-1">
-					{aiRenameSaving ? '保存中...' : '保存设置'}
+				<Button type="submit" disabled={store.saving} class="flex-1">
+					{store.saving ? '保存中...' : '保存设置'}
 				</Button>
 			</div>
 		</SheetFooter>

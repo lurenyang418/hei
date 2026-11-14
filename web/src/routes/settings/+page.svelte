@@ -39,6 +39,7 @@
 	import { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
 	import { CredentialSettingsStore } from '$lib/stores/settings/credential.svelte';
 	import { CaptchaSettingsStore } from '$lib/stores/settings/captcha.svelte';
+	import { AiRenameSettingsStore } from '$lib/stores/settings/ai-rename.svelte';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import Loading from '$lib/components/ui/Loading.svelte';
 
@@ -54,6 +55,11 @@
 		closeSheet: () => (openSheet = null)
 	});
 	const captcha = new CaptchaSettingsStore({
+		reloadConfig: loadConfig,
+		closeSheet: () => (openSheet = null)
+	});
+
+	const aiRename = new AiRenameSettingsStore({
 		reloadConfig: loadConfig,
 		closeSheet: () => (openSheet = null)
 	});
@@ -330,19 +336,6 @@
 
 
 	// AI重命名配置
-	let aiRenameEnabled = false;
-	let aiRenameProvider = 'deepseek';
-	let aiRenameBaseUrl = 'https://api.deepseek.com/v1';
-	let aiRenameApiKey = '';
-	let aiRenameModel = 'deepseek-v4-flash';
-	let aiRenameTimeoutSeconds = 30;
-	let aiRenameVideoPromptHint = '';
-	let aiRenameAudioPromptHint = '';
-	let aiRenameRenameParentDir = false;
-	let aiRenameSaving = false;
-	let aiRenameClearingCache = false;
-	let aiRenameModels: string[] = [];
-	let aiRenameModelsLoading = false;
 
 	// 数据库管理
 	let databaseStatus: {
@@ -612,15 +605,7 @@
 		// 番剧目录结构配置
 
 		// AI重命名配置
-		aiRenameEnabled = config.ai_rename?.enabled ?? false;
-		aiRenameProvider = config.ai_rename?.provider === 'custom' ? 'custom' : 'deepseek';
-		aiRenameBaseUrl = config.ai_rename?.base_url || 'https://api.deepseek.com/v1';
-		aiRenameApiKey = config.ai_rename?.api_key || '';
-		aiRenameModel = config.ai_rename?.model || 'deepseek-v4-flash';
-		aiRenameTimeoutSeconds = config.ai_rename?.timeout_seconds ?? 30;
-		aiRenameVideoPromptHint = config.ai_rename?.video_prompt_hint || '';
-		aiRenameAudioPromptHint = config.ai_rename?.audio_prompt_hint || '';
-		aiRenameRenameParentDir = config.ai_rename?.rename_parent_dir ?? false;
+		aiRename.applyFromConfig(config);
 	}
 
 
@@ -1055,94 +1040,8 @@
 
 
 
-	// 保存AI重命名配置
-	async function saveAiRenameConfig() {
-		const config: UpdateConfigRequest = {
-			ai_rename_enabled: aiRenameEnabled,
-			ai_rename_provider: aiRenameProvider.trim(),
-			ai_rename_base_url: aiRenameBaseUrl.trim(),
-			ai_rename_api_key: aiRenameApiKey.trim(),
-			ai_rename_model: aiRenameModel.trim(),
-			ai_rename_timeout_seconds: normalizeNumberInput(
-				aiRenameTimeoutSeconds,
-				DEFAULT_CONFIG_VALUES.aiRenameTimeoutSeconds
-			),
-			ai_rename_video_prompt_hint: aiRenameVideoPromptHint,
-			ai_rename_audio_prompt_hint: aiRenameAudioPromptHint,
-			ai_rename_rename_parent_dir: aiRenameRenameParentDir
-		};
 
-		const response = await runRequest(() => api.updateConfig(config), {
-			setLoading: (value) => (aiRenameSaving = value),
-			context: '保存AI重命名配置失败'
-		});
-		if (!response) return;
 
-		if (response.data.success) {
-			toast.success('AI重命名配置保存成功');
-			// 重新加载配置以确保同步
-			await loadConfig();
-			openSheet = null; // 关闭抽屉
-		} else {
-			toast.error('保存失败', { description: response.data.message });
-		}
-	}
-
-	// 清除所有AI对话历史缓存
-	async function handleClearAllAiCache() {
-		const response = await runRequest(() => api.clearAiRenameCache(), {
-			setLoading: (value) => (aiRenameClearingCache = value),
-			context: '清除AI缓存失败'
-		});
-		if (!response) return;
-
-		if (response.data.success) {
-			toast.success('已清除所有AI对话历史缓存');
-		} else {
-			toast.error('清除失败', { description: response.data.message });
-		}
-	}
-
-	// 从服务商 /models 端点获取可用模型（前端直连，需服务商允许跨域）
-	async function fetchAiRenameModels() {
-		const base = aiRenameBaseUrl.trim().replace(/\/+$/, '');
-		const key = aiRenameApiKey.trim();
-		if (!base) {
-			toast.error('请先填写 API Base URL');
-			return;
-		}
-		if (!key) {
-			toast.error('请先填写 API Key');
-			return;
-		}
-
-		aiRenameModelsLoading = true;
-		try {
-			const response = await fetch(`${base}/models`, {
-				headers: { Authorization: `Bearer ${key}` }
-			});
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}`);
-			}
-			const payload = await response.json();
-			const models: string[] = Array.isArray(payload?.data)
-				? payload.data
-						.map((item: { id?: string }) => item?.id)
-						.filter((id: string | undefined): id is string => Boolean(id))
-				: [];
-			if (models.length === 0) {
-				throw new Error('服务商未返回模型列表');
-			}
-			aiRenameModels = [...new Set(models)].sort((a, b) => a.localeCompare(b));
-			toast.success(`已获取 ${aiRenameModels.length} 个模型`);
-		} catch (error) {
-			toast.error('获取模型列表失败', {
-				description: `${error instanceof Error ? error.message : String(error)}；可手动填写模型名称`
-			});
-		} finally {
-			aiRenameModelsLoading = false;
-		}
-	}
 
 
 </script>
@@ -1395,22 +1294,7 @@
 		if (!open) openSheet = null;
 	}}
 	{isMobile}
-	bind:aiRenameEnabled
-	bind:aiRenameProvider
-	bind:aiRenameBaseUrl
-	bind:aiRenameApiKey
-	bind:aiRenameModel
-	bind:aiRenameTimeoutSeconds
-	bind:aiRenameVideoPromptHint
-	bind:aiRenameAudioPromptHint
-	bind:aiRenameRenameParentDir
-	aiRenameSaving={aiRenameSaving}
-	aiRenameClearingCache={aiRenameClearingCache}
-	aiRenameModels={aiRenameModels}
-	aiRenameModelsLoading={aiRenameModelsLoading}
-	onSave={saveAiRenameConfig}
-	onClearCache={handleClearAllAiCache}
-	onFetchModels={fetchAiRenameModels}
+	store={aiRename}
 />
 
 <DatabaseSheet
