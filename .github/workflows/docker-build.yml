@@ -128,7 +128,6 @@ jobs:
         with:
           name: web-build
           path: web/build
-          retention-days: 1
 
       - name: Read Rust toolchain version
         id: read_rust_toolchain
