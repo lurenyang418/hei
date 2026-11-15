@@ -54,7 +54,9 @@
 						<div class="text-sm font-semibold text-green-800 dark:text-green-200">
 							当前登录：{store.currentUser.username}
 						</div>
-						<div class="text-xs text-green-600 dark:text-green-400">UID: {store.currentUser.user_id}</div>
+						<div class="text-xs text-green-600 dark:text-green-400">
+							UID: {store.currentUser.user_id}
+						</div>
 					</div>
 					<Badge variant="default" class="bg-green-500">已登录</Badge>
 				</div>
@@ -129,7 +131,11 @@
 
 							<div class="space-y-2">
 								<Label for="dedeuserid">DedeUserID *</Label>
-								<Input id="dedeuserid" bind:value={store.dedeUserId} placeholder="请输入DedeUserID" />
+								<Input
+									id="dedeuserid"
+									bind:value={store.dedeUserId}
+									placeholder="请输入DedeUserID"
+								/>
 							</div>
 
 							<div class="space-y-2 md:col-span-2">
@@ -143,7 +149,11 @@
 
 							<div class="space-y-2">
 								<Label for="store.buvid4">store.buvid4 (可选)</Label>
-								<Input id="store.buvid4" bind:value={store.buvid4} placeholder="请输入buvid4（可选）" />
+								<Input
+									id="store.buvid4"
+									bind:value={store.buvid4}
+									placeholder="请输入buvid4（可选）"
+								/>
 							</div>
 
 							<div class="space-y-2">
@@ -263,17 +273,13 @@
 											DedeUserID：{store.testResult.credential_fields.dedeuserid_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											ac_time_value：{store.testResult.credential_fields
-												.ac_time_value_len}
+											ac_time_value：{store.testResult.credential_fields.ac_time_value_len}
 										</div>
 										<div class="bg-background rounded border px-2 py-1">
-											store.buvid4：{store.testResult.credential_fields.has_buvid4
-												? '有'
-												: '无'}
+											store.buvid4：{store.testResult.credential_fields.has_buvid4 ? '有' : '无'}
 										</div>
 										<div class="bg-background rounded border px-2 py-1 sm:col-span-2">
-											DedeUserID__ckMd5：{store.testResult.credential_fields
-												.has_dedeuserid_ckmd5
+											DedeUserID__ckMd5：{store.testResult.credential_fields.has_dedeuserid_ckmd5
 												? '有'
 												: '无'}
 										</div>
@@ -281,7 +287,8 @@
 
 									{#if store.testResult.details}
 										<pre
-											class="bg-background mt-3 max-h-36 overflow-auto rounded border p-2 text-xs whitespace-pre-wrap text-slate-700 dark:text-slate-300">{store.testResult.details}</pre>
+											class="bg-background mt-3 max-h-36 overflow-auto rounded border p-2 text-xs whitespace-pre-wrap text-slate-700 dark:text-slate-300">{store
+												.testResult.details}</pre>
 									{/if}
 								</div>
 							{/if}

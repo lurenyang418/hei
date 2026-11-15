@@ -13,18 +13,10 @@
 	import EmptyState from '$lib/components/empty-state.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { CustomSelect } from '$lib/components/ui/select';
-	import * as Tabs from '$lib/components/ui/tabs';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import FilterIcon from '@lucide/svelte/icons/filter';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
-	import ActivityIcon from '@lucide/svelte/icons/activity';
-	import UserIcon from '@lucide/svelte/icons/user';
-	import ListTreeIcon from '@lucide/svelte/icons/list-tree';
-	import HeartIcon from '@lucide/svelte/icons/heart';
-	import HistoryIcon from '@lucide/svelte/icons/history';
-	import ListVideoIcon from '@lucide/svelte/icons/list-video';
-	import LayersIcon from '@lucide/svelte/icons/layers';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { setBreadcrumb } from '$lib/stores/breadcrumb';
 	import { toast } from 'svelte-sonner';
@@ -599,10 +591,7 @@
 
 	async function handleResetVideo(video: VideoInfo, forceReset: boolean) {
 		try {
-			const result = await api.resetVideo(
-				video.id,
-				forceReset
-			);
+			const result = await api.resetVideo(video.id, forceReset);
 			const data = result.data;
 			if (data.resetted) {
 				toast.success('重置成功', {
@@ -762,10 +751,7 @@
 		}
 	}
 
-	function handleSourceFilter(
-		sourceType: VideoSourceType,
-		sourceId: string
-	) {
+	function handleSourceFilter(sourceType: VideoSourceType, sourceId: string) {
 		selectedSourceType = sourceType;
 		selectedSourceId = sourceId;
 		const range = getResolutionRange(selectedResolution);
@@ -1212,15 +1198,15 @@
 						<div class="flex items-center gap-2">
 							<span class="text-sm font-medium">按分辨率筛选</span>
 						</div>
-							<div class="mt-2 w-full sm:max-w-xs">
-								<CustomSelect
-									class="border-input bg-background ring-offset-background focus:ring-ring h-9 w-full rounded-md border px-3 py-1 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-none"
-									value={selectedResolution}
-									options={RESOLUTION_OPTIONS}
-									onChange={(nextValue) => handleResolutionChange(String(nextValue ?? ''))}
-								/>
-							</div>
+						<div class="mt-2 w-full sm:max-w-xs">
+							<CustomSelect
+								class="border-input bg-background ring-offset-background focus:ring-ring h-9 w-full rounded-md border px-3 py-1 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-none"
+								value={selectedResolution}
+								options={RESOLUTION_OPTIONS}
+								onChange={(nextValue) => handleResolutionChange(String(nextValue ?? ''))}
+							/>
 						</div>
+					</div>
 				</div>
 			{/if}
 
@@ -1229,7 +1215,7 @@
 				<div class="flex flex-wrap items-center gap-2">
 					<span class="text-muted-foreground text-sm">当前筛选:</span>
 
-{#if selectedSourceType && selectedSourceId && videoSources}
+					{#if selectedSourceType && selectedSourceId && videoSources}
 						{@const sourceConfig = Object.values(VIDEO_SOURCES).find(
 							(config) => config.type === selectedSourceType
 						)}

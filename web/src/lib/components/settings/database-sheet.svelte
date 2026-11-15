@@ -266,7 +266,13 @@
 			{/if}
 		</div>
 		<SheetFooter class={isMobile ? 'pb-safe border-t px-4 pt-3' : 'pb-safe border-t pt-4'}>
-			<Button type="button" variant="outline" onclick={() => store.loadStatus()} disabled={store.loading} class="w-full">
+			<Button
+				type="button"
+				variant="outline"
+				onclick={() => store.loadStatus()}
+				disabled={store.loading}
+				class="w-full"
+			>
 				{store.loading ? '刷新中...' : '刷新统计'}
 			</Button>
 		</SheetFooter>

@@ -41,11 +41,7 @@ export class VideoSourceListStore {
 		return sources[sourceType]?.some((source) => source.id === sourceId) ?? false;
 	}
 
-	markQueuedDeletePending(
-		sourceType: VideoSourceType,
-		sourceId: number,
-		sourceName: string
-	): void {
+	markQueuedDeletePending(sourceType: VideoSourceType, sourceId: number, sourceName: string): void {
 		this.queuedDeleteNoticeMap.set(`${sourceType}:${sourceId}`, {
 			sourceType,
 			sourceId,

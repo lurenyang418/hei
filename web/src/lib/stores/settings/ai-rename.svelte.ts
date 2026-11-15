@@ -1,3 +1,4 @@
+import { SvelteSet } from 'svelte/reactivity';
 import { toast } from 'svelte-sonner';
 import api from '$lib/api';
 import { runRequest } from '$lib/utils/request.js';
@@ -59,10 +60,7 @@ export class AiRenameSettingsStore {
 			ai_rename_base_url: this.baseUrl.trim(),
 			ai_rename_api_key: this.apiKey.trim(),
 			ai_rename_model: this.model.trim(),
-			ai_rename_timeout_seconds: normalizeNumberInput(
-				this.timeoutSeconds,
-				SAVE_TIMEOUT_FALLBACK
-			),
+			ai_rename_timeout_seconds: normalizeNumberInput(this.timeoutSeconds, SAVE_TIMEOUT_FALLBACK),
 			ai_rename_video_prompt_hint: this.videoPromptHint,
 			ai_rename_audio_prompt_hint: this.audioPromptHint,
 			ai_rename_rename_parent_dir: this.renameParentDir
@@ -133,7 +131,7 @@ export class AiRenameSettingsStore {
 			if (models.length === 0) {
 				throw new Error('服务商未返回模型列表');
 			}
-			this.models = [...new Set(models)].sort((a, b) => a.localeCompare(b));
+			this.models = [...new SvelteSet(models)].sort((a, b) => a.localeCompare(b));
 			toast.success(`已获取 ${this.models.length} 个模型`);
 		} catch (error) {
 			toast.error('获取模型列表失败', {

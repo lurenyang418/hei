@@ -1,8 +1,13 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { toast } from 'svelte-sonner';
 import api from '$lib/api';
 import { runRequest } from '$lib/utils/request.js';
-import type { AddVideoSourceRequest, BatchSelectedItem, BatchSelectedItemData, VideoCategory } from '$lib/types';
+import type {
+	AddVideoSourceRequest,
+	BatchSelectedItem,
+	BatchSelectedItemData,
+	VideoCategory
+} from '$lib/types';
 
 export type BatchContext = {
 	/** 当前选择的视频源类型（search/following 项按它解析） */
@@ -116,7 +121,13 @@ export class BatchSelectionStore {
 	getSourceIdFromBatchItem(item: BatchSelectedItem): string {
 		switch (item.type) {
 			case 'search':
-				return (item.data.mid ?? item.data.season_id ?? item.data.id ?? item.data.bvid ?? '').toString();
+				return (
+					item.data.mid ??
+					item.data.season_id ??
+					item.data.id ??
+					item.data.bvid ??
+					''
+				).toString();
 			case 'favorite':
 				return (item.data.id ?? item.data.fid ?? '').toString();
 			case 'collection':
@@ -185,7 +196,7 @@ export class BatchSelectionStore {
 			return;
 		}
 
-		const resolvedTypes = new Set(
+		const resolvedTypes = new SvelteSet(
 			Array.from(this.selectedItems.values()).map((item) => this.getSourceTypeFromBatchItem(item))
 		);
 		if (resolvedTypes.size > 1) {

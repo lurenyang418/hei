@@ -1,6 +1,6 @@
 //! 子进程创建辅助。
 //!
-//! Windows 上从「没有控制台的父进程」spawn 控制台程序（node / ffmpeg / aria2c / yt-dlp）
+//! Windows 上从「没有控制台的父进程」spawn 控制台程序（ffmpeg / aria2c）
 //! 时，系统会为每个子进程新建一个控制台窗口，表现就是屏幕上不停闪黑框。本项目会频繁
 //! spawn 这类工具，所以统一用这里的工厂函数创建
 //! Command，把 CREATE_NO_WINDOW 打开。

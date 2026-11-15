@@ -13,6 +13,7 @@ export default defineConfig({
 			manifest: {
 				name: '管理面板',
 				short_name: 'hei',
+				lang: 'zh-CN',
 				description: 'B站视频同步下载管理工具',
 				theme_color: '#ffffff',
 				background_color: '#ffffff',
@@ -32,57 +33,15 @@ export default defineConfig({
 						sizes: '512x512',
 						type: 'image/png',
 						purpose: 'any'
-					},
-					{
-						src: '/icon-512.png',
-						sizes: '512x512',
-						type: 'image/png',
-						purpose: 'maskable'
 					}
 				]
 			},
 			workbox: {
-				// 运行时缓存策略
-				runtimeCaching: [
-					{
-						// API请求使用NetworkFirst策略
-						urlPattern: /^https?:\/\/.*\/api\/.*/i,
-						handler: 'NetworkFirst',
-						options: {
-							cacheName: 'api-cache',
-							expiration: {
-								maxEntries: 100,
-								maxAgeSeconds: 5 * 60 // 5分钟
-							},
-							networkTimeoutSeconds: 10
-						}
-					},
-					{
-						// 静态资源使用CacheFirst策略
-						urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-						handler: 'CacheFirst',
-						options: {
-							cacheName: 'images-cache',
-							expiration: {
-								maxEntries: 100,
-								maxAgeSeconds: 30 * 24 * 60 * 60 // 30天
-							}
-						}
-					},
-					{
-						// 视频流不缓存
-						urlPattern: /\/api\/videos\/(proxy-stream|stream)/i,
-						handler: 'NetworkOnly'
-					}
-				],
+				// 仅预缓存前端构建资源；API、图片代理和视频流直接访问网络。
 				// 排除不需要缓存的资源
 				navigateFallback: null,
 				// 清理过期缓存
 				cleanupOutdatedCaches: true
-			},
-			devOptions: {
-				enabled: true, // 开发环境也启用PWA
-				type: 'module'
 			}
 		})
 	],

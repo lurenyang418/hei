@@ -67,16 +67,12 @@
 											: 'gray'}-500"
 							/>
 							<div class="min-w-0 flex-1">
-								<div
-									class="flex {isMobile ? 'flex-col gap-1' : 'items-center gap-2'} mb-1"
-								>
+								<div class="flex {isMobile ? 'flex-col gap-1' : 'items-center gap-2'} mb-1">
 									<Badge variant="outline" class={levelColors[log.level]}>
 										{log.level.toUpperCase()}
 									</Badge>
 									{#if log.target}
-										<span class="text-muted-foreground font-mono text-xs"
-											>{log.target}</span
-										>
+										<span class="text-muted-foreground font-mono text-xs">{log.target}</span>
 									{/if}
 								</div>
 								<p class="text-sm break-words">{log.message}</p>

@@ -179,9 +179,7 @@ export class MainConfigStore {
 	saving = $state(false);
 
 	// 并发提示用派生值
-	effectiveDownloadThreads = $derived(
-		normalizeConcurrencyValue(this.parallelDownloadThreads, 4)
-	);
+	effectiveDownloadThreads = $derived(normalizeConcurrencyValue(this.parallelDownloadThreads, 4));
 	effectiveMaxFileConnections = $derived(this.effectiveDownloadThreads);
 	effectiveConcurrentVideo = $derived(normalizeConcurrencyValue(this.concurrentVideo, 3));
 	effectiveConcurrentPage = $derived(normalizeConcurrencyValue(this.concurrentPage, 2));
@@ -247,7 +245,8 @@ export class MainConfigStore {
 		this.danmakuUpdateColdDays =
 			config.danmaku_update_cold_days ?? DEFAULT_CONFIG_VALUES.danmakuUpdateColdDays;
 		this.danmakuUpdateColdIntervalDays =
-			config.danmaku_update_cold_interval_days ?? DEFAULT_CONFIG_VALUES.danmakuUpdateColdIntervalDays;
+			config.danmaku_update_cold_interval_days ??
+			DEFAULT_CONFIG_VALUES.danmakuUpdateColdIntervalDays;
 
 		this.concurrentVideo = config.concurrent_video || DEFAULT_CONFIG_VALUES.concurrentVideo;
 		this.concurrentPage = config.concurrent_page || DEFAULT_CONFIG_VALUES.concurrentPage;
@@ -268,9 +267,11 @@ export class MainConfigStore {
 			config.large_submission_threshold || DEFAULT_CONFIG_VALUES.largeSubmissionThreshold;
 		this.baseRequestDelay = config.base_request_delay || DEFAULT_CONFIG_VALUES.baseRequestDelay;
 		this.largeSubmissionDelayMultiplier =
-			config.large_submission_delay_multiplier || DEFAULT_CONFIG_VALUES.largeSubmissionDelayMultiplier;
+			config.large_submission_delay_multiplier ||
+			DEFAULT_CONFIG_VALUES.largeSubmissionDelayMultiplier;
 		this.enableProgressiveDelay = config.enable_progressive_delay ?? true;
-		this.maxDelayMultiplier = config.max_delay_multiplier || DEFAULT_CONFIG_VALUES.maxDelayMultiplier;
+		this.maxDelayMultiplier =
+			config.max_delay_multiplier || DEFAULT_CONFIG_VALUES.maxDelayMultiplier;
 		this.enableIncrementalFetch = config.enable_incremental_fetch ?? true;
 		this.incrementalFallbackToFull = config.incremental_fallback_to_full ?? true;
 		this.enableBatchProcessing = config.enable_batch_processing || false;
@@ -281,7 +282,8 @@ export class MainConfigStore {
 			config.auto_backoff_base_seconds || DEFAULT_CONFIG_VALUES.autoBackoffBaseSeconds;
 		this.autoBackoffMaxMultiplier =
 			config.auto_backoff_max_multiplier || DEFAULT_CONFIG_VALUES.autoBackoffMaxMultiplier;
-		this.sourceDelaySeconds = config.source_delay_seconds ?? DEFAULT_CONFIG_VALUES.sourceDelaySeconds;
+		this.sourceDelaySeconds =
+			config.source_delay_seconds ?? DEFAULT_CONFIG_VALUES.sourceDelaySeconds;
 		this.submissionSourceDelaySeconds =
 			config.submission_source_delay_seconds ?? DEFAULT_CONFIG_VALUES.submissionSourceDelaySeconds;
 		this.enableDynamicApiDelay = config.enable_dynamic_api_delay ?? true;
@@ -289,8 +291,7 @@ export class MainConfigStore {
 			config.dynamic_api_delay_multiplier ?? DEFAULT_CONFIG_VALUES.dynamicApiDelayMultiplier;
 		this.enableLargeSourceDownloadLimit = config.enable_large_source_download_limit ?? true;
 		this.largeSourceDownloadThreshold =
-			config.large_source_download_threshold ??
-			DEFAULT_CONFIG_VALUES.largeSourceDownloadThreshold;
+			config.large_source_download_threshold ?? DEFAULT_CONFIG_VALUES.largeSourceDownloadThreshold;
 		this.largeSourceDownloadPageThreshold =
 			config.large_source_download_page_threshold ??
 			DEFAULT_CONFIG_VALUES.largeSourceDownloadPageThreshold;
@@ -298,8 +299,7 @@ export class MainConfigStore {
 			config.large_source_max_videos_per_round ??
 			DEFAULT_CONFIG_VALUES.largeSourceMaxVideosPerRound;
 		this.largeSourceMaxPagesPerRound =
-			config.large_source_max_pages_per_round ??
-			DEFAULT_CONFIG_VALUES.largeSourceMaxPagesPerRound;
+			config.large_source_max_pages_per_round ?? DEFAULT_CONFIG_VALUES.largeSourceMaxPagesPerRound;
 		this.largeSourceConcurrentVideo =
 			config.large_source_concurrent_video ?? DEFAULT_CONFIG_VALUES.largeSourceConcurrentVideo;
 		this.largeSourceConcurrentPage =
@@ -307,8 +307,7 @@ export class MainConfigStore {
 		this.largeSourcePlayurlLimit =
 			config.large_source_playurl_limit ?? DEFAULT_CONFIG_VALUES.largeSourcePlayurlLimit;
 		this.largeSourcePlayurlDurationMs =
-			config.large_source_playurl_duration_ms ??
-			DEFAULT_CONFIG_VALUES.largeSourcePlayurlDurationMs;
+			config.large_source_playurl_duration_ms ?? DEFAULT_CONFIG_VALUES.largeSourcePlayurlDurationMs;
 		this.audioOnlyUseLowQnForPlayurl = config.audio_only_use_low_qn_for_playurl ?? true;
 
 		this.enableAria2HealthCheck = config.enable_aria2_health_check ?? false;

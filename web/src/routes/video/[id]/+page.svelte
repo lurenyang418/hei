@@ -11,7 +11,6 @@
 	import { setBreadcrumb } from '$lib/stores/breadcrumb';
 	import {
 		appStateStore,
-		setVideoIds,
 		setCurrentPage,
 		setVideoListInfo,
 		setPlatform,
@@ -29,7 +28,6 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import EditIcon from '@lucide/svelte/icons/edit';
 	import PlayIcon from '@lucide/svelte/icons/play';
-	import ImageIcon from '@lucide/svelte/icons/image';
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import TrashIcon from '@lucide/svelte/icons/trash-2';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -56,8 +54,8 @@
 	let videoDetailLoadToken = 0;
 	let lastPlaybackNoticeKey: string | null = null;
 	let chargeLockedDisplayMode: 'local' | null = null;
+	const embeddedFrameStyle = 'aspect-ratio: 16/9; max-height: 70vh;';
 	$: routeResourceId = $page.params.id ?? '';
-	$: embeddedFrameStyle = 'aspect-ratio: 16/9; max-height: 70vh;';
 
 	function videoDetailHref(videoId: number) {
 		return resolve(`/video/${videoId}`);
@@ -100,9 +98,7 @@
 	function getEmbeddedPlayerTitle() {
 		const currentPage = getCurrentPageInfo();
 		if (!currentPage) {
-			return videoData?.video.name
-				? `B站内嵌播放器 - ${videoData.video.name}`
-				: 'B站内嵌播放器';
+			return videoData?.video.name ? `B站内嵌播放器 - ${videoData.video.name}` : 'B站内嵌播放器';
 		}
 		return `B站内嵌播放器 - P${currentPage.pid} ${currentPage.name}`;
 	}
@@ -864,25 +860,22 @@
 	<section>
 		{#if videoData.pages && videoData.pages.length > 0}
 			<div class="mb-4 flex {isMobile ? 'flex-col gap-2' : 'items-center justify-between'}">
-				<h2 class="{isMobile ? 'text-lg' : 'text-xl'} font-semibold">
-					分页列表
-				</h2>
+				<h2 class="{isMobile ? 'text-lg' : 'text-xl'} font-semibold">分页列表</h2>
 				<div class="flex {isMobile ? 'flex-col gap-2' : 'items-center gap-2'}">
 					<div class="text-muted-foreground text-sm">
 						共 {videoData.pages.length} 个分页
 					</div>
-											<Button
-							size="sm"
-							variant="outline"
-							class={isMobile ? 'w-full' : ''}
-							title={getRefreshVideoDanmakuTitle()}
-							onclick={handleRefreshVideoDanmaku}
-							disabled={refreshingVideoDanmaku}
-						>
-							<RefreshCwIcon class="mr-2 h-4 w-4 {refreshingVideoDanmaku ? 'animate-spin' : ''}" />
-							{refreshingVideoDanmaku ? '刷新中...' : '刷新全部弹幕'}
-						</Button>
-
+					<Button
+						size="sm"
+						variant="outline"
+						class={isMobile ? 'w-full' : ''}
+						title={getRefreshVideoDanmakuTitle()}
+						onclick={handleRefreshVideoDanmaku}
+						disabled={refreshingVideoDanmaku}
+					>
+						<RefreshCwIcon class="mr-2 h-4 w-4 {refreshingVideoDanmaku ? 'animate-spin' : ''}" />
+						{refreshingVideoDanmaku ? '刷新中...' : '刷新全部弹幕'}
+					</Button>
 				</div>
 			</div>
 
@@ -921,63 +914,62 @@
 									showProgress={true}
 								/>
 
-																	<div
-										class="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-									>
-										<div class="min-w-0">
-											<div
-												class="text-muted-foreground cursor-help text-xs"
-												title={getDanmakuSyncTitle(
-													pageInfo.danmaku_sync_generation,
-													pageInfo.danmaku_last_synced_at
-												)}
-											>
-												弹幕同步
-											</div>
-											<div
-												class="cursor-help truncate text-sm font-medium"
-												title={getDanmakuSyncTitle(
-													pageInfo.danmaku_sync_generation,
-													pageInfo.danmaku_last_synced_at
-												)}
-											>
-												{getDanmakuStageLabel(pageInfo.danmaku_sync_generation)}
-												{#if pageInfo.danmaku_last_synced_at}
-													· {getRelativeDanmakuTime(pageInfo.danmaku_last_synced_at)}
-												{/if}
-											</div>
+								<div
+									class="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+								>
+									<div class="min-w-0">
+										<div
+											class="text-muted-foreground cursor-help text-xs"
+											title={getDanmakuSyncTitle(
+												pageInfo.danmaku_sync_generation,
+												pageInfo.danmaku_last_synced_at
+											)}
+										>
+											弹幕同步
+										</div>
+										<div
+											class="cursor-help truncate text-sm font-medium"
+											title={getDanmakuSyncTitle(
+												pageInfo.danmaku_sync_generation,
+												pageInfo.danmaku_last_synced_at
+											)}
+										>
+											{getDanmakuStageLabel(pageInfo.danmaku_sync_generation)}
 											{#if pageInfo.danmaku_last_synced_at}
-												<div
-													class="text-muted-foreground cursor-help text-[11px]"
-													title={getDanmakuLastSyncedTitle(pageInfo.danmaku_last_synced_at)}
-												>
-													上次刷新：{pageInfo.danmaku_last_synced_at}
-												</div>
-												<div class="text-muted-foreground flex items-center gap-1 text-[11px]">
-													<span
-														class="cursor-help"
-														title="显示最近一次写入到弹幕文件的条数。首次刷新通常是全量写入，之后会按日期增量追加。"
-													>
-														上次写入：{formatDanmakuWriteCount(pageInfo.danmaku_last_write_count)}
-													</span>
-												</div>
+												· {getRelativeDanmakuTime(pageInfo.danmaku_last_synced_at)}
 											{/if}
 										</div>
-										<Button
-											size="sm"
-											variant="outline"
-											class="shrink-0"
-											title={getRefreshPageDanmakuTitle(pageInfo.path)}
-											onclick={() => handleRefreshPageDanmaku(pageInfo.id)}
-											disabled={isRefreshingPage(pageInfo.id) || !pageInfo.path}
-										>
-											<RefreshCwIcon
-												class="mr-2 h-4 w-4 {isRefreshingPage(pageInfo.id) ? 'animate-spin' : ''}"
-											/>
-											{isRefreshingPage(pageInfo.id) ? '刷新中...' : '刷新弹幕'}
-										</Button>
+										{#if pageInfo.danmaku_last_synced_at}
+											<div
+												class="text-muted-foreground cursor-help text-[11px]"
+												title={getDanmakuLastSyncedTitle(pageInfo.danmaku_last_synced_at)}
+											>
+												上次刷新：{pageInfo.danmaku_last_synced_at}
+											</div>
+											<div class="text-muted-foreground flex items-center gap-1 text-[11px]">
+												<span
+													class="cursor-help"
+													title="显示最近一次写入到弹幕文件的条数。首次刷新通常是全量写入，之后会按日期增量追加。"
+												>
+													上次写入：{formatDanmakuWriteCount(pageInfo.danmaku_last_write_count)}
+												</span>
+											</div>
+										{/if}
 									</div>
-
+									<Button
+										size="sm"
+										variant="outline"
+										class="shrink-0"
+										title={getRefreshPageDanmakuTitle(pageInfo.path)}
+										onclick={() => handleRefreshPageDanmaku(pageInfo.id)}
+										disabled={isRefreshingPage(pageInfo.id) || !pageInfo.path}
+									>
+										<RefreshCwIcon
+											class="mr-2 h-4 w-4 {isRefreshingPage(pageInfo.id) ? 'animate-spin' : ''}"
+										/>
+										{isRefreshingPage(pageInfo.id) ? '刷新中...' : '刷新弹幕'}
+									</Button>
+								</div>
 
 								<!-- 播放按钮区域 -->
 								<div class="flex justify-center gap-2">
@@ -1028,9 +1020,7 @@
 						<div class="sticky top-4">
 							<div class="mb-4 flex items-center justify-between">
 								<div class="flex items-center gap-2">
-									<h3 class="text-lg font-semibold">
-										视频播放
-									</h3>
+									<h3 class="text-lg font-semibold">视频播放</h3>
 									<span
 										class="rounded px-2 py-1 text-sm {onlinePlayMode
 											? 'bg-blue-100 text-blue-700'
@@ -1062,8 +1052,7 @@
 							{/if}
 							{#if onlinePlayMode}
 								<div class="mb-3 text-sm text-gray-500">
-									当前为 B 站内嵌播放，清晰度和码率由平台播放器控制，不继承本程序
-									的清晰度设置。
+									当前为 B 站内嵌播放，清晰度和码率由平台播放器控制，不继承本程序 的清晰度设置。
 								</div>
 							{/if}
 
@@ -1074,58 +1063,58 @@
 									⚠️ 该视频未达到最低下载标准，未下载本地媒体，无法进行本地播放。
 								</div>
 							{/if}
-								<div class="overflow-hidden rounded-lg bg-black">
-									{#if chargeLockedDisplayMode === 'local' && !onlinePlayMode}
-										<div class="flex h-64 items-center justify-center text-white">
-											<div>充电视频未充电</div>
-										</div>
-									{:else if onlinePlayMode}
-										{#if getEmbeddedPlayerUrl()}
-											{#key `${currentVideoId}-${currentPlayingPageIndex}-${onlinePlayMode}`}
-												<iframe
-													class="embedded-player-frame block h-auto w-full border-0"
-													style={embeddedFrameStyle}
-													src={getEmbeddedPlayerUrl() ?? undefined}
-													title={getEmbeddedPlayerTitle()}
-													allow="autoplay; fullscreen"
-													referrerpolicy="unsafe-url"
-												></iframe>
-											{/key}
-										{:else}
-											<div class="flex h-64 items-center justify-center text-white">
-												<div>当前视频缺少 B 站标识，无法内嵌播放</div>
-											</div>
-										{/if}
-									{:else}
+							<div class="overflow-hidden rounded-lg bg-black">
+								{#if chargeLockedDisplayMode === 'local' && !onlinePlayMode}
+									<div class="flex h-64 items-center justify-center text-white">
+										<div>充电视频未充电</div>
+									</div>
+								{:else if onlinePlayMode}
+									{#if getEmbeddedPlayerUrl()}
 										{#key `${currentVideoId}-${currentPlayingPageIndex}-${onlinePlayMode}`}
-											<div class="video-container relative" role="group">
-												<video
-													controls
-													autoplay
-													class="h-auto w-full"
-													style="aspect-ratio: 16/9; max-height: 70vh;"
-													src={getVideoSource()}
-													onerror={(event) => {
-														console.warn('视频加载错误:', event);
-														if (videoData?.video.is_charge_video) {
-															chargeLockedDisplayMode = 'local';
-															showChargeLockedToast('local');
-														} else if (videoData?.video.skip_reason) {
-															showSkipReasonToast();
-														}
-													}}
-													onloadstart={() => {
-														console.log('开始加载视频:', getVideoSource());
-													}}
-												>
-													<!-- 默认空字幕轨道用于无障碍功能 -->
-													<track kind="captions" srclang="zh" label="无字幕" default />
-													您的浏览器不支持视频播放。
-												</video>
-											</div>
+											<iframe
+												class="embedded-player-frame block h-auto w-full border-0"
+												style={embeddedFrameStyle}
+												src={getEmbeddedPlayerUrl() ?? undefined}
+												title={getEmbeddedPlayerTitle()}
+												allow="autoplay; fullscreen"
+												referrerpolicy="unsafe-url"
+											></iframe>
 										{/key}
+									{:else}
+										<div class="flex h-64 items-center justify-center text-white">
+											<div>当前视频缺少 B 站标识，无法内嵌播放</div>
+										</div>
 									{/if}
-								</div>
+								{:else}
+									{#key `${currentVideoId}-${currentPlayingPageIndex}-${onlinePlayMode}`}
+										<div class="video-container relative" role="group">
+											<video
+												controls
+												autoplay
+												class="h-auto w-full"
+												style="aspect-ratio: 16/9; max-height: 70vh;"
+												src={getVideoSource()}
+												onerror={(event) => {
+													console.warn('视频加载错误:', event);
+													if (videoData?.video.is_charge_video) {
+														chargeLockedDisplayMode = 'local';
+														showChargeLockedToast('local');
+													} else if (videoData?.video.skip_reason) {
+														showSkipReasonToast();
+													}
+												}}
+												onloadstart={() => {
+													console.log('开始加载视频:', getVideoSource());
+												}}
+											>
+												<!-- 默认空字幕轨道用于无障碍功能 -->
+												<track kind="captions" srclang="zh" label="无字幕" default />
+												您的浏览器不支持视频播放。
+											</video>
+										</div>
+									{/key}
+								{/if}
+							</div>
 
 							<!-- 分页选择按钮 -->
 							{#if videoData.pages.length > 1}

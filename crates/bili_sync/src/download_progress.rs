@@ -22,7 +22,7 @@ pub struct DownloadProgressItem {
     pub file_name: String,
     /// 已下载字节（0 表示总大小未知时无法计算百分比）
     pub downloaded_bytes: u64,
-    /// 总字节（0 表示未知，如 yt-dlp 子进程下载）
+    /// 总字节（0 表示暂时未知）
     pub total_bytes: u64,
     /// 实时速度（字节/秒）
     pub speed_bps: u64,

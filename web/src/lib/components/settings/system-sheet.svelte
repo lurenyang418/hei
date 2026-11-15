@@ -36,7 +36,13 @@
 
 				<div class="space-y-2">
 					<Label for="store.interval">扫描间隔（秒）</Label>
-					<Input id="store.interval" type="number" bind:value={store.interval} min="60" placeholder="1200" />
+					<Input
+						id="store.interval"
+						type="number"
+						bind:value={store.interval}
+						min="60"
+						placeholder="1200"
+					/>
 					<p class="text-muted-foreground text-sm">每次扫描下载的时间间隔</p>
 				</div>
 

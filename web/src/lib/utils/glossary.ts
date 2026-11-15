@@ -370,7 +370,8 @@ const GLOSSARY_ENTRIES: GlossaryEntry[] = [
 	},
 	{
 		terms: ['Bot Token', 'Chat ID', 'API 地址（可选）'],
-		description: 'Telegram 通知配置：Bot Token 来自 @BotFather，Chat ID 为目标会话；可自定义 API 地址以走代理或自建 Bot API。'
+		description:
+			'Telegram 通知配置：Bot Token 来自 @BotFather，Chat ID 为目标会话；可自定义 API 地址以走代理或自建 Bot API。'
 	},
 	{
 		terms: ['Webhook URL', 'Bearer Token（可选）'],

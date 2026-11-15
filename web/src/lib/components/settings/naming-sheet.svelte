@@ -10,8 +10,6 @@
 	import { EyeIcon } from '@lucide/svelte';
 	import type { SettingsNamingStore } from '$lib/stores/settings/naming.svelte';
 
-	type HelpItem = { name: string; desc: string };
-
 	export let store: SettingsNamingStore;
 	export let open = false;
 	export let onOpenChange: (open: boolean) => void = () => {};
@@ -232,7 +230,8 @@
 						bind:value={store.videoName}
 						placeholder={`{{upper_name}}`}
 						class={store.multiPageNameHasPath ? 'border-orange-400 bg-orange-50' : ''}
-						oninput={(e) => store.handleVideoNameChange((e.target as HTMLInputElement)?.value || '')}
+						oninput={(e) =>
+							store.handleVideoNameChange((e.target as HTMLInputElement)?.value || '')}
 					/>
 					{#if store.multiPageNameHasPath && store.videoNameHasPath}
 						<p class="text-xs text-orange-600 dark:text-orange-400">
@@ -269,7 +268,8 @@
 							: store.videoNameHasPath && store.multiPageNameHasPath
 								? 'border-orange-400 bg-orange-50'
 								: ''}
-						oninput={(e) => store.handleMultiPageNameChange((e.target as HTMLInputElement)?.value || '')}
+						oninput={(e) =>
+							store.handleMultiPageNameChange((e.target as HTMLInputElement)?.value || '')}
 					/>
 					{#if store.multiPageNameError}
 						<p class="text-xs text-red-500 dark:text-red-400">{store.multiPageNameError}</p>

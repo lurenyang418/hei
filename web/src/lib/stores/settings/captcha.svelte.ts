@@ -41,8 +41,7 @@ export class CaptchaSettingsStore {
 		this.autoSolveApiKey = config.risk_control?.auto_solve?.api_key || '';
 		this.autoSolveMaxRetries =
 			config.risk_control?.auto_solve?.max_retries || DEFAULT_AUTO_SOLVE_MAX_RETRIES;
-		this.autoSolveTimeout =
-			config.risk_control?.auto_solve?.solve_timeout || DEFAULT_RISK_TIMEOUT;
+		this.autoSolveTimeout = config.risk_control?.auto_solve?.solve_timeout || DEFAULT_RISK_TIMEOUT;
 	}
 
 	/** 主配置保存时提交的风控字段（与页面原有主保存载荷一致） */

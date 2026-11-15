@@ -57,9 +57,7 @@
 						<Plus class="mt-0.5 h-4 w-4 text-green-600" />
 						<div>
 							<p class="font-medium text-green-900 dark:text-green-100">添加队列</p>
-							<p class="text-xs text-green-700 dark:text-green-300">
-								处理新视频源的添加和初始化
-							</p>
+							<p class="text-xs text-green-700 dark:text-green-300">处理新视频源的添加和初始化</p>
 						</div>
 					</div>
 					<div class="flex items-start gap-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-950/20">

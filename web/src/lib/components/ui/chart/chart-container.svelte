@@ -21,7 +21,7 @@
 		ref?: HTMLElement | null;
 	} = $props();
 
-	const chartId = `chart-${id || uid.replace(/:/g, '')}`;
+	let chartId = $derived(`chart-${id || uid.replace(/:/g, '')}`);
 
 	setChartContext({
 		get config() {

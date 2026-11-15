@@ -40,7 +40,6 @@ export class SubmissionSelectionStore {
 	showLoadMore = $state(false);
 
 	currentLoadedPage = 0;
-	#loadingProgress = '';
 	#searchTimer: ReturnType<typeof setTimeout> | null = null;
 	#ctx: SubmissionContext;
 
@@ -141,15 +140,10 @@ export class SubmissionSelectionStore {
 	async #loadInBatch(loadCount: number): Promise<void> {
 		const upId = this.#ctx.getUpId();
 		const startPage = this.currentLoadedPage + 1;
-		const targetVideos = Math.min(
-			this.videos.length + loadCount,
-			this.totalCount || Infinity
-		);
+		const targetVideos = Math.min(this.videos.length + loadCount, this.totalCount || Infinity);
 		const neededPages = Math.ceil(targetVideos / SUBMISSION_PAGE_SIZE);
 
 		for (let page = startPage; page <= neededPages; page++) {
-			this.#loadingProgress = `正在加载第 ${page} 页...`;
-
 			if (page > startPage) {
 				await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY));
 			}
@@ -167,7 +161,7 @@ export class SubmissionSelectionStore {
 			this.totalCount = Math.max(this.totalCount, response.data.total);
 
 			const newVideos = response.data.videos || [];
-			const existingBvids = new Set(this.videos.map((video) => video.bvid));
+			const existingBvids = new SvelteSet(this.videos.map((video) => video.bvid));
 			const uniqueNewVideos = newVideos.filter((video) => !existingBvids.has(video.bvid));
 
 			this.videos = [...this.videos, ...uniqueNewVideos];
@@ -179,7 +173,6 @@ export class SubmissionSelectionStore {
 		}
 
 		this.hasMore = this.videos.length < this.totalCount;
-		this.#loadingProgress = '';
 		// 搜索词为空时，过滤列表跟随完整列表
 		if (!this.searchQuery.trim()) {
 			this.filtered = this.videos;

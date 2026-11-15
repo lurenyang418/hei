@@ -1037,20 +1037,20 @@ fn normalize_file_path_task(path: &str) -> String {
 }
 
 fn is_dangerous_path_for_deletion_task(path: &str) -> bool {
-    let norm = normalize_file_path_task(path).trim_end_matches('/').to_string();
-    if norm.is_empty() || norm == "/" || norm == "\\" {
-        return true;
-    }
+    let normalized = normalize_file_path_task(path);
+    let norm = normalized.trim_end_matches('/');
+    let is_root = norm.is_empty();
 
     #[cfg(windows)]
     {
         let bytes = norm.as_bytes();
-        if bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
-            return true;
-        }
+        is_root || (bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':')
     }
 
-    false
+    #[cfg(not(windows))]
+    {
+        is_root
+    }
 }
 
 fn cleanup_empty_dir_if_empty_task(dir: &str, label: &str) {

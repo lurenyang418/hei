@@ -1,3 +1,4 @@
+import { SvelteSet } from 'svelte/reactivity';
 import { toast } from 'svelte-sonner';
 import api from '$lib/api';
 import { runRequest } from '$lib/utils/request.js';
@@ -14,7 +15,7 @@ export class PugvCourseStore {
 	loading = $state(false);
 	fetchAttempted = false;
 	selectedSeasonIds = $state<string[]>([]);
-	existingSeasonIds = $state<Set<string>>(new Set());
+	existingSeasonIds = $state<Set<string>>(new SvelteSet());
 
 	/** 选中讲师后设置基础信息并清空旧课程 */
 	setUp(mid: string, name: string): void {

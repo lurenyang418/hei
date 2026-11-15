@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { page } from '$app/stores';
+	import { SvelteSet } from 'svelte/reactivity';
 	import api from '$lib/api';
 	import BatchCheckbox from '$lib/components/batch-checkbox.svelte';
 	import BiliImage from '$lib/components/bili-image.svelte';
@@ -36,16 +35,9 @@
 	import type {
 		SearchResultItem,
 		VideoCategory,
-		SubmissionVideoInfo,
 		UserFavoriteFolder,
 		UserCollectionItem,
 		UserFollowing,
-		BangumiSeasonInfo,
-		BangumiSourceOption,
-		HoveredItem,
-		BatchSelectedItem,
-		BatchSelectedItemData,
-		PugvCourseItem,
 		ValidateFavoriteResponse,
 		ConfigResponse,
 		UserCollectionInfo,
@@ -53,7 +45,7 @@
 		FilterOption,
 		VideoQuality,
 		AudioQuality,
-		VideoCodec,
+		VideoCodec
 	} from '$lib/types';
 	import {
 		Search,
@@ -62,17 +54,16 @@
 		Filter as FilterIcon,
 		Info as InfoIcon,
 		Languages as LanguagesIcon,
-		SlidersHorizontal as SlidersHorizontalIcon,
-		FolderOpen
+		SlidersHorizontal as SlidersHorizontalIcon
 	} from '@lucide/svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { flip } from 'svelte/animate';
-	import { fade, fly } from 'svelte/transition';
+	import { fly } from 'svelte/transition';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile, IsTablet } from '$lib/hooks/is-mobile.svelte.js';
 	import { formatTimestamp } from '$lib/utils/timezone';
-	import { formatSubmissionDateLabel, formatSubmissionMetricLabel } from '$lib/utils/submission';
+	import { formatSubmissionMetricLabel } from '$lib/utils/submission';
 
 	const hover = new HoverTooltipStore();
 
@@ -178,7 +169,6 @@
 	let loading = false;
 
 	// 下载选项
-	let generateImagePostVideo = true; // 图文作品是否额外合成幻灯片 MP4
 	let globalFilterOptionDefault: FilterOption = {
 		...DEFAULT_FILTER_OPTION,
 		codecs: [...DEFAULT_FILTER_OPTION.codecs]
@@ -186,7 +176,6 @@
 	// AI重命名高级选项
 
 	// 添加手动输入标志
-
 
 	function clearSearchPanel(options: { clearKeyword?: boolean } = {}) {
 		search.clear(options);
@@ -230,8 +219,6 @@
 	let userFollowings: UserFollowing[] = [];
 	let loadingFollowings = false;
 
-
-
 	let cachedNameBeforeMerge = '';
 	let cachedPathBeforeMerge = '';
 	let isUsingMergedSourceMeta = false;
@@ -242,12 +229,9 @@
 	let existingSubmissionIds: Set<number> = new SvelteSet();
 	let existingBangumiSeasonIds: Set<string> = new SvelteSet();
 
-
-
 	function getFavoriteDisplayName(favorite: Partial<UserFavoriteFolder> & { name?: string }) {
 		return favorite.title || favorite.name || '未命名收藏夹';
 	}
-
 
 	// 悬停详情相关
 
@@ -279,26 +263,14 @@
 			label: '课程',
 			description:
 				'B站课程（含付费课）。season_id 在课程链接 cheese/play/ss 后面，可直接粘贴整条链接'
-		},
+		}
 	];
-	const sourceTypeLabelMap: Record<string, string> = {
-		collection: '合集',
-		favorite: '收藏夹',
-		submission: 'UP主投稿',
-		watch_later: '稍后观看',
-		bangumi: '番剧',
-		pugv: '课程'
-	};
 
 	// 合集类型选项
 	const collectionTypeOptions = [
 		{ value: 'season', label: '合集', description: 'B站标准合集' },
 		{ value: 'series', label: '系列', description: '视频系列' }
 	];
-
-	function getSourceTypeLabel(type: string): string {
-		return sourceTypeLabelMap[type] ?? type;
-	}
 
 	// 课程：允许直接粘贴整条链接，自动抽出 season_id
 	function normalizePugvSeasonId(raw: string): string {
@@ -308,7 +280,6 @@
 			text.match(/cheese\/play\/ss(\d+)/i) ?? text.match(/\bss(\d+)\b/i) ?? text.match(/^(\d+)$/);
 		return matched ? matched[1] : text;
 	}
-
 
 	$: currentQuickSubscriptionType = sourceType;
 	$: currentQuickSubscriptionTemplate =
@@ -323,8 +294,6 @@
 						: currentQuickSubscriptionType === 'pugv'
 							? quick.pugv.trim()
 							: '';
-
-
 
 	function buildDownloadFilePathPreview(): string {
 		const root = path.trim().replace(/[\\/]+$/, '');
@@ -433,9 +402,11 @@
 	let subscribedCollections: UserCollectionInfo[] = [];
 	let loadingSubscribedCollections = false;
 
-
 	onMount(async () => {
-		setBreadcrumb([{ label: '主页', href: '/' }, { label: '添加视频源', isActive: true }]);
+		setBreadcrumb([
+			{ label: '主页', href: '/' },
+			{ label: '添加视频源', isActive: true }
+		]);
 		await Promise.all([loadExistingVideoSources(), loadQuickSubscriptionTemplates()]);
 	});
 
@@ -448,10 +419,11 @@
 		if (favoriteValidationTimeout) clearTimeout(favoriteValidationTimeout);
 	});
 
-
 	$: {
 		if (bangumi.isMerging) {
-			const targetSource = bangumi.existingSources.find((source) => source.id === bangumi.mergeToSourceId);
+			const targetSource = bangumi.existingSources.find(
+				(source) => source.id === bangumi.mergeToSourceId
+			);
 			if (targetSource) {
 				if (!isUsingMergedSourceMeta) {
 					cachedNameBeforeMerge = name;
@@ -476,7 +448,6 @@
 	// 选择搜索结果
 	function selectSearchResult(result: SearchResultItem) {
 		clearFollowingsPanel();
-
 
 		switch (sourceType) {
 			case 'collection':
@@ -549,17 +520,6 @@
 		return div.textContent || div.innerText || title;
 	}
 
-
-
-
-
-
-
-
-
-
-
-
 	async function handleSubmit() {
 		filter.advancedError = '';
 
@@ -583,12 +543,15 @@
 			return;
 		}
 
-		if (filter.publishedAfter && filter.publishedBefore && filter.publishedAfter > filter.publishedBefore) {
+		if (
+			filter.publishedAfter &&
+			filter.publishedBefore &&
+			filter.publishedAfter > filter.publishedBefore
+		) {
 			filter.advancedError = '投稿起始日期不能晚于投稿截止日期';
 			toast.error('过滤条件无效', { description: filter.advancedError });
 			return;
 		}
-
 
 		// 验证表单
 		const isPugvUpFlow = sourceType === 'pugv' && !!(pugv.upMid && pugv.courses.length > 0);
@@ -853,7 +816,6 @@
 			options.audioOnly = false;
 			options.audioOnlyM4aOnly = false;
 			options.flatFolder = false;
-			generateImagePostVideo = true;
 			options.splitChaptersAfterDownload = false;
 			options.downloadChargeVideos = true;
 			options.downloadDanmaku = true;
@@ -879,7 +841,8 @@
 	}
 
 	// 根据类型显示不同的描述
-	$: currentTypeDescription = sourceTypeOptions.find((opt) => opt.value === sourceType)?.description || '';
+	$: currentTypeDescription =
+		sourceTypeOptions.find((opt) => opt.value === sourceType)?.description || '';
 
 	// 获取收藏夹列表
 	async function fetchUserFavorites() {
@@ -1161,12 +1124,6 @@
 		bangumi.handleSeasonIdChange();
 	}
 
-
-
-
-
-
-
 	// 加载已有视频源（用于过滤）
 	async function loadExistingVideoSources() {
 		const result = await runRequest(() => api.getVideoSources(), {
@@ -1230,7 +1187,7 @@
 		});
 
 		// 处理课程（每门课程一个源，按 season_id 去重）
-		pugv.existingSeasonIds = new Set(
+		pugv.existingSeasonIds = new SvelteSet(
 			(result.data.pugv ?? [])
 				.map((p) => (p.season_id ? p.season_id.toString() : ''))
 				.filter((seasonId) => seasonId.length > 0)
@@ -1271,7 +1228,6 @@
 	function isBangumiSeasonExists(seasonId: string): boolean {
 		return existingBangumiSeasonIds.has(seasonId.toString());
 	}
-
 
 	// 过滤后的收藏夹列表（不完全过滤，而是标记已存在状态）
 	$: filteredUserFavorites = userFavorites;
@@ -1354,8 +1310,6 @@
 	}
 
 	// 统一的悬浮处理函数
-
-
 
 	// 获取关注的UP主列表
 	async function fetchUserFollowings() {
@@ -1487,33 +1441,6 @@
 		// 保留已有的选择，不做清空
 	}
 
-	// 投稿选择相关函数
-
-
-
-	const isDouyin = false;
-	const isTiktok = false;
-
-	// 搜索过滤投稿 - 使用后端API搜索
-
-
-	// 执行搜索
-
-
-
-
-
-
-
-
-
-
-
-	// 当显示投稿选择且有sourceId时加载数据
-
-
-
-
 	function startBatchAdd() {
 		if (!options.filterOptionInheritGlobal && options.filterOptionDraft.codecs.length === 0) {
 			toast.error('码率设置无效', { description: '至少保留一个编解码器' });
@@ -1531,9 +1458,6 @@
 		if (selectedSourceType === 'pugv') return quick.pugv.trim();
 		return '';
 	})();
-
-
-
 
 	function selectAllVisible(itemType: string) {
 		switch (itemType) {
@@ -1609,11 +1533,6 @@
 				break;
 		}
 	}
-
-
-
-
-
 </script>
 
 <svelte:head>
@@ -1673,8 +1592,6 @@
 							<p class="text-muted-foreground text-sm">{currentTypeDescription}</p>
 						</div>
 
-
-
 						{#if sourcePlatform === 'bilibili'}
 							<!-- 搜索功能 -->
 							{#if sourceType !== 'favorite' && sourceType !== 'watch_later'}
@@ -1706,7 +1623,7 @@
 															? '搜索番剧...'
 															: sourceType === 'pugv'
 																? '搜索UP主（讲师）...'
-																	: '搜索视频...'}
+																: '搜索视频...'}
 													onkeydown={(e) => {
 														if (e.key === 'Enter') {
 															// 阻止表单隐式提交
@@ -2029,7 +1946,8 @@
 															label: `合并到：${source.name}${source.season_id ? ` (Season ID: ${source.season_id})` : ''}${source.media_id ? ` (Media ID: ${source.media_id})` : ''}`
 														}))
 													]}
-													onChange={(nextValue) => (bangumi.mergeToSourceId = nextValue as number | null)}
+													onChange={(nextValue) =>
+														(bangumi.mergeToSourceId = nextValue as number | null)}
 													class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
 												/>
 												{#if bangumi.mergeToSourceId}
@@ -2243,14 +2161,17 @@
 											</div>
 										</div>
 										<label class="relative inline-flex cursor-pointer items-center">
-											<input type="checkbox" bind:checked={options.audioOnlyM4aOnly} class="peer sr-only" />
+											<input
+												type="checkbox"
+												bind:checked={options.audioOnlyM4aOnly}
+												class="peer sr-only"
+											/>
 											<div
 												class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-amber-600 peer-focus:ring-2 peer-focus:ring-amber-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-amber-500"
 											></div>
 										</label>
 									</div>
 								{/if}
-
 
 								<!-- 平铺目录模式 -->
 								<div
@@ -2396,7 +2317,11 @@
 												</div>
 											</div>
 											<label class="relative inline-flex cursor-pointer items-center">
-												<input type="checkbox" bind:checked={options.useDynamicApi} class="peer sr-only" />
+												<input
+													type="checkbox"
+													bind:checked={options.useDynamicApi}
+													class="peer sr-only"
+												/>
 												<div
 													class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 												></div>
@@ -2433,7 +2358,11 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={options.downloadDanmaku} class="peer sr-only" />
+										<input
+											type="checkbox"
+											bind:checked={options.downloadDanmaku}
+											class="peer sr-only"
+										/>
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 										></div>
@@ -2468,7 +2397,11 @@
 										</div>
 									</div>
 									<label class="relative inline-flex cursor-pointer items-center">
-										<input type="checkbox" bind:checked={options.downloadSubtitle} class="peer sr-only" />
+										<input
+											type="checkbox"
+											bind:checked={options.downloadSubtitle}
+											class="peer sr-only"
+										/>
 										<div
 											class="peer h-5 w-9 rounded-full bg-gray-300 peer-checked:bg-blue-600 peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-gray-600 dark:peer-checked:bg-blue-500"
 										></div>
@@ -2616,7 +2549,8 @@
 										>
 											<button
 												type="button"
-												onclick={() => (options.showAiRenameAdvanced = !options.showAiRenameAdvanced)}
+												onclick={() =>
+													(options.showAiRenameAdvanced = !options.showAiRenameAdvanced)}
 												class="flex w-full items-center justify-between text-left"
 											>
 												<span class="text-[10px] font-medium text-gray-700 dark:text-gray-300"
@@ -3136,10 +3070,7 @@
 							<Button
 								type="button"
 								variant="outline"
-								onclick={() =>
-									goto(
-										resolve('/video-sources')
-									)}
+								onclick={() => goto(resolve('/video-sources'))}
 								class={isMobile ? 'w-full' : ''}
 							>
 								取消
@@ -3160,8 +3091,8 @@
 						{filteredSearchResults}
 						batchCheckboxStates={batch.checkboxStates}
 						{enableSearchAnimations}
-						isBangumiSeasonExists={isBangumiSeasonExists}
-						isSubmissionExists={isSubmissionExists}
+						{isBangumiSeasonExists}
+						{isSubmissionExists}
 						isBatchSelected={(key) => batch.isSelected(key)}
 						onClose={() => {
 							search.open = false;
@@ -3176,9 +3107,6 @@
 						onMouseMove={(e) => hover.move(e)}
 					/>
 				{/if}
-
-
-
 
 				<!-- 关注UP主列表（移动到右侧） -->
 				{#if (sourceType === 'collection' || sourceType === 'submission') && userFollowings.length > 0}
@@ -3233,7 +3161,7 @@
 											<BiliImage
 												src={following.face}
 												alt={following.name}
-												class="h-10 w-10 flex-shrink-0 rounded-full object-form.cover"
+												class="object-form.cover h-10 w-10 flex-shrink-0 rounded-full"
 												placeholder="头像"
 											/>
 											<div class="min-w-0 flex-1">
@@ -3330,7 +3258,7 @@
 											<BiliImage
 												src={collection.cover}
 												alt={collection.name}
-												class="h-16 w-24 flex-shrink-0 rounded object-form.cover"
+												class="object-form.cover h-16 w-24 flex-shrink-0 rounded"
 												placeholder="无封面"
 											/>
 											<div class="min-w-0 flex-1">
@@ -3426,7 +3354,7 @@
 											<BiliImage
 												src={favorite.cover}
 												alt={getFavoriteDisplayName(favorite)}
-												class="h-16 w-24 flex-shrink-0 rounded object-form.cover"
+												class="object-form.cover h-16 w-24 flex-shrink-0 rounded"
 												placeholder="无封面"
 											/>
 											<div class="min-w-0 flex-1">
@@ -3629,12 +3557,10 @@
 													: 'transform cursor-pointer hover:scale-102 hover:bg-purple-50 hover:shadow-md dark:hover:bg-purple-900'} {isMobile
 													? 'h-auto'
 													: 'h-[120px]'}"
-												onmouseenter={(e) =>
-													!season.isExisting && hover.show('season', season, e)}
+												onmouseenter={(e) => !season.isExisting && hover.show('season', season, e)}
 												onmouseleave={!season.isExisting ? () => hover.hide() : undefined}
 												onmousemove={!season.isExisting ? (e) => hover.move(e) : undefined}
-												onclick={() =>
-													!season.isExisting && bangumi.toggleSeason(season.season_id)}
+												onclick={() => !season.isExisting && bangumi.toggleSeason(season.season_id)}
 												onkeydown={(e) =>
 													!season.isExisting &&
 													(e.key === 'Enter' || e.key === ' ') &&
@@ -3650,7 +3576,7 @@
 													<BiliImage
 														src={season.cover}
 														alt={season.season_title}
-														class="h-20 w-14 flex-shrink-0 rounded object-form.cover"
+														class="object-form.cover h-20 w-14 flex-shrink-0 rounded"
 														placeholder="无封面"
 													/>
 													<div class="min-w-0 flex-1">
@@ -3719,7 +3645,12 @@
 									class="m-2"
 								>
 									{#snippet actions()}
-										<Button type="button" size="sm" variant="outline" onclick={bangumi.fetchSeasons}>
+										<Button
+											type="button"
+											size="sm"
+											variant="outline"
+											onclick={bangumi.fetchSeasons}
+										>
 											重新获取
 										</Button>
 									{/snippet}
@@ -3805,7 +3736,7 @@
 												<BiliImage
 													src={course.cover || undefined}
 													alt={course.title}
-													class="h-20 w-14 flex-shrink-0 rounded object-form.cover"
+													class="object-form.cover h-20 w-14 flex-shrink-0 rounded"
 													placeholder="无封面"
 												/>
 												<div class="min-w-0 flex-1">
@@ -3939,7 +3870,7 @@
 											<BiliImage
 												src={collection.cover}
 												alt={collection.name}
-												class="h-16 w-24 flex-shrink-0 rounded object-form.cover"
+												class="object-form.cover h-16 w-24 flex-shrink-0 rounded"
 												placeholder={collection.collection_type === 'favorite'
 													? '收藏夹'
 													: '无封面'}
@@ -4007,7 +3938,7 @@
 <HoverDetailCard
 	hoveredItem={hover.item}
 	mousePosition={hover.position}
-	sourceType={sourceType}
+	{sourceType}
 	sourceId={form.sourceId}
 	selectedSeasons={bangumi.selected}
 />
@@ -4036,22 +3967,6 @@
 		display: -webkit-box;
 		line-clamp: 2;
 		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.line-clamp-3 {
-		display: -webkit-box;
-		line-clamp: 3;
-		-webkit-line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.line-clamp-4 {
-		display: -webkit-box;
-		line-clamp: 4;
-		-webkit-line-clamp: 4;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}

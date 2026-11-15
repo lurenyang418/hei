@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { Download, X } from 'lucide-svelte';
+	import { Download, X } from '@lucide/svelte';
 	import { SvelteDate } from 'svelte/reactivity';
 
 	interface BeforeInstallPromptEvent extends Event {
@@ -12,6 +12,14 @@
 	let deferredPrompt = $state<BeforeInstallPromptEvent | null>(null);
 	let showBanner = $state(false);
 	let isInstalled = $state(false);
+
+	function isDismissed() {
+		const expiry = localStorage.getItem('pwa-install-dismissed-expiry');
+		if (expiry && Date.parse(expiry) > Date.now()) return true;
+		localStorage.removeItem('pwa-install-dismissed');
+		localStorage.removeItem('pwa-install-dismissed-expiry');
+		return false;
+	}
 
 	// 检查是否已经安装
 	function checkIfInstalled() {
@@ -26,12 +34,6 @@
 			isInstalled = true;
 			return;
 		}
-
-		// 检查localStorage中的安装状态
-		const dismissed = localStorage.getItem('pwa-install-dismissed');
-		if (dismissed === 'true') {
-			showBanner = false;
-		}
 	}
 
 	onMount(() => {
@@ -43,8 +45,7 @@
 			deferredPrompt = e as BeforeInstallPromptEvent;
 
 			// 如果用户之前没有拒绝，则显示安装横幅
-			const dismissed = localStorage.getItem('pwa-install-dismissed');
-			if (dismissed !== 'true' && !isInstalled) {
+			if (!isDismissed() && !isInstalled) {
 				showBanner = true;
 			}
 		};
@@ -53,8 +54,10 @@
 		const handleAppInstalled = () => {
 			showBanner = false;
 			isInstalled = true;
+			deferredPrompt = null;
 			toast.success('应用已成功安装到桌面！');
 			localStorage.removeItem('pwa-install-dismissed');
+			localStorage.removeItem('pwa-install-dismissed-expiry');
 		};
 
 		window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -72,21 +75,16 @@
 			return;
 		}
 
-		// 显示安装提示
-		deferredPrompt.prompt();
-
-		// 等待用户响应
-		const { outcome } = await deferredPrompt.userChoice;
-
-		if (outcome === 'accepted') {
-			console.log('用户接受安装');
-		} else {
-			console.log('用户拒绝安装');
-			// 用户拒绝后，暂时隐藏横幅
-			showBanner = false;
-		}
-
+		const prompt = deferredPrompt;
 		deferredPrompt = null;
+		showBanner = false;
+		try {
+			await prompt.prompt();
+			const { outcome } = await prompt.userChoice;
+			if (outcome === 'dismissed') dismissBanner();
+		} catch {
+			toast.error('安装失败，请通过浏览器菜单添加到主屏幕');
+		}
 	}
 
 	function dismissBanner() {
@@ -94,7 +92,6 @@
 		// 记住用户已经关闭过横幅，7天内不再显示
 		const expiryDate = new SvelteDate();
 		expiryDate.setDate(expiryDate.getDate() + 7);
-		localStorage.setItem('pwa-install-dismissed', 'true');
 		localStorage.setItem('pwa-install-dismissed-expiry', expiryDate.toISOString());
 	}
 </script>
@@ -134,6 +131,7 @@
 
 			<button
 				onclick={dismissBanner}
+				aria-label="关闭安装提示"
 				class="flex-shrink-0 text-zinc-400 transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
 			>
 				<X class="h-4 w-4" />

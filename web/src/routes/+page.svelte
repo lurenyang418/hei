@@ -6,7 +6,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import MyChartTooltip from '$lib/components/custom/my-chart-tooltip.svelte';
 	import { curveMonotoneX } from 'd3-shape';
 	import { BarChart, AreaChart } from 'layerchart';
@@ -50,9 +49,6 @@
 	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import XCircleIcon from '@lucide/svelte/icons/x-circle';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
-	import BellIcon from '@lucide/svelte/icons/bell';
-	import ListVideoIcon from '@lucide/svelte/icons/list-video';
-	import LayersIcon from '@lucide/svelte/icons/layers';
 	import MoreHorizontalIcon from '@lucide/svelte/icons/more-horizontal';
 
 	// 认证状态
@@ -221,7 +217,7 @@
 
 	const INGEST_PLATFORM_LABEL: Record<IngestPlatform, string> = {
 		all: '全部',
-		bilibili: 'B站',
+		bilibili: 'B站'
 	};
 
 	const INGEST_PLATFORM_TABS: Array<{ value: IngestPlatform; label: string }> = [
@@ -568,66 +564,66 @@
 									</div>
 								</div>
 
-									{#if monitoringPlatform === 'bilibili'}
-										<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<HeartIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">收藏夹</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_favorites} / {dashboardData.total_favorites}</Badge
-												>
+								{#if monitoringPlatform === 'bilibili'}
+									<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<HeartIcon class="text-muted-foreground h-4 w-4" />
+												<span class="text-sm">收藏夹</span>
 											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<FolderIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">合集 / 列表</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_collections} / {dashboardData.total_collections}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<UserIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">投稿</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_submissions} / {dashboardData.total_submissions}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<ClockIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">稍后再看</span>
-												</div>
-												<Badge variant="outline">
-													{dashboardData.enable_watch_later
-														? `启用 (${dashboardData.total_watch_later})`
-														: `禁用 (${dashboardData.total_watch_later})`}
-												</Badge>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<TvIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">番剧</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_bangumi} / {dashboardData.total_bangumi}</Badge
-												>
-											</div>
-											<div class="flex items-center justify-between">
-												<div class="flex items-center gap-2">
-													<GraduationCapIcon class="text-muted-foreground h-4 w-4" />
-													<span class="text-sm">课程</span>
-												</div>
-												<Badge variant="outline"
-													>{dashboardData.enabled_pugv} / {dashboardData.total_pugv}</Badge
-												>
-											</div>
+											<Badge variant="outline"
+												>{dashboardData.enabled_favorites} / {dashboardData.total_favorites}</Badge
+											>
 										</div>
-									{/if}
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<FolderIcon class="text-muted-foreground h-4 w-4" />
+												<span class="text-sm">合集 / 列表</span>
+											</div>
+											<Badge variant="outline"
+												>{dashboardData.enabled_collections} / {dashboardData.total_collections}</Badge
+											>
+										</div>
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<UserIcon class="text-muted-foreground h-4 w-4" />
+												<span class="text-sm">投稿</span>
+											</div>
+											<Badge variant="outline"
+												>{dashboardData.enabled_submissions} / {dashboardData.total_submissions}</Badge
+											>
+										</div>
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<ClockIcon class="text-muted-foreground h-4 w-4" />
+												<span class="text-sm">稍后再看</span>
+											</div>
+											<Badge variant="outline">
+												{dashboardData.enable_watch_later
+													? `启用 (${dashboardData.total_watch_later})`
+													: `禁用 (${dashboardData.total_watch_later})`}
+											</Badge>
+										</div>
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<TvIcon class="text-muted-foreground h-4 w-4" />
+												<span class="text-sm">番剧</span>
+											</div>
+											<Badge variant="outline"
+												>{dashboardData.enabled_bangumi} / {dashboardData.total_bangumi}</Badge
+											>
+										</div>
+										<div class="flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<GraduationCapIcon class="text-muted-foreground h-4 w-4" />
+												<span class="text-sm">课程</span>
+											</div>
+											<Badge variant="outline"
+												>{dashboardData.enabled_pugv} / {dashboardData.total_pugv}</Badge
+											>
+										</div>
+									</div>
+								{/if}
 							</div>
 						{:else}
 							<Loading size="sm" align="start" textClass="text-sm" />
@@ -651,10 +647,7 @@
 								<div class="flex items-center justify-between text-sm">
 									<span>近七日新增视频</span>
 									<span class="font-medium">
-										{dayMultiCounts.reduce(
-											(sum, v) => sum + v.bilibili,
-											0
-										)}&nbsp; 个
+										{dayMultiCounts.reduce((sum, v) => sum + v.bilibili, 0)}&nbsp; 个
 									</span>
 								</div>
 								<div class="flex flex-wrap gap-3 text-xs">
@@ -682,8 +675,7 @@
 											key: 'bilibili',
 											label: 'B站',
 											color: videoChartConfig.bilibili.color
-										},
-
+										}
 									]}
 									props={{
 										bars: {

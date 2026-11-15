@@ -115,7 +115,7 @@ export class VideoSourceBulkStore {
 		}
 
 		if (successCount > 0) {
-			const failedIds = new Set(failed.map((item) => item.id));
+			const failedIds = new SvelteSet(failed.map((item) => item.id));
 			this.#ctx.updateSources(sourceType, ids, (source) =>
 				failedIds.has(source.id) ? source : { ...source, enabled }
 			);

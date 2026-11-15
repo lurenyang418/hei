@@ -140,8 +140,8 @@
 					class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-200"
 				>
 					<p class="font-medium">
-						预估最大连接数：{store.estimatedMaxConnections}（单文件最多 {store.effectiveMaxFileConnections} 条 ×
-						同时处理视频数 {store.effectiveConcurrentVideo} × 每视频并发分页数 {store.effectiveConcurrentPage}）
+						预估最大连接数：{store.estimatedMaxConnections}（单文件最多 {store.effectiveMaxFileConnections}
+						条 × 同时处理视频数 {store.effectiveConcurrentVideo} × 每视频并发分页数 {store.effectiveConcurrentPage}）
 					</p>
 					<p class="mt-1 opacity-80">
 						这是理论峰值，实际连接数受网络带宽和源站限制，通常达不到这个数字。

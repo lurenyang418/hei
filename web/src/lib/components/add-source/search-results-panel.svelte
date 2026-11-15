@@ -33,7 +33,10 @@
 </script>
 
 <!-- 右侧：搜索结果区域 -->
-<div class={isCompactLayout ? 'w-full' : 'min-w-[550px] flex-1'} transition:fly={{ x: 300, duration: 300 }}>
+<div
+	class={isCompactLayout ? 'w-full' : 'min-w-[550px] flex-1'}
+	transition:fly={{ x: 300, duration: 300 }}
+>
 	<SidePanel
 		isMobile={isCompactLayout}
 		title="搜索结果"

@@ -17272,21 +17272,19 @@ pub async fn get_recent_ingests(
     }
 
     // 2) 内存不足时用 DB 补齐
-    if items.len() < limit {
-        if platform == "all" || platform == "bilibili" {
-            let need = limit - items.len();
-            let fallback = video::Entity::find()
-                .filter(video::Column::DownloadStatus.gte(crate::utils::status::STATUS_COMPLETED))
-                .order_by_desc(video::Column::CreatedAt)
-                .limit(need as u64)
-                .all(db.as_ref())
-                .await
-                .map_err(|e| ApiError::from(InnerApiError::from(e)))?;
-            for v in fallback {
-                if seen.insert(("bilibili".to_string(), v.id)) {
-                    let created_at = v.created_at.clone();
-                    items.push(video_to_ingest_item(v, created_at, None));
-                }
+    if items.len() < limit && (platform == "all" || platform == "bilibili") {
+        let need = limit - items.len();
+        let fallback = video::Entity::find()
+            .filter(video::Column::DownloadStatus.gte(crate::utils::status::STATUS_COMPLETED))
+            .order_by_desc(video::Column::CreatedAt)
+            .limit(need as u64)
+            .all(db.as_ref())
+            .await
+            .map_err(|e| ApiError::from(InnerApiError::from(e)))?;
+        for v in fallback {
+            if seen.insert(("bilibili".to_string(), v.id)) {
+                let created_at = v.created_at.clone();
+                items.push(video_to_ingest_item(v, created_at, None));
             }
         }
     }

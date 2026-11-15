@@ -130,51 +130,67 @@
 		showVersionTooltip = false;
 	}
 
-	// Service Worker 更新提示
-	function registerSWUpdateHandler() {
-		if ('serviceWorker' in navigator) {
-			navigator.serviceWorker.ready.then((registration) => {
-				// 监听新的Service Worker进入waiting状态
-				registration.addEventListener('updatefound', () => {
-					const newWorker = registration.installing;
-					if (newWorker) {
-						newWorker.addEventListener('statechange', () => {
-							if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-								// 新版本已准备好
-								toast.info('发现新版本', {
-									description: '点击更新以获取最新功能',
-									duration: 10000,
-									action: {
-										label: '更新',
-										onClick: () => {
-											// 通知Service Worker跳过等待并激活
-											newWorker.postMessage({ type: 'SKIP_WAITING' });
-											// 刷新页面
-											window.location.reload();
-										}
-									}
-								});
-							}
-						});
+	// 自动更新模式下，新 Service Worker 接管后刷新一次。
+	onMount(() => {
+		if (!('serviceWorker' in navigator)) return;
+
+		if (import.meta.env.DEV) {
+			const isDevWorker = (worker: ServiceWorker | null) => {
+				if (!worker) return false;
+				const url = new URL(worker.scriptURL);
+				return url.origin === window.location.origin && url.pathname === '/dev-sw.js';
+			};
+			void navigator.serviceWorker
+				.getRegistrations()
+				.then(async (registrations) => {
+					const devRegistrations = registrations.filter((registration) =>
+						[registration.active, registration.waiting, registration.installing].some(isDevWorker)
+					);
+					if (devRegistrations.length === 0) return;
+
+					const wasControlled = isDevWorker(navigator.serviceWorker.controller);
+					const removed = await Promise.all(
+						devRegistrations.map((registration) => registration.unregister())
+					);
+					if ('caches' in window) {
+						await Promise.all(['api-cache', 'images-cache'].map((name) => caches.delete(name)));
 					}
+					// 注销不会解除当前页面的控制；刷新后才会绕过旧 Worker。
+					if (wasControlled && removed.some(Boolean)) window.location.reload();
+				})
+				.catch(() => {
+					// 浏览器禁止访问 Service Worker 或缓存时继续加载页面。
 				});
-
-				// 检查是否有更新
-				registration.update().catch(() => {
-					// 静默失败，不影响用户体验
-				});
-			});
-
-			// 监听Service Worker控制器变化（新版本已激活）
-			let refreshing = false;
-			navigator.serviceWorker.addEventListener('controllerchange', () => {
-				if (!refreshing) {
-					refreshing = true;
-					window.location.reload();
-				}
-			});
+			return;
 		}
-	}
+
+		let hadController = Boolean(navigator.serviceWorker.controller);
+		let refreshing = false;
+		const handleControllerChange = () => {
+			if (!navigator.serviceWorker.controller) return;
+			if (hadController && !refreshing) {
+				refreshing = true;
+				window.location.reload();
+			}
+			hadController = true;
+		};
+		navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+		void navigator.serviceWorker.ready
+			.then(async (registration) => {
+				// 删除旧版本留下的运行时缓存，不清除前端资源预缓存。
+				if ('caches' in window) {
+					await Promise.all(['api-cache', 'images-cache'].map((name) => caches.delete(name)));
+				}
+				await registration.update();
+			})
+			.catch(() => {
+				// 离线或更新检查失败时继续使用当前版本。
+			});
+
+		return () => {
+			navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+		};
+	});
 
 	// 初始化共用数据
 	onMount(async () => {
@@ -186,8 +202,6 @@
 			sidebarWidth = savedSidebarWidth;
 		}
 		cleanupGlossaryTooltips = installGlossaryTooltips(document);
-		// 注册Service Worker更新处理
-		registerSWUpdateHandler();
 		await checkAuthStatus();
 		// 监听登录成功事件
 		window.addEventListener('login-success', () => {

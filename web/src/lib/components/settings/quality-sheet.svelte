@@ -14,7 +14,6 @@
 	export let onOpenChange: (open: boolean) => void = () => {};
 	export let isMobile = false;
 
-
 	const videoQualityOptions: Option[] = [
 		{ value: 'Quality8k', label: '8K超高清' },
 		{ value: 'QualityDolby', label: '杜比视界' },

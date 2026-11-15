@@ -19,11 +19,11 @@
 		class?: string;
 	} = $props();
 
-	const wrapperClasses = {
+	let wrapperClasses = $derived({
 		sm: inline ? 'text-sm' : 'py-8 text-sm',
 		default: inline ? 'text-base' : 'py-12 text-base',
 		lg: inline ? 'text-base' : 'py-16 text-base'
-	} as const;
+	} as const);
 
 	const spinnerSizeClasses = {
 		sm: 'h-4 w-4',
@@ -31,7 +31,7 @@
 		lg: 'h-8 w-8'
 	} as const;
 
-	const alignClass = align === 'start' ? 'justify-start' : 'justify-center';
+	let alignClass = $derived(align === 'start' ? 'justify-start' : 'justify-center');
 </script>
 
 <div class={`flex items-center ${alignClass} ${wrapperClasses[size]} ${className}`}>

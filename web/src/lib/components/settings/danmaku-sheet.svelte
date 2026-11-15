@@ -22,7 +22,6 @@
 		coldDays: '超过成熟期、但还没达到这个天数的分页会进入老化期；再往后会停止后台轮询。',
 		coldIntervalDays: '老化期内后台检查弹幕更新的间隔，单位是天。'
 	};
-
 </script>
 
 <!-- 弹幕设置抽屉 -->
@@ -204,10 +203,8 @@
 
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
 					<div class="space-y-2">
-						<Label
-							for="danmaku-update-fresh-days"
-							class="cursor-help"
-							title={updateHelp.freshDays}>新鲜期天数</Label
+						<Label for="danmaku-update-fresh-days" class="cursor-help" title={updateHelp.freshDays}
+							>新鲜期天数</Label
 						>
 						<Input
 							id="danmaku-update-fresh-days"
@@ -274,10 +271,8 @@
 					</div>
 
 					<div class="space-y-2">
-						<Label
-							for="danmaku-update-cold-days"
-							class="cursor-help"
-							title={updateHelp.coldDays}>老化期截至天数</Label
+						<Label for="danmaku-update-cold-days" class="cursor-help" title={updateHelp.coldDays}
+							>老化期截至天数</Label
 						>
 						<Input
 							id="danmaku-update-cold-days"

@@ -112,9 +112,7 @@
 							id="telegram-bot-token"
 							type="password"
 							bind:value={store.telegramBotToken}
-							placeholder={store.status?.configured
-								? '已配置（留空保持不变）'
-								: '请输入 Bot Token'}
+							placeholder={store.status?.configured ? '已配置（留空保持不变）' : '请输入 Bot Token'}
 						/>
 						<p class="text-muted-foreground text-sm">
 							通过 <a
@@ -172,7 +170,8 @@
 								{ value: 'custom', label: '自定义请求' },
 								{ value: 'synology_chat', label: 'Synology Chat（群晖）' }
 							]}
-							onChange={(nextValue) => (store.webhookFormat = String(nextValue ?? 'auto') as WebhookFormat)}
+							onChange={(nextValue) =>
+								(store.webhookFormat = String(nextValue ?? 'auto') as WebhookFormat)}
 							class="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 						/>
 						<p class="text-muted-foreground text-sm">
@@ -252,7 +251,8 @@
 										size="sm"
 										onclick={() => {
 											store.webhookCustomBody = store.defaultWebhookFormBody;
-											store.webhookCustomHeaders = '{"Content-Type":"application/x-www-form-urlencoded"}';
+											store.webhookCustomHeaders =
+												'{"Content-Type":"application/x-www-form-urlencoded"}';
 										}}
 									>
 										表单模板

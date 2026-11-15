@@ -46,7 +46,10 @@ export type FilterOptionContext = {
 export class VideoSourceFilterOptionStore {
 	dialogOpen = $state(false);
 	info = $state<{ type: string; id: number; name: string }>({ type: '', id: 0, name: '' });
-	draft = $state<FilterOption>({ ...DEFAULT_FILTER_OPTION, codecs: [...DEFAULT_FILTER_OPTION.codecs] });
+	draft = $state<FilterOption>({
+		...DEFAULT_FILTER_OPTION,
+		codecs: [...DEFAULT_FILTER_OPTION.codecs]
+	});
 	inheritGlobal = $state(true);
 	saving = $state(false);
 

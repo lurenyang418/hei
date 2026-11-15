@@ -8,7 +8,6 @@
 	import Loading from '$lib/components/ui/Loading.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { formatSubmissionDateLabel, formatSubmissionMetricLabel } from '$lib/utils/submission';
-	import type { SubmissionVideoInfo } from '$lib/types';
 
 	import type { SubmissionSelectionStore } from '$lib/stores/add-source/submission.svelte';
 
@@ -26,7 +25,7 @@
 
 		// 当滚动接近底部时显示加载更多按钮
 		if (scrollHeight - scrollTop - clientHeight < threshold) {
-			(store.showLoadMore = true);
+			store.showLoadMore = true;
 		}
 	}
 </script>
@@ -41,8 +40,7 @@
 		{#snippet header()}
 			<div>
 				<div class="flex items-center gap-2">
-					<span class="text-base font-medium text-blue-800 dark:text-blue-200"
-						>📹 选择历史投稿</span
+					<span class="text-base font-medium text-blue-800 dark:text-blue-200">📹 选择历史投稿</span
 					>
 					<span class="text-xs text-blue-600 dark:text-blue-400"
 						>选择您希望下载的历史投稿。未选择的视频不会下载和显示。新发布的视频会自动下载。</span
@@ -145,9 +143,7 @@
 				{:else}
 					<div
 						class="grid gap-4 {isMobile ? 'grid-cols-1' : ''}"
-						style={isMobile
-							? ''
-							: 'grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));'}
+						style={isMobile ? '' : 'grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));'}
 					>
 						{#each store.filtered as video (video.bvid)}
 							<div
@@ -157,9 +153,7 @@
 									video.bvid
 								)
 									? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-950'
-									: 'border-gray-200 dark:border-gray-700'} {isMobile
-									? 'h-auto'
-									: 'h-[100px]'}"
+									: 'border-gray-200 dark:border-gray-700'} {isMobile ? 'h-auto' : 'h-[100px]'}"
 								onclick={() => store.toggle(video.bvid)}
 								onkeydown={(event) => store.handleKeydown(event, video.bvid)}
 							>
@@ -180,7 +174,9 @@
 											onclick={(event) => event.stopPropagation()}
 											class="absolute top-1 right-1 z-10 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:text-blue-400"
 										/>
-										<h4 class="text-foreground mb-1 line-clamp-2 flex-shrink-0 pr-6 text-sm font-medium">
+										<h4
+											class="text-foreground mb-1 line-clamp-2 flex-shrink-0 pr-6 text-sm font-medium"
+										>
 											{video.title}
 										</h4>
 										<p class="text-muted-foreground mb-2 line-clamp-1 flex-shrink-0 text-xs">

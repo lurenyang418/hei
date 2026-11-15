@@ -26,8 +26,8 @@
 		VideoIcon,
 		BellIcon,
 		SparklesIcon,
-		DatabaseIcon,
-	} from 'lucide-svelte';
+		DatabaseIcon
+	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { runRequest } from '$lib/utils/request.js';
 	import { NotificationSettingsStore } from '$lib/stores/settings/notification.svelte';
@@ -111,9 +111,6 @@
 			icon: KeyIcon
 		},
 
-
-
-
 		{
 			id: 'risk',
 			title: '风控配置',
@@ -178,22 +175,9 @@
 		return settingTooltips[id as keyof typeof settingTooltips] ?? '';
 	}
 
-
-
-
-
 	// AI重命名配置
 
 	// 数据库管理
-
-
-	// 显示帮助信息的状态（在文件命名抽屉中使用）
-	let showHelp = false;
-
-
-	// 验证相关状态
-	let bindAddressError = '';
-	let bindAddressValid = true;
 
 	// 视频质量选项
 
@@ -239,51 +223,12 @@
 		aiRename.applyFromConfig(config);
 	}
 
-
-
-
 	// 命名模板变化时按需刷新预览（签名比较在 store 内完成）
 	$: naming.refreshOnChange(naming.signature, openSheet === 'naming');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 	$: if (openSheet === 'database') {
 		database.loadAll();
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 </script>
 
 <svelte:head>
@@ -309,7 +254,7 @@
 				>
 					{#each settingCategories as category (category.id)}
 						<Card
-							class="hover:border-primary/50 gap-0 py-4 cursor-pointer transition-all hover:shadow-md {isMobile
+							class="hover:border-primary/50 cursor-pointer gap-0 py-4 transition-all hover:shadow-md {isMobile
 								? 'min-h-[80px]'
 								: ''}"
 							onclick={() => (openSheet = category.id)}

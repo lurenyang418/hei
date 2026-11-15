@@ -286,11 +286,7 @@
 
 	function handleCoverImageError(event: Event) {
 		const target = event.currentTarget as HTMLImageElement;
-		if (
-			video.valid !== false &&
-			video.cover &&
-			target.dataset.coverFallback !== 'local'
-		) {
+		if (video.valid !== false && video.cover && target.dataset.coverFallback !== 'local') {
 			target.dataset.coverFallback = 'local';
 			target.src = getLocalCoverUrl(video.id);
 			return;

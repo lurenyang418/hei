@@ -13,7 +13,7 @@
 	import { VideoSourceFilterOptionStore } from '$lib/stores/video-sources/filter-option.svelte';
 	import { VideoSourceDialogsStore } from '$lib/stores/video-sources/dialogs.svelte';
 	import { VideoSourceListStore } from '$lib/stores/video-sources/list.svelte';
-	import { videoSourceStore, setVideoSources } from '$lib/stores/video-source';
+	import { videoSourceStore } from '$lib/stores/video-source';
 	import { runRequest } from '$lib/utils/request.js';
 	import { IsMobile } from '$lib/hooks/is-mobile.svelte.js';
 	import DeleteVideoSourceDialog from '$lib/components/delete-video-source-dialog.svelte';
@@ -34,8 +34,7 @@
 		FilterOption,
 		VideoCodec,
 		VideoQuality,
-		VideoSource,
-		VideoSourcesResponse
+		VideoSource
 	} from '$lib/types';
 
 	// 图标导入
@@ -51,9 +50,7 @@
 	import MusicIcon from '@lucide/svelte/icons/music';
 	import FileAudioIcon from '@lucide/svelte/icons/file-audio';
 	import FolderSyncIcon from '@lucide/svelte/icons/folder-sync';
-	import ImageIcon from '@lucide/svelte/icons/image';
 	import ListTreeIcon from '@lucide/svelte/icons/list-tree';
-	import LayersIcon from '@lucide/svelte/icons/layers';
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
 	import SubtitlesIcon from '@lucide/svelte/icons/subtitles';
 	import LanguagesIcon from '@lucide/svelte/icons/languages';
@@ -62,15 +59,10 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
-	import HeartIcon from '@lucide/svelte/icons/heart';
-	import UserIcon from '@lucide/svelte/icons/user';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { resolve } from '$app/paths';
 	import { formatCompactTimestampOrFallback } from '$lib/utils/timezone';
-	import { buildAuthenticatedStreamUrl } from '$lib/utils/live-stream';
-	import { createManagedEventSource } from '$lib/utils/live-event-source';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	const DEFAULT_AI_SUBTITLE_LANGUAGE = 'zh-CN';
 	const AI_SUBTITLE_LANGUAGE_OPTIONS = [
@@ -113,7 +105,6 @@
 		no_hires: false
 	};
 
-
 	const bulk = new VideoSourceBulkStore({
 		updateSources: updateSourcesInStore
 	});
@@ -133,8 +124,6 @@
 
 	const dialogs = new VideoSourceDialogsStore();
 	const list = new VideoSourceListStore();
-
-	let platformTab = 'bilibili';
 
 	// 响应式相关
 	const isMobileQuery = new IsMobile();
@@ -200,18 +189,7 @@
 		return 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-300';
 	}
 
-
-
-
-
-
-
-
-
 	// B站合集/收藏夹/投稿源扫描策略配置（分批/自适应）
-
-
-
 
 	type UpdateResult = { success: boolean; message: string };
 	type SuccessToast = {
@@ -236,13 +214,6 @@
 			AI_SUBTITLE_LANGUAGE_OPTIONS.find((option) => option.value === normalized)?.label ??
 			normalized
 		);
-	}
-
-	function cloneFilterOption(option: FilterOption): FilterOption {
-		return {
-			...option,
-			codecs: [...option.codecs]
-		};
 	}
 
 	function normalizeVideoQuality(value: string | undefined, fallback: VideoQuality): VideoQuality {
@@ -375,14 +346,6 @@
 		applyLocalUpdate?.(result.data);
 	}
 
-
-
-
-
-
-
-
-
 	// 切换视频源启用状态
 	async function handleToggleEnabled(
 		sourceType: string,
@@ -510,8 +473,6 @@
 		);
 	}
 
-
-
 	// 切换仅下载音频设置
 	async function handleToggleAudioOnly(
 		sourceType: string,
@@ -587,35 +548,6 @@
 					updateSourceInStore(sourceType, sourceId, (source) => ({
 						...source,
 						flat_folder: data.flat_folder
-					}));
-				}
-			}
-		);
-	}
-
-	// 切换图文作品是否额外合成幻灯片 MP4
-	async function handleToggleGenerateImagePostVideo(
-		sourceType: string,
-		sourceId: number,
-		currentGenerateImagePostVideo: boolean
-	) {
-		const nextGenerateImagePostVideo = !currentGenerateImagePostVideo;
-		await updateAndApply(
-			() =>
-				api.updateVideoSourceDownloadOptions(sourceType, sourceId, {
-					generate_image_post_video: nextGenerateImagePostVideo
-				}),
-			{
-				successToast: () => ({
-					title: '设置更新成功',
-					description: nextGenerateImagePostVideo
-						? '已启用图文作品合成视频'
-						: '已关闭图文作品合成视频，后续仅保存原图与配乐'
-				}),
-				applyLocalUpdate: (data) => {
-					updateSourceInStore(sourceType, sourceId, (source) => ({
-						...source,
-						generate_image_post_video: data.generate_image_post_video ?? nextGenerateImagePostVideo
 					}));
 				}
 			}
@@ -889,16 +821,20 @@
 	// AI批量重命名完成后的回调
 	function handleAiRenameHistoryComplete() {
 		// 刷新视频源列表以显示最新状态（AI重命名已开启）
-		updateSourceInStore(dialogs.aiRenameHistoryInfo.type, dialogs.aiRenameHistoryInfo.id, (source) => ({
-			...source,
-			ai_rename: true,
-			ai_rename_video_prompt: dialogs.aiRenameHistoryInfo.videoPrompt,
-			ai_rename_audio_prompt: dialogs.aiRenameHistoryInfo.audioPrompt,
-			ai_rename_enable_multi_page: dialogs.aiRenameHistoryInfo.enableMultiPage,
-			ai_rename_enable_collection: dialogs.aiRenameHistoryInfo.enableCollection,
-			ai_rename_enable_bangumi: dialogs.aiRenameHistoryInfo.enableBangumi,
-			ai_rename_rename_parent_dir: dialogs.aiRenameHistoryInfo.renameParentDir
-		}));
+		updateSourceInStore(
+			dialogs.aiRenameHistoryInfo.type,
+			dialogs.aiRenameHistoryInfo.id,
+			(source) => ({
+				...source,
+				ai_rename: true,
+				ai_rename_video_prompt: dialogs.aiRenameHistoryInfo.videoPrompt,
+				ai_rename_audio_prompt: dialogs.aiRenameHistoryInfo.audioPrompt,
+				ai_rename_enable_multi_page: dialogs.aiRenameHistoryInfo.enableMultiPage,
+				ai_rename_enable_collection: dialogs.aiRenameHistoryInfo.enableCollection,
+				ai_rename_enable_bangumi: dialogs.aiRenameHistoryInfo.enableBangumi,
+				ai_rename_rename_parent_dir: dialogs.aiRenameHistoryInfo.renameParentDir
+			})
+		);
 	}
 
 	// 确认删除
@@ -1127,7 +1063,6 @@
 		list.load();
 		list.startStream();
 		scanConfig.load();
-
 	});
 
 	onDestroy(() => {
@@ -1155,705 +1090,676 @@
 		</Button>
 	</div>
 
-
-		<div class="mt-6">
-			{#if list.loading}
-				<Loading />
-			{:else}
-					<Card class="mb-4 py-3">
-						<CardContent class="px-4">
-							<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-								<div class="space-y-1">
-									<div
-										class="text-sm font-semibold"
-										title="配置合集、收藏夹和UP主投稿源的分批扫描与自适应扫描策略"
-									>
-										B站源扫描优化
-									</div>
-									<div class="text-muted-foreground text-xs">
-										分批扫描覆盖合集、收藏夹和UP主投稿源；新源优先，其余按最久未扫描顺序轮转。自适应会对长期无更新的源逐步降频。
-									</div>
-									<div class="text-muted-foreground text-xs">
-										当前：每轮 {Number(scanConfig.batchSize) === 0
-											? '不限'
-											: scanConfig.batchSize} 个 · 自适应 {scanConfig.adaptiveScan
-											? '已开启'
-											: '已关闭'}
-										· 最大间隔 {scanConfig.adaptiveMaxHours || '24'} 小时
-									</div>
-								</div>
-
-								<div class="flex items-center gap-2 md:justify-end">
-									<Button
-										size="sm"
-										variant="outline"
-										disabled={scanConfig.saving}
-										onclick={() => scanConfig.load()}
-									>
-										刷新
-									</Button>
-									<Button
-										size="sm"
-										disabled={scanConfig.saving}
-										onclick={() => scanConfig.open()}
-									>
-										弹窗配置
-									</Button>
-								</div>
+	<div class="mt-6">
+		{#if list.loading}
+			<Loading />
+		{:else}
+			<Card class="mb-4 py-3">
+				<CardContent class="px-4">
+					<div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+						<div class="space-y-1">
+							<div
+								class="text-sm font-semibold"
+								title="配置合集、收藏夹和UP主投稿源的分批扫描与自适应扫描策略"
+							>
+								B站源扫描优化
 							</div>
-						</CardContent>
-					</Card>
-				<div class="grid gap-6">
-					{#each sourceEntriesForPlatform() as [sourceKey, sourceConfig] (sourceKey)}
-						{@const sources = getSourcesForSection(sourceConfig)}
-						<Card>
-							<CardHeader class="cursor-pointer" onclick={() => toggleCollapse(sourceKey)}>
-								<CardTitle
-									class="flex items-center gap-2"
-									title={`展开或收起${sourceConfig.title}列表`}
-								>
-									{#if collapsedSections[sourceKey] !== false}
-										<ChevronRightIcon class="text-muted-foreground h-4 w-4" />
-									{:else}
-										<ChevronDownIcon class="text-muted-foreground h-4 w-4" />
-									{/if}
-									<sourceConfig.icon class="h-5 w-5" />
-									{sourceConfig.title}
-									<Badge variant="outline" class="ml-auto">
-										{sources?.length || 0} 个
-									</Badge>
-								</CardTitle>
-							</CardHeader>
-							{#if collapsedSections[sourceKey] === false}
-								<CardContent>
-									{#if sources && sources.length > 0}
-										{@const bulkMode = bulk.modeSections[sourceKey] === true}
-										{@const selectedSet = bulk.selectedIds[sourceKey] ?? new SvelteSet<number>()}
+							<div class="text-muted-foreground text-xs">
+								分批扫描覆盖合集、收藏夹和UP主投稿源；新源优先，其余按最久未扫描顺序轮转。自适应会对长期无更新的源逐步降频。
+							</div>
+							<div class="text-muted-foreground text-xs">
+								当前：每轮 {Number(scanConfig.batchSize) === 0 ? '不限' : scanConfig.batchSize} 个 ·
+								自适应 {scanConfig.adaptiveScan ? '已开启' : '已关闭'}
+								· 最大间隔 {scanConfig.adaptiveMaxHours || '24'} 小时
+							</div>
+						</div>
 
-										<div
-											class="mb-3 flex flex-wrap items-center gap-2 {isMobileQuery.current
-												? 'justify-between'
-												: ''}"
+						<div class="flex items-center gap-2 md:justify-end">
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={scanConfig.saving}
+								onclick={() => scanConfig.load()}
+							>
+								刷新
+							</Button>
+							<Button size="sm" disabled={scanConfig.saving} onclick={() => scanConfig.open()}>
+								弹窗配置
+							</Button>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+			<div class="grid gap-6">
+				{#each sourceEntriesForPlatform() as [sourceKey, sourceConfig] (sourceKey)}
+					{@const sources = getSourcesForSection(sourceConfig)}
+					<Card>
+						<CardHeader class="cursor-pointer" onclick={() => toggleCollapse(sourceKey)}>
+							<CardTitle
+								class="flex items-center gap-2"
+								title={`展开或收起${sourceConfig.title}列表`}
+							>
+								{#if collapsedSections[sourceKey] !== false}
+									<ChevronRightIcon class="text-muted-foreground h-4 w-4" />
+								{:else}
+									<ChevronDownIcon class="text-muted-foreground h-4 w-4" />
+								{/if}
+								<sourceConfig.icon class="h-5 w-5" />
+								{sourceConfig.title}
+								<Badge variant="outline" class="ml-auto">
+									{sources?.length || 0} 个
+								</Badge>
+							</CardTitle>
+						</CardHeader>
+						{#if collapsedSections[sourceKey] === false}
+							<CardContent>
+								{#if sources && sources.length > 0}
+									{@const bulkMode = bulk.modeSections[sourceKey] === true}
+									{@const selectedSet = bulk.selectedIds[sourceKey] ?? new SvelteSet<number>()}
+
+									<div
+										class="mb-3 flex flex-wrap items-center gap-2 {isMobileQuery.current
+											? 'justify-between'
+											: ''}"
+									>
+										<Button
+											size="sm"
+											variant="outline"
+											disabled={bulk.updating}
+											onclick={() => bulk.toggleBulkMode(sourceKey)}
 										>
-											<Button
-												size="sm"
-												variant="outline"
-												disabled={bulk.updating}
-												onclick={() => bulk.toggleBulkMode(sourceKey)}
-											>
-												{bulkMode ? '退出批量' : '批量操作'}
-											</Button>
+											{bulkMode ? '退出批量' : '批量操作'}
+										</Button>
 
-											{#if bulkMode}
-												<span class="text-muted-foreground text-sm">
-													已选 {selectedSet.size} / {sources.length}
-												</span>
+										{#if bulkMode}
+											<span class="text-muted-foreground text-sm">
+												已选 {selectedSet.size} / {sources.length}
+											</span>
 
-												<div class="ml-auto flex flex-wrap items-center gap-2">
-													<SelectAllButton
-														disabled={bulk.updating}
-														onclick={() => bulk.selectAll(sourceKey, sources)}
-														className="text-sm"
-													/>
-													<Button
-														size="sm"
-														variant="outline"
-														disabled={bulk.updating || selectedSet.size === 0}
-														onclick={() => bulk.clearAll(sourceKey)}
-													>
-														清空
-													</Button>
-													<Button
-														size="sm"
-														disabled={bulk.updating || selectedSet.size === 0}
-														onclick={() => bulk.setEnabled(sourceKey, sourceConfig.type, true)}
-													>
-														批量启用
-													</Button>
-													<Button
-														size="sm"
-														variant="secondary"
-														disabled={bulk.updating || selectedSet.size === 0}
-														onclick={() => bulk.setEnabled(sourceKey, sourceConfig.type, false)}
-													>
-														批量禁用
-													</Button>
-												</div>
-											{/if}
-										</div>
-
-										<div class="space-y-3">
-											{#each sources as source (source.id)}
-												<div
-													class="flex {isMobileQuery.current
-														? 'flex-col gap-3'
-														: 'flex-row items-center justify-between gap-3'} rounded-lg border p-3"
-												>
-													{#if bulkMode}
-														<label
-															class="flex items-center {isMobileQuery.current ? 'self-start' : ''}"
-														>
-															<input
-																type="checkbox"
-																checked={selectedSet.has(source.id)}
-																disabled={bulk.updating}
-																onchange={() => bulk.toggleSelect(sourceKey, source.id)}
-																class="h-4 w-4 rounded border-gray-300"
-															/>
-														</label>
-													{/if}
-													<div class="min-w-0 flex-1">
-														<div
-															class="flex {isMobileQuery.current
-																? 'flex-col gap-2'
-																: 'flex-row items-center gap-2'} mb-1"
-														>
-															<span class="truncate font-medium">{source.name}</span>
-															<Badge
-																variant={source.enabled ? 'default' : 'secondary'}
-																class="w-fit text-xs"
-															>
-																{source.enabled ? '已启用' : '已禁用'}
-															</Badge>
-														</div>
-														<div class="text-muted-foreground truncate text-sm" title={source.path}>
-															{source.path || '未设置路径'}
-														</div>
-														<div
-															class="text-muted-foreground mt-1 flex items-center gap-2 text-xs"
-															title="该视频源当前已发现的最新一条视频发布时间。最近 7 天内为绿色，8 到 30 天为黄色，31 天及以上为红色，可用于判断这个源最近是否还有更新"
-														>
-															<span>最新视频时间：</span>
-															<Badge
-																variant="outline"
-																class={getLatestVideoTimeBadgeClass(source.latest_row_at)}
-															>
-																{formatLatestVideoTime(source.latest_row_at)}
-															</Badge>
-														</div>
-														<!-- 显示对应类型的ID -->
-														<div class="text-muted-foreground mt-1 text-xs">
-															{#if sourceConfig.type === 'favorite' && source.f_id}
-																收藏夹ID: {source.f_id}
-															{:else if sourceConfig.type === 'collection' && source.s_id}
-																合集ID: {source.s_id}
-																{#if source.m_id}
-																	| UP主ID: {source.m_id}{/if}
-															{:else if sourceConfig.type === 'submission' && source.upper_id}
-																UP主ID: {source.upper_id}
-																{#if source.selected_videos}
-																	{@const selectedCount = (() => {
-																		try {
-																			return JSON.parse(source.selected_videos).length;
-																		} catch {
-																			return 0;
-																		}
-																	})()}
-																	{#if selectedCount > 0}
-																		<span class="ml-2 text-purple-600"
-																			>| 已选 {selectedCount} 个历史投稿</span
-																		>
-																	{/if}
-																{/if}
-															{:else if sourceConfig.type === 'bangumi' || sourceConfig.type === 'pugv'}
-																{#if source.season_id}<span class="block"
-																		>{sourceConfig.type === 'pugv' ? '课程ID' : '主季度ID'}: {source.season_id}</span
-																	>{/if}
-																{#if source.selected_seasons?.length}
-																	<span class="block"
-																		>已选季度ID: {source.selected_seasons.join(', ')}</span
-																	>
-																{/if}
-																{#if source.media_id}<span class="block"
-																		>Media ID: {source.media_id}</span
-																	>{/if}
-															{:else if sourceConfig.type === 'watch_later'}
-																稍后再看 (无特定ID)
-
-															{/if}
-														</div>
-														<!-- 扫描/过滤/下载选项状态展示 -->
-														<VideoSourceStatusBadges
-															{source}
-															getAiSubtitleLanguageLabel={getAiSubtitleLanguageLabel}
-														/>
-													</div>
-
-													<div class="flex flex-wrap items-center justify-end gap-1 sm:ml-4">
-														<!-- 启用/禁用 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleEnabled(
-																	sourceConfig.type,
-																	source.id,
-																	source.enabled,
-																	source.name
-																)}
-															title={source.enabled ? '禁用' : '启用'}
-															class="h-8 w-8 p-0"
-														>
-															<PowerIcon
-																class="h-4 w-4 {source.enabled
-																	? 'text-green-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 选择历史投稿（仅投稿类型显示） -->
-														{#if sourceConfig.type === 'submission'}
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleSelectSubmissionVideos(
-																		source.id,
-																		source.upper_id,
-																		source.name,
-																		source.selected_videos
-																	)}
-																title="选择历史投稿"
-																class="h-8 w-8 p-0"
-															>
-																<ListVideoIcon class="h-4 w-4 text-purple-600" />
-															</Button>
-
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleToggleDynamicApi(
-																		source.id,
-																		source.use_dynamic_api ?? false
-																	)}
-																title="只有使用动态API才能拉取到动态视频，但该接口不提供分页参数，每次请求只能拉取12条视频。这会一定程度上增加请求次数，用户可根据实际情况酌情选择，推荐仅在UP主有较多动态视频时开启。"
-																class="h-8 w-8 p-0"
-															>
-																<ActivityIcon
-																	class="h-4 w-4 {source.use_dynamic_api
-																		? 'text-blue-600'
-																		: 'text-gray-400'}"
-																/>
-															</Button>
-														{/if}
-
-														{#if true}
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleToggleDownloadChargeVideos(
-																		sourceConfig.type,
-																		source.id,
-																		source.download_charge_videos ?? true
-																	)}
-																title={source.download_charge_videos !== false
-																	? '禁用充电视频下载'
-																	: '启用充电视频下载'}
-																class="h-8 w-8 p-0"
-															>
-																<BatteryChargingIcon
-																	class="h-4 w-4 {source.download_charge_videos !== false
-																		? 'text-pink-600'
-																		: 'text-gray-400'}"
-																/>
-															</Button>
-
-															{#if sourceConfig.type !== 'bangumi' && sourceConfig.type !== 'pugv'}
-																<Button
-																	size="sm"
-																	variant="ghost"
-																	onclick={() =>
-																		handleRetryChargeVideos(sourceConfig.type, source.id)}
-																	disabled={retryingChargeVideoSources.has(
-																		`${sourceConfig.type}:${source.id}`
-																	)}
-																	title="重试充电视频"
-																	class="h-8 w-8 p-0"
-																>
-																	<BatteryChargingIcon
-																		class="h-4 w-4 {retryingChargeVideoSources.has(
-																			`${sourceConfig.type}:${source.id}`
-																		)
-																			? 'text-gray-400'
-																			: 'text-pink-600'}"
-																	/>
-																</Button>
-															{/if}
-														{/if}
-
-														<!-- 重设路径 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleResetPath(
-																	sourceConfig.type,
-																	source.id,
-																	source.name,
-																	source.path
-																)}
-															title="重设路径"
-															class="h-8 w-8 p-0"
-														>
-															<FolderOpenIcon class="h-4 w-4 text-orange-600" />
-														</Button>
-
-														<!-- 扫描删除视频设置 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleScanDeleted(
-																	sourceConfig.type,
-																	source.id,
-																	source.scan_deleted_videos
-																)}
-															title={source.scan_deleted_videos
-																? '关闭持续扫描已删除'
-																: '持续启用扫描已删除'}
-															class="h-8 w-8 p-0"
-														>
-															<RotateCcwIcon
-																class="h-4 w-4 {source.scan_deleted_videos
-																	? 'text-blue-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleScanDeletedOnce(
-																	sourceConfig.type,
-																	source.id,
-																	source.scan_deleted_videos_once
-																)}
-															title={source.scan_deleted_videos_once
-																? '取消本轮扫描已删除'
-																: '本轮扫描已删除一次'}
-															class="h-8 w-8 p-0"
-														>
-															<HistoryIcon
-																class="h-4 w-4 {source.scan_deleted_videos_once
-																	? 'text-orange-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 源级流过滤/码率设置 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																filterOptionStore.open(sourceConfig.type, source)}
-															title={source.filter_option
-																? '编辑源级码率/流过滤'
-																: '设置源级码率/流过滤'}
-															class="h-8 w-8 p-0"
-														>
-															<SlidersHorizontalIcon
-																class="h-4 w-4 {source.filter_option
-																	? 'text-cyan-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 关键词过滤 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleOpenKeywordFilter(sourceConfig.type, source.id, source.name)}
-															title="关键词过滤"
-															class="h-8 w-8 p-0"
-														>
-															<FilterIcon
-																class="h-4 w-4 {hasSourceKeywordFilters(source)
-																	? 'text-purple-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 仅下载音频 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleAudioOnly(
-																	sourceConfig.type,
-																	source.id,
-																	source.audio_only ?? false
-																)}
-															title={source.audio_only ? '禁用仅音频模式' : '启用仅音频模式'}
-															class="h-8 w-8 p-0"
-														>
-															<MusicIcon
-																class="h-4 w-4 {source.audio_only
-																	? 'text-amber-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 仅保留M4A（仅在音频模式开启时显示） -->
-														{#if source.audio_only}
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleToggleAudioOnlyM4aOnly(
-																		sourceConfig.type,
-																		source.id,
-																		source.audio_only_m4a_only ?? false
-																	)}
-																title={source.audio_only_m4a_only
-																	? '禁用仅M4A模式'
-																	: '启用仅M4A模式'}
-																class="h-8 w-8 p-0"
-															>
-																<FileAudioIcon
-																	class="h-4 w-4 {source.audio_only_m4a_only
-																		? 'text-amber-500'
-																		: 'text-gray-400'}"
-																/>
-															</Button>
-														{/if}
-
-														<!-- 平铺目录 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleFlatFolder(
-																	sourceConfig.type,
-																	source.id,
-																	source.flat_folder ?? false
-																)}
-															title={source.flat_folder ? '禁用平铺目录' : '启用平铺目录'}
-															class="h-8 w-8 p-0"
-														>
-															<FolderSyncIcon
-																class="h-4 w-4 {source.flat_folder
-																	? 'text-purple-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 图文作品合成视频 -->
-
-
-														<!-- 分章下载 -->
-														{#if true}
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleToggleSplitChaptersAfterDownload(
-																		sourceConfig.type,
-																		source.id,
-																		source.split_chapters_after_download ?? false
-																	)}
-																title={source.split_chapters_after_download
-																	? '禁用分章下载'
-																	: '启用分章下载'}
-																class="h-8 w-8 p-0"
-															>
-																<ListTreeIcon
-																	class="h-4 w-4 {source.split_chapters_after_download
-																		? 'text-emerald-600'
-																		: 'text-gray-400'}"
-																/>
-															</Button>
-														{/if}
-
-														<!-- 下载弹幕 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleDownloadDanmaku(
-																	sourceConfig.type,
-																	source.id,
-																	source.download_danmaku ?? true
-																)}
-															title={source.download_danmaku !== false ? '禁用弹幕下载' : '启用弹幕下载'}
-															class="h-8 w-8 p-0"
-														>
-															<MessageSquareTextIcon
-																class="h-4 w-4 {source.download_danmaku !== false
-																	? 'text-green-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 下载字幕 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleToggleDownloadSubtitle(
-																	sourceConfig.type,
-																	source.id,
-																	source.download_subtitle ?? true
-																)}
-															title={source.download_subtitle !== false
-																? '禁用字幕下载'
-																: '启用字幕下载'}
-															class="h-8 w-8 p-0"
-														>
-															<SubtitlesIcon
-																class="h-4 w-4 {source.download_subtitle !== false
-																	? 'text-green-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- AI 字幕 -->
-														{#if true}
-															<Button
-																size="sm"
-																variant="ghost"
-																onclick={() =>
-																	handleToggleDownloadAiSubtitle(
-																		sourceConfig.type,
-																		source.id,
-																		source.download_ai_subtitle ?? true
-																	)}
-																disabled={source.download_subtitle === false}
-																title={source.download_ai_subtitle !== false
-																	? '禁用 AI 字幕下载'
-																	: '启用 AI 字幕下载'}
-																class="h-8 w-8 p-0"
-															>
-																<LanguagesIcon
-																	class="h-4 w-4 {source.download_subtitle !== false &&
-																	source.download_ai_subtitle !== false
-																		? 'text-blue-600'
-																		: 'text-gray-400'}"
-																/>
-															</Button>
-														{/if}
-
-														<CustomSelect
-															value={normalizeAiSubtitleLanguage(source.ai_subtitle_language)}
-															options={AI_SUBTITLE_LANGUAGE_OPTIONS}
-															disabled={source.download_subtitle === false ||
-																(true &&
-																	source.download_ai_subtitle === false)}
-															title="AI 字幕优先语言，目标语言缺失时回退中文"
-															class="h-8 w-[76px] rounded-md border border-gray-200 bg-white px-1 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-															size="sm"
-															onChange={(nextValue) =>
-																handleUpdateAiSubtitleLanguage(
-																	sourceConfig.type,
-																	source.id,
-																	String(nextValue ?? DEFAULT_AI_SUBTITLE_LANGUAGE)
-																)}
-														/>
-
-														<!-- AI重命名 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleOpenAiPromptDialog(
-																	sourceConfig.type,
-																	source.id,
-																	source.name,
-																	source.ai_rename ?? false,
-																	source.ai_rename_video_prompt ?? '',
-																	source.ai_rename_audio_prompt ?? '',
-																	source.ai_rename_enable_multi_page ?? false,
-																	source.ai_rename_enable_collection ?? false,
-																	source.ai_rename_enable_bangumi ?? false,
-																	source.ai_rename_rename_parent_dir ?? false
-																)}
-															title="AI重命名设置"
-															class="h-8 w-8 p-0"
-														>
-															<SparklesIcon
-																class="h-4 w-4 {source.ai_rename
-																	? 'text-blue-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- AI批量重命名历史 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleAiRenameHistory(
-																	sourceConfig.type,
-																	source.id,
-																	source.name,
-																	source.ai_rename_video_prompt ?? '',
-																	source.ai_rename_audio_prompt ?? '',
-																	source.ai_rename_enable_multi_page ?? false,
-																	source.ai_rename_enable_collection ?? false,
-																	source.ai_rename_enable_bangumi ?? false,
-																	source.ai_rename_rename_parent_dir ?? false
-																)}
-															title="AI批量重命名历史文件"
-															class="h-8 w-8 p-0"
-														>
-															<HistoryIcon
-																class="h-4 w-4 {source.ai_rename
-																	? 'text-cyan-600'
-																	: 'text-gray-400'}"
-															/>
-														</Button>
-
-														<!-- 删除 -->
-														<Button
-															size="sm"
-															variant="ghost"
-															onclick={() =>
-																handleDeleteSource(sourceConfig.type, source.id, source.name)}
-															title="删除"
-															class="h-8 w-8 p-0"
-														>
-															<TrashIcon class="text-destructive h-4 w-4" />
-														</Button>
-													</div>
-												</div>
-											{/each}
-										</div>
-									{:else}
-										<EmptyState
-											icon={sourceConfig.icon}
-											title={`暂无${sourceConfig.title}`}
-											description={sourceConfig.type === 'favorite'
-												? '还没有添加任何收藏夹订阅'
-												: sourceConfig.type === 'collection'
-													? '还没有添加任何合集或列表订阅'
-													: sourceConfig.type === 'submission'
-														? '还没有添加任何UP主投稿订阅'
-														: '还没有添加稍后再看订阅'}
-											class="py-8"
-										>
-											{#snippet actions()}
+											<div class="ml-auto flex flex-wrap items-center gap-2">
+												<SelectAllButton
+													disabled={bulk.updating}
+													onclick={() => bulk.selectAll(sourceKey, sources)}
+													className="text-sm"
+												/>
 												<Button
 													size="sm"
 													variant="outline"
-													onclick={() =>
-														navigateToAddSource()}
+													disabled={bulk.updating || selectedSet.size === 0}
+													onclick={() => bulk.clearAll(sourceKey)}
 												>
-													<PlusIcon class="mr-2 h-4 w-4" />
-													添加{sourceConfig.title}
+													清空
 												</Button>
-											{/snippet}
-										</EmptyState>
-									{/if}
-								</CardContent>
-							{/if}
-						</Card>
-					{/each}
-				</div>
-			{/if}
-		</div>
+												<Button
+													size="sm"
+													disabled={bulk.updating || selectedSet.size === 0}
+													onclick={() => bulk.setEnabled(sourceKey, sourceConfig.type, true)}
+												>
+													批量启用
+												</Button>
+												<Button
+													size="sm"
+													variant="secondary"
+													disabled={bulk.updating || selectedSet.size === 0}
+													onclick={() => bulk.setEnabled(sourceKey, sourceConfig.type, false)}
+												>
+													批量禁用
+												</Button>
+											</div>
+										{/if}
+									</div>
+
+									<div class="space-y-3">
+										{#each sources as source (source.id)}
+											<div
+												class="flex {isMobileQuery.current
+													? 'flex-col gap-3'
+													: 'flex-row items-center justify-between gap-3'} rounded-lg border p-3"
+											>
+												{#if bulkMode}
+													<label
+														class="flex items-center {isMobileQuery.current ? 'self-start' : ''}"
+													>
+														<input
+															type="checkbox"
+															checked={selectedSet.has(source.id)}
+															disabled={bulk.updating}
+															onchange={() => bulk.toggleSelect(sourceKey, source.id)}
+															class="h-4 w-4 rounded border-gray-300"
+														/>
+													</label>
+												{/if}
+												<div class="min-w-0 flex-1">
+													<div
+														class="flex {isMobileQuery.current
+															? 'flex-col gap-2'
+															: 'flex-row items-center gap-2'} mb-1"
+													>
+														<span class="truncate font-medium">{source.name}</span>
+														<Badge
+															variant={source.enabled ? 'default' : 'secondary'}
+															class="w-fit text-xs"
+														>
+															{source.enabled ? '已启用' : '已禁用'}
+														</Badge>
+													</div>
+													<div class="text-muted-foreground truncate text-sm" title={source.path}>
+														{source.path || '未设置路径'}
+													</div>
+													<div
+														class="text-muted-foreground mt-1 flex items-center gap-2 text-xs"
+														title="该视频源当前已发现的最新一条视频发布时间。最近 7 天内为绿色，8 到 30 天为黄色，31 天及以上为红色，可用于判断这个源最近是否还有更新"
+													>
+														<span>最新视频时间：</span>
+														<Badge
+															variant="outline"
+															class={getLatestVideoTimeBadgeClass(source.latest_row_at)}
+														>
+															{formatLatestVideoTime(source.latest_row_at)}
+														</Badge>
+													</div>
+													<!-- 显示对应类型的ID -->
+													<div class="text-muted-foreground mt-1 text-xs">
+														{#if sourceConfig.type === 'favorite' && source.f_id}
+															收藏夹ID: {source.f_id}
+														{:else if sourceConfig.type === 'collection' && source.s_id}
+															合集ID: {source.s_id}
+															{#if source.m_id}
+																| UP主ID: {source.m_id}{/if}
+														{:else if sourceConfig.type === 'submission' && source.upper_id}
+															UP主ID: {source.upper_id}
+															{#if source.selected_videos}
+																{@const selectedCount = (() => {
+																	try {
+																		return JSON.parse(source.selected_videos).length;
+																	} catch {
+																		return 0;
+																	}
+																})()}
+																{#if selectedCount > 0}
+																	<span class="ml-2 text-purple-600"
+																		>| 已选 {selectedCount} 个历史投稿</span
+																	>
+																{/if}
+															{/if}
+														{:else if sourceConfig.type === 'bangumi' || sourceConfig.type === 'pugv'}
+															{#if source.season_id}<span class="block"
+																	>{sourceConfig.type === 'pugv' ? '课程ID' : '主季度ID'}: {source.season_id}</span
+																>{/if}
+															{#if source.selected_seasons?.length}
+																<span class="block"
+																	>已选季度ID: {source.selected_seasons.join(', ')}</span
+																>
+															{/if}
+															{#if source.media_id}<span class="block"
+																	>Media ID: {source.media_id}</span
+																>{/if}
+														{:else if sourceConfig.type === 'watch_later'}
+															稍后再看 (无特定ID)
+														{/if}
+													</div>
+													<!-- 扫描/过滤/下载选项状态展示 -->
+													<VideoSourceStatusBadges {source} {getAiSubtitleLanguageLabel} />
+												</div>
+
+												<div class="flex flex-wrap items-center justify-end gap-1 sm:ml-4">
+													<!-- 启用/禁用 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleEnabled(
+																sourceConfig.type,
+																source.id,
+																source.enabled,
+																source.name
+															)}
+														title={source.enabled ? '禁用' : '启用'}
+														class="h-8 w-8 p-0"
+													>
+														<PowerIcon
+															class="h-4 w-4 {source.enabled ? 'text-green-600' : 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 选择历史投稿（仅投稿类型显示） -->
+													{#if sourceConfig.type === 'submission'}
+														<Button
+															size="sm"
+															variant="ghost"
+															onclick={() =>
+																handleSelectSubmissionVideos(
+																	source.id,
+																	source.upper_id,
+																	source.name,
+																	source.selected_videos
+																)}
+															title="选择历史投稿"
+															class="h-8 w-8 p-0"
+														>
+															<ListVideoIcon class="h-4 w-4 text-purple-600" />
+														</Button>
+
+														<Button
+															size="sm"
+															variant="ghost"
+															onclick={() =>
+																handleToggleDynamicApi(source.id, source.use_dynamic_api ?? false)}
+															title="只有使用动态API才能拉取到动态视频，但该接口不提供分页参数，每次请求只能拉取12条视频。这会一定程度上增加请求次数，用户可根据实际情况酌情选择，推荐仅在UP主有较多动态视频时开启。"
+															class="h-8 w-8 p-0"
+														>
+															<ActivityIcon
+																class="h-4 w-4 {source.use_dynamic_api
+																	? 'text-blue-600'
+																	: 'text-gray-400'}"
+															/>
+														</Button>
+													{/if}
+
+													{#if true}
+														<Button
+															size="sm"
+															variant="ghost"
+															onclick={() =>
+																handleToggleDownloadChargeVideos(
+																	sourceConfig.type,
+																	source.id,
+																	source.download_charge_videos ?? true
+																)}
+															title={source.download_charge_videos !== false
+																? '禁用充电视频下载'
+																: '启用充电视频下载'}
+															class="h-8 w-8 p-0"
+														>
+															<BatteryChargingIcon
+																class="h-4 w-4 {source.download_charge_videos !== false
+																	? 'text-pink-600'
+																	: 'text-gray-400'}"
+															/>
+														</Button>
+
+														{#if sourceConfig.type !== 'bangumi' && sourceConfig.type !== 'pugv'}
+															<Button
+																size="sm"
+																variant="ghost"
+																onclick={() =>
+																	handleRetryChargeVideos(sourceConfig.type, source.id)}
+																disabled={retryingChargeVideoSources.has(
+																	`${sourceConfig.type}:${source.id}`
+																)}
+																title="重试充电视频"
+																class="h-8 w-8 p-0"
+															>
+																<BatteryChargingIcon
+																	class="h-4 w-4 {retryingChargeVideoSources.has(
+																		`${sourceConfig.type}:${source.id}`
+																	)
+																		? 'text-gray-400'
+																		: 'text-pink-600'}"
+																/>
+															</Button>
+														{/if}
+													{/if}
+
+													<!-- 重设路径 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleResetPath(
+																sourceConfig.type,
+																source.id,
+																source.name,
+																source.path
+															)}
+														title="重设路径"
+														class="h-8 w-8 p-0"
+													>
+														<FolderOpenIcon class="h-4 w-4 text-orange-600" />
+													</Button>
+
+													<!-- 扫描删除视频设置 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleScanDeleted(
+																sourceConfig.type,
+																source.id,
+																source.scan_deleted_videos
+															)}
+														title={source.scan_deleted_videos
+															? '关闭持续扫描已删除'
+															: '持续启用扫描已删除'}
+														class="h-8 w-8 p-0"
+													>
+														<RotateCcwIcon
+															class="h-4 w-4 {source.scan_deleted_videos
+																? 'text-blue-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleScanDeletedOnce(
+																sourceConfig.type,
+																source.id,
+																source.scan_deleted_videos_once
+															)}
+														title={source.scan_deleted_videos_once
+															? '取消本轮扫描已删除'
+															: '本轮扫描已删除一次'}
+														class="h-8 w-8 p-0"
+													>
+														<HistoryIcon
+															class="h-4 w-4 {source.scan_deleted_videos_once
+																? 'text-orange-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 源级流过滤/码率设置 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() => filterOptionStore.open(sourceConfig.type, source)}
+														title={source.filter_option
+															? '编辑源级码率/流过滤'
+															: '设置源级码率/流过滤'}
+														class="h-8 w-8 p-0"
+													>
+														<SlidersHorizontalIcon
+															class="h-4 w-4 {source.filter_option
+																? 'text-cyan-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 关键词过滤 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleOpenKeywordFilter(sourceConfig.type, source.id, source.name)}
+														title="关键词过滤"
+														class="h-8 w-8 p-0"
+													>
+														<FilterIcon
+															class="h-4 w-4 {hasSourceKeywordFilters(source)
+																? 'text-purple-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 仅下载音频 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleAudioOnly(
+																sourceConfig.type,
+																source.id,
+																source.audio_only ?? false
+															)}
+														title={source.audio_only ? '禁用仅音频模式' : '启用仅音频模式'}
+														class="h-8 w-8 p-0"
+													>
+														<MusicIcon
+															class="h-4 w-4 {source.audio_only
+																? 'text-amber-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 仅保留M4A（仅在音频模式开启时显示） -->
+													{#if source.audio_only}
+														<Button
+															size="sm"
+															variant="ghost"
+															onclick={() =>
+																handleToggleAudioOnlyM4aOnly(
+																	sourceConfig.type,
+																	source.id,
+																	source.audio_only_m4a_only ?? false
+																)}
+															title={source.audio_only_m4a_only ? '禁用仅M4A模式' : '启用仅M4A模式'}
+															class="h-8 w-8 p-0"
+														>
+															<FileAudioIcon
+																class="h-4 w-4 {source.audio_only_m4a_only
+																	? 'text-amber-500'
+																	: 'text-gray-400'}"
+															/>
+														</Button>
+													{/if}
+
+													<!-- 平铺目录 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleFlatFolder(
+																sourceConfig.type,
+																source.id,
+																source.flat_folder ?? false
+															)}
+														title={source.flat_folder ? '禁用平铺目录' : '启用平铺目录'}
+														class="h-8 w-8 p-0"
+													>
+														<FolderSyncIcon
+															class="h-4 w-4 {source.flat_folder
+																? 'text-purple-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 图文作品合成视频 -->
+
+													<!-- 分章下载 -->
+													{#if true}
+														<Button
+															size="sm"
+															variant="ghost"
+															onclick={() =>
+																handleToggleSplitChaptersAfterDownload(
+																	sourceConfig.type,
+																	source.id,
+																	source.split_chapters_after_download ?? false
+																)}
+															title={source.split_chapters_after_download
+																? '禁用分章下载'
+																: '启用分章下载'}
+															class="h-8 w-8 p-0"
+														>
+															<ListTreeIcon
+																class="h-4 w-4 {source.split_chapters_after_download
+																	? 'text-emerald-600'
+																	: 'text-gray-400'}"
+															/>
+														</Button>
+													{/if}
+
+													<!-- 下载弹幕 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleDownloadDanmaku(
+																sourceConfig.type,
+																source.id,
+																source.download_danmaku ?? true
+															)}
+														title={source.download_danmaku !== false
+															? '禁用弹幕下载'
+															: '启用弹幕下载'}
+														class="h-8 w-8 p-0"
+													>
+														<MessageSquareTextIcon
+															class="h-4 w-4 {source.download_danmaku !== false
+																? 'text-green-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 下载字幕 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleToggleDownloadSubtitle(
+																sourceConfig.type,
+																source.id,
+																source.download_subtitle ?? true
+															)}
+														title={source.download_subtitle !== false
+															? '禁用字幕下载'
+															: '启用字幕下载'}
+														class="h-8 w-8 p-0"
+													>
+														<SubtitlesIcon
+															class="h-4 w-4 {source.download_subtitle !== false
+																? 'text-green-600'
+																: 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- AI 字幕 -->
+													{#if true}
+														<Button
+															size="sm"
+															variant="ghost"
+															onclick={() =>
+																handleToggleDownloadAiSubtitle(
+																	sourceConfig.type,
+																	source.id,
+																	source.download_ai_subtitle ?? true
+																)}
+															disabled={source.download_subtitle === false}
+															title={source.download_ai_subtitle !== false
+																? '禁用 AI 字幕下载'
+																: '启用 AI 字幕下载'}
+															class="h-8 w-8 p-0"
+														>
+															<LanguagesIcon
+																class="h-4 w-4 {source.download_subtitle !== false &&
+																source.download_ai_subtitle !== false
+																	? 'text-blue-600'
+																	: 'text-gray-400'}"
+															/>
+														</Button>
+													{/if}
+
+													<CustomSelect
+														value={normalizeAiSubtitleLanguage(source.ai_subtitle_language)}
+														options={AI_SUBTITLE_LANGUAGE_OPTIONS}
+														disabled={source.download_subtitle === false ||
+															source.download_ai_subtitle === false}
+														title="AI 字幕优先语言，目标语言缺失时回退中文"
+														class="h-8 w-[76px] rounded-md border border-gray-200 bg-white px-1 text-xs text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+														size="sm"
+														onChange={(nextValue) =>
+															handleUpdateAiSubtitleLanguage(
+																sourceConfig.type,
+																source.id,
+																String(nextValue ?? DEFAULT_AI_SUBTITLE_LANGUAGE)
+															)}
+													/>
+
+													<!-- AI重命名 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleOpenAiPromptDialog(
+																sourceConfig.type,
+																source.id,
+																source.name,
+																source.ai_rename ?? false,
+																source.ai_rename_video_prompt ?? '',
+																source.ai_rename_audio_prompt ?? '',
+																source.ai_rename_enable_multi_page ?? false,
+																source.ai_rename_enable_collection ?? false,
+																source.ai_rename_enable_bangumi ?? false,
+																source.ai_rename_rename_parent_dir ?? false
+															)}
+														title="AI重命名设置"
+														class="h-8 w-8 p-0"
+													>
+														<SparklesIcon
+															class="h-4 w-4 {source.ai_rename ? 'text-blue-600' : 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- AI批量重命名历史 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleAiRenameHistory(
+																sourceConfig.type,
+																source.id,
+																source.name,
+																source.ai_rename_video_prompt ?? '',
+																source.ai_rename_audio_prompt ?? '',
+																source.ai_rename_enable_multi_page ?? false,
+																source.ai_rename_enable_collection ?? false,
+																source.ai_rename_enable_bangumi ?? false,
+																source.ai_rename_rename_parent_dir ?? false
+															)}
+														title="AI批量重命名历史文件"
+														class="h-8 w-8 p-0"
+													>
+														<HistoryIcon
+															class="h-4 w-4 {source.ai_rename ? 'text-cyan-600' : 'text-gray-400'}"
+														/>
+													</Button>
+
+													<!-- 删除 -->
+													<Button
+														size="sm"
+														variant="ghost"
+														onclick={() =>
+															handleDeleteSource(sourceConfig.type, source.id, source.name)}
+														title="删除"
+														class="h-8 w-8 p-0"
+													>
+														<TrashIcon class="text-destructive h-4 w-4" />
+													</Button>
+												</div>
+											</div>
+										{/each}
+									</div>
+								{:else}
+									<EmptyState
+										icon={sourceConfig.icon}
+										title={`暂无${sourceConfig.title}`}
+										description={sourceConfig.type === 'favorite'
+											? '还没有添加任何收藏夹订阅'
+											: sourceConfig.type === 'collection'
+												? '还没有添加任何合集或列表订阅'
+												: sourceConfig.type === 'submission'
+													? '还没有添加任何UP主投稿订阅'
+													: '还没有添加稍后再看订阅'}
+										class="py-8"
+									>
+										{#snippet actions()}
+											<Button size="sm" variant="outline" onclick={() => navigateToAddSource()}>
+												<PlusIcon class="mr-2 h-4 w-4" />
+												添加{sourceConfig.title}
+											</Button>
+										{/snippet}
+									</EmptyState>
+								{/if}
+							</CardContent>
+						{/if}
+					</Card>
+				{/each}
+			</div>
+		{/if}
+	</div>
 </div>
 
 <!-- B站源扫描优化弹窗 -->

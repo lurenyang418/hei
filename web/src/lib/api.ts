@@ -61,7 +61,7 @@ import type {
 	DatabaseMaintenanceAction,
 	DatabaseMaintenanceResponse,
 	DatabaseBackupListResponse,
-	DatabaseRestoreResponse,
+	DatabaseRestoreResponse
 } from './types';
 import { ErrorType } from './types';
 import { wsManager } from './ws';
@@ -372,7 +372,6 @@ class ApiClient {
 		id: number,
 		enabled: boolean
 	): Promise<ApiResponse<UpdateVideoSourceEnabledResponse>> {
-
 		return this.put<UpdateVideoSourceEnabledResponse>(
 			`/video-sources/${sourceType}/${id}/enabled`,
 			{ enabled }
@@ -473,7 +472,6 @@ class ApiClient {
 			message: string;
 		}>
 	> {
-
 		return this.put<{
 			success: boolean;
 			source_id: number;
@@ -558,7 +556,6 @@ class ApiClient {
 		sourceType: string,
 		id: number
 	): Promise<ApiResponse<GetKeywordFiltersResponse>> {
-
 		return this.get<GetKeywordFiltersResponse>(
 			`/video-sources/${sourceType}/${id}/keyword-filters`
 		);
@@ -582,7 +579,6 @@ class ApiClient {
 		publishedAfter?: string,
 		publishedBefore?: string
 	): Promise<ApiResponse<UpdateKeywordFiltersResponse>> {
-
 		return this.put<UpdateKeywordFiltersResponse>(
 			`/video-sources/${sourceType}/${id}/keyword-filters`,
 			{

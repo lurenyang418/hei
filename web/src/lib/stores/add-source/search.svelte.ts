@@ -67,10 +67,7 @@ export class SearchStore {
 
 				if (totalResults > pageSize) {
 					const totalPages = firstResult.data.num_pages || Math.ceil(totalResults / pageSize);
-					const remainingPages = Array.from(
-						{ length: totalPages - 1 },
-						(_, index) => index + 2
-					);
+					const remainingPages = Array.from({ length: totalPages - 1 }, (_, index) => index + 2);
 
 					// 串行拉取剩余页，避免并发过多被限流
 					for (const page of remainingPages) {
@@ -95,15 +92,11 @@ export class SearchStore {
 
 				// 按唯一标识去重
 				const uniqueResults = allResults.filter((result, index, arr) => {
-					const id =
-						result.season_id || result.bvid || result.mid || `${result.title}_${index}`;
+					const id = result.season_id || result.bvid || result.mid || `${result.title}_${index}`;
 					return (
 						arr.findIndex((item) => {
 							const itemId =
-								item.season_id ||
-								item.bvid ||
-								item.mid ||
-								`${item.title}_${arr.indexOf(item)}`;
+								item.season_id || item.bvid || item.mid || `${item.title}_${arr.indexOf(item)}`;
 							return itemId === id;
 						}) === index
 					);

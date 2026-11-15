@@ -1,12 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '$lib/components/ui/card';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -21,31 +15,18 @@
 		WandSparkles,
 		X
 	} from '@lucide/svelte';
-	import api from '$lib/api';
-	import type { QueueStatusResponse } from '$lib/types';
 	import { setBreadcrumb } from '$lib/stores/breadcrumb';
-	import { runRequest } from '$lib/utils/request.js';
 	import { formatTimestampOrFallback } from '$lib/utils/timezone';
-	import { buildAuthenticatedStreamUrl } from '$lib/utils/live-stream';
-	import { createManagedEventSource } from '$lib/utils/live-event-source';
 	import { QueueStore } from '$lib/stores/queue/queue.svelte';
-	import { toast } from 'svelte-sonner';
 	import QueueHelpPanel from '$lib/components/queue-help-panel.svelte';
 
 	const queue = new QueueStore();
-
 
 	// 设置面包屑
 	setBreadcrumb([
 		{ label: '首页', href: '/' },
 		{ label: '任务队列', href: '/queue' }
 	]);
-
-
-
-
-
-
 
 	// 格式化时间
 	function formatTime(timeString: string): string {
@@ -81,8 +62,6 @@
 		return iconMap[taskType] || ListTodo;
 	}
 
-
-
 	// 获取队列状态颜色
 	function getQueueStatusVariant(
 		isProcessing: boolean,
@@ -99,7 +78,6 @@
 		if (hasItems) return '等待中';
 		return '空闲';
 	}
-
 
 	onMount(() => {
 		queue.fetch().finally(() => {
@@ -159,7 +137,6 @@
 					</p>
 				</CardContent>
 			</Card>
-
 
 			<Card class="gap-2 py-3">
 				<CardHeader class="flex flex-row items-center justify-between space-y-0 px-4 pt-3 pb-2">
@@ -243,12 +220,14 @@
 						<Badge
 							variant={getQueueStatusVariant(
 								queue.status.config_queue.is_processing,
-								queue.status.config_queue.update_length + queue.status.config_queue.reload_length > 0
+								queue.status.config_queue.update_length + queue.status.config_queue.reload_length >
+									0
 							)}
 						>
 							{getQueueStatusText(
 								queue.status.config_queue.is_processing,
-								queue.status.config_queue.update_length + queue.status.config_queue.reload_length > 0
+								queue.status.config_queue.update_length + queue.status.config_queue.reload_length >
+									0
 							)}
 						</Badge>
 					</div>
@@ -301,7 +280,6 @@
 				</CardContent>
 			</Card>
 		</div>
-
 
 		<!-- 队列详情 -->
 		<div class="grid gap-6 lg:grid-cols-3">
