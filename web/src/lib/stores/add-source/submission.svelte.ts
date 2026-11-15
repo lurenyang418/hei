@@ -28,7 +28,7 @@ export class SubmissionSelectionStore {
 
 	videos = $state<SubmissionVideoInfo[]>([]);
 	filtered = $state<SubmissionVideoInfo[]>([]);
-	selected = new SvelteSet<string>();
+	readonly selected = new SvelteSet<string>();
 
 	loading = $state(false);
 	loadingMore = $state(false);
@@ -93,7 +93,10 @@ export class SubmissionSelectionStore {
 
 	reset(): void {
 		this.videos = [];
-		this.selected = new SvelteSet(this.selectedVideos);
+		this.selected.clear();
+		for (const bvid of this.selectedVideos) {
+			this.selected.add(bvid);
+		}
 		this.loading = false;
 		this.error = null;
 		this.totalCount = 0;

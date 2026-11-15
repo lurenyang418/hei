@@ -124,6 +124,10 @@
 		total: search.total,
 		open: search.open
 	}));
+	const submissionState = toStore(() => ({
+		open: submission.open,
+		selectedVideos: submission.selectedVideos
+	}));
 	const bangumiState = toStore(() => ({
 		seasons: bangumi.seasons,
 		loading: bangumi.loading,
@@ -1991,8 +1995,8 @@
 														>历史投稿选择</span
 													>
 													<span class="ml-2 text-xs text-blue-600 dark:text-blue-400">
-														{#if submission.selectedVideos.length > 0}
-															已选择 {submission.selectedVideos.length} 个历史投稿
+														{#if $submissionState.selectedVideos.length > 0}
+															已选择 {$submissionState.selectedVideos.length} 个历史投稿
 														{:else}
 															未选择特定投稿（将下载全部）
 														{/if}
@@ -2006,7 +2010,7 @@
 													}}
 													class="border-blue-300 text-blue-700 hover:bg-blue-100"
 												>
-													{submission.selectedVideos.length > 0 ? '重新选择' : '选择投稿'}
+													{$submissionState.selectedVideos.length > 0 ? '重新选择' : '选择投稿'}
 												</Button>
 											</div>
 											<p class="mt-2 text-xs text-blue-600 dark:text-blue-400">
@@ -3927,7 +3931,7 @@
 				{/if}
 
 				<!-- B站投稿内容选择面板 -->
-				{#if sourceType === 'submission' && submission.open}
+				{#if sourceType === 'submission' && $submissionState.open}
 					<SubmissionSelectionPanel {isCompactLayout} {isMobile} store={submission} />
 				{/if}
 			</div>

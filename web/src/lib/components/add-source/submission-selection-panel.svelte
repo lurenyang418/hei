@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import { Search, X } from '@lucide/svelte';
 	import BiliImage from '$lib/components/bili-image.svelte';
@@ -11,9 +12,17 @@
 
 	import type { SubmissionSelectionStore } from '$lib/stores/add-source/submission.svelte';
 
-	export let store: SubmissionSelectionStore;
-	export let isCompactLayout = false;
-	export let isMobile = false;
+	interface Props {
+		store: SubmissionSelectionStore;
+		isCompactLayout?: boolean;
+		isMobile?: boolean;
+	}
+
+	let { store, isCompactLayout = false, isMobile = false }: Props = $props();
+
+	onMount(() => {
+		void store.start();
+	});
 
 	// 处理滚动事件，检测是否需要显示加载更多按钮
 	function handleScroll(event: Event) {
