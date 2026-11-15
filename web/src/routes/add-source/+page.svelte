@@ -57,6 +57,7 @@
 		SlidersHorizontal as SlidersHorizontalIcon
 	} from '@lucide/svelte';
 	import { onDestroy, onMount } from 'svelte';
+	import { toStore } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
 	import { flip } from 'svelte/animate';
 	import { fly } from 'svelte/transition';
@@ -114,6 +115,20 @@
 			}
 		}
 	});
+
+	// 将 rune 状态显式桥接到 legacy 页面，避免只追踪状态对象引用。
+	const searchState = toStore(() => ({
+		keyword: search.keyword,
+		loading: search.loading,
+		results: search.results,
+		total: search.total,
+		open: search.open
+	}));
+	const bangumiState = toStore(() => ({
+		seasons: bangumi.seasons,
+		loading: bangumi.loading,
+		fetchAttempted: bangumi.fetchAttempted
+	}));
 
 	const options = new SourceOptionsStore();
 	const quick = new QuickSubscriptionStore();
@@ -1241,7 +1256,7 @@
 	$: filteredUserFollowings = userFollowings;
 
 	// 过滤后的搜索结果（根据类型过滤已存在的源）
-	$: filteredSearchResults = search.results.filter((result) => {
+	$: filteredSearchResults = $searchState.results.filter((result) => {
 		if (sourceType === 'submission' && result.mid) {
 			return !existingSubmissionIds.has(Number(result.mid));
 		}
@@ -1250,7 +1265,7 @@
 	});
 
 	// 过滤后的番剧季度列表（标记已存在的季度）
-	$: filteredBangumiSeasons = bangumi.seasons.map((season) => ({
+	$: filteredBangumiSeasons = $bangumiState.seasons.map((season) => ({
 		...season,
 		isExisting: isBangumiSeasonExists(season.season_id)
 	}));
@@ -1635,11 +1650,11 @@
 												<div class="flex gap-2">
 													<Button
 														onclick={() => handleSearch()}
-														disabled={search.loading || !search.keyword.trim()}
+														disabled={$searchState.loading || !$searchState.keyword.trim()}
 														size="sm"
 														class={isMobile ? 'flex-1' : ''}
 													>
-														{#if search.loading}
+														{#if $searchState.loading}
 															搜索中...
 														{:else}
 															<Search class="h-4 w-4" />
@@ -1746,17 +1761,17 @@
 												/>
 												<Button
 													onclick={() => handleSearch()}
-													disabled={search.loading || !search.keyword.trim()}
+													disabled={$searchState.loading || !$searchState.keyword.trim()}
 													size="sm"
 													class={isMobile ? 'w-full' : ''}
 												>
-													{#if search.loading}搜索中...{:else}搜索{/if}
+													{#if $searchState.loading}搜索中...{:else}搜索{/if}
 												</Button>
 											</div>
 
 											<p class="text-muted-foreground mt-2 text-xs">
-												{#if search.open && search.results.length > 0}
-													找到 {search.results.length} 个UP主，请在{isCompactLayout
+												{#if $searchState.open && $searchState.results.length > 0}
+													找到 {$searchState.results.length} 个UP主，请在{isCompactLayout
 														? '下方'
 														: '右侧'}列表中选择
 												{:else}
@@ -1901,7 +1916,7 @@
 									{/if}
 
 									<!-- 下载所有季度（仅番剧时显示，紧跟在Season ID后面） -->
-									{#if sourceType === 'bangumi' && form.sourceId && bangumi.seasons.length > 0 && !bangumi.loading}
+									{#if sourceType === 'bangumi' && form.sourceId && $bangumiState.seasons.length > 0 && !$bangumiState.loading}
 										<div class="mt-3 flex items-center space-x-2">
 											<input
 												type="checkbox"
@@ -1923,13 +1938,13 @@
 											<p class="mt-1 ml-6 text-xs text-purple-600">
 												勾选后将下载该番剧的所有季度，无需单独选择
 											</p>
-										{:else if bangumi.seasons.length > 1}
+										{:else if $bangumiState.seasons.length > 1}
 											<p class="mt-1 ml-6 text-xs text-purple-600">
-												检测到 {bangumi.seasons.length} 个相关季度，请在{isCompactLayout
+												检测到 {$bangumiState.seasons.length} 个相关季度，请在{isCompactLayout
 													? '下方'
 													: '右侧'}选择要下载的季度
 											</p>
-										{:else if bangumi.seasons.length === 1}
+										{:else if $bangumiState.seasons.length === 1}
 											<p class="mt-1 ml-6 text-xs text-purple-600">该番剧只有当前一个季度</p>
 										{/if}
 
@@ -1961,7 +1976,7 @@
 												{/if}
 											</div>
 										{/if}
-									{:else if sourceType === 'bangumi' && form.sourceId && bangumi.loading}
+									{:else if sourceType === 'bangumi' && form.sourceId && $bangumiState.loading}
 										<p class="mt-3 text-xs text-purple-600">正在获取季度信息...</p>
 									{/if}
 
@@ -3080,14 +3095,14 @@
 				</div>
 
 				<!-- 右侧：搜索结果区域 -->
-				{#if search.open && search.results.length > 0}
+				{#if $searchState.open && $searchState.results.length > 0}
 					<SearchResultsPanel
 						{isCompactLayout}
 						{isMobile}
 						batchMode={batch.mode}
 						{sourceType}
-						searchResults={search.results}
-						searchTotalResults={search.total}
+						searchResults={$searchState.results}
+						searchTotalResults={$searchState.total}
 						{filteredSearchResults}
 						batchCheckboxStates={batch.checkboxStates}
 						{enableSearchAnimations}
@@ -3095,9 +3110,7 @@
 						{isSubmissionExists}
 						isBatchSelected={(key) => batch.isSelected(key)}
 						onClose={() => {
-							search.open = false;
-							search.results = [];
-							search.total = 0;
+							search.clear();
 						}}
 						onSelectAll={() => selectAllVisible('search')}
 						onSelectResult={selectSearchResult}
@@ -3507,15 +3520,15 @@
 				{/if}
 
 				<!-- 番剧季度选择区域（移动到右侧） -->
-				{#if sourceType === 'bangumi' && form.sourceId && !form.downloadAllSeasons && (bangumi.loading || bangumi.seasons.length > 1 || (bangumi.fetchAttempted && bangumi.seasons.length === 0))}
+				{#if sourceType === 'bangumi' && form.sourceId && !form.downloadAllSeasons && ($bangumiState.loading || $bangumiState.seasons.length > 1 || ($bangumiState.fetchAttempted && $bangumiState.seasons.length === 0))}
 					<div class={isCompactLayout ? 'w-full' : 'flex-1'}>
 						<SidePanel
 							isMobile={isCompactLayout}
 							title="选择要下载的季度"
-							subtitle={bangumi.loading
+							subtitle={$bangumiState.loading
 								? '正在加载...'
-								: bangumi.seasons.length > 0
-									? `共 ${bangumi.seasons.length} 个相关季度`
+								: $bangumiState.seasons.length > 0
+									? `共 ${$bangumiState.seasons.length} 个相关季度`
 									: '暂无季度信息'}
 							headerClass="bg-purple-50 dark:bg-purple-950"
 							titleClass="text-base font-medium text-purple-800 dark:text-purple-200"
@@ -3528,19 +3541,19 @@
 									class="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700 dark:bg-purple-900 dark:text-purple-300"
 								>
 									已选择 {bangumi.selected.length} 个
-									{#if bangumi.selected.length === bangumi.seasons.length}
+									{#if bangumi.selected.length === $bangumiState.seasons.length}
 										（全部）
 									{/if}
 								</span>
 							{/snippet}
 
-							{#if bangumi.loading}
+							{#if $bangumiState.loading}
 								<div class="p-4 text-center">
 									<div class="text-sm text-purple-700 dark:text-purple-300">
 										正在加载季度信息...
 									</div>
 								</div>
-							{:else if bangumi.seasons.length > 0}
+							{:else if $bangumiState.seasons.length > 0}
 								<div class="seasons-grid-container">
 									<div
 										class="grid gap-4 {isMobile ? 'grid-cols-1' : ''}"
@@ -3632,7 +3645,7 @@
 										{/each}
 									</div>
 								</div>
-								{#if !bangumi.loading && bangumi.seasons.length > 0}
+								{#if !$bangumiState.loading && $bangumiState.seasons.length > 0}
 									<p class="mt-3 text-center text-xs text-purple-600">
 										不选择则仅下载{isCompactLayout ? '上方' : '左侧'}输入的当前季度
 									</p>
